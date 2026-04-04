@@ -26,6 +26,19 @@ echo "    Country   : $COUNTRY"
 
 echo "==> Checking adapter AP mode support..."
 if iw dev "$INTERFACE" info >/dev/null 2>&1; then
+    # Print USB bus info for the adapter
+    PHY=$(iw dev "$INTERFACE" info 2>/dev/null | awk '/wiphy/{print "phy" $2}')
+    SYS_PATH=$(find /sys/class/ieee80211/${PHY}/device -name "idVendor" 2>/dev/null | head -1 | xargs dirname 2>/dev/null || true)
+    if [ -n "$SYS_PATH" ]; then
+        VENDOR=$(cat "$SYS_PATH/idVendor" 2>/dev/null || echo "?")
+        PRODUCT=$(cat "$SYS_PATH/idProduct" 2>/dev/null || echo "?")
+        USB_INFO=$(lsusb 2>/dev/null | grep -i "${VENDOR}:${PRODUCT}" | head -1 || echo "(not found in lsusb)")
+        USB_SPEED=$(cat "$SYS_PATH/speed" 2>/dev/null || echo "unknown")
+        echo "    USB info  : $USB_INFO"
+        echo "    USB speed : ${USB_SPEED} Mbit/s"
+    else
+        echo "    USB info  : (could not determine — may not be a USB adapter)"
+    fi
     MODES=$(iw list 2>/dev/null | grep -A 20 "Supported interface modes" | grep "\* " || echo "    (unable to read)")
     echo "    Supported modes for $INTERFACE:"
     echo "$MODES"
