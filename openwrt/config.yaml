@@ -12,11 +12,13 @@ startup: services
 boot: manual
 init: false
 
-# KVM and network virtualization require elevated privileges
-privileged: true
+# KVM and network virtualization require full hardware access.
+# full_access is equivalent to Docker's privileged:true.
+# host_pid is required for the macvtap/veth network setup.
+# Note: after install you may need to disable the "Protection mode" toggle
+# in the add-on Info tab for host_pid and full_access to take effect.
+full_access: true
 host_pid: true
-devices:
-  - /dev/kvm
 
 ports:
   8006/tcp: 8006
