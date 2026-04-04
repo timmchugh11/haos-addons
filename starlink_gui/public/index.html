@@ -406,6 +406,8 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
+/* ── bypass mode ── */
+.bypass-active .router-item{display:none!important}
 </style>
 </head>
 <body>
@@ -421,7 +423,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
   <div class="spacer"></div>
   <div class="top-links">
     <a href="#dashboard" onclick="navigate('dashboard'); return false;">Home</a>
-    <a href="#router-status" onclick="navigate('router-status'); return false;">Network</a>
+    <a href="#router-status" class="router-item" onclick="navigate('router-status'); return false;">Network</a>
     <a href="#settings" onclick="navigate('settings'); return false;">Settings</a>
   </div>
   <span id="conn-status" class="conn-badge idle">Connecting</span>
@@ -464,25 +466,25 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
     Controls
   </a>
 
-  <div class="nav-divider"></div>
-  <div class="nav-group">Router</div>
-  <a href="#router-status" class="nav-link" data-page="router-status">
+  <div class="nav-divider router-item"></div>
+  <div class="nav-group router-item">Router</div>
+  <a href="#router-status" class="nav-link router-item" data-page="router-status">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
     Status
   </a>
-  <a href="#router-clients" class="nav-link" data-page="router-clients">
+  <a href="#router-clients" class="nav-link router-item" data-page="router-clients">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     Clients
   </a>
-  <a href="#router-interfaces" class="nav-link" data-page="router-interfaces">
+  <a href="#router-interfaces" class="nav-link router-item" data-page="router-interfaces">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="6" rx="1"/><rect x="3" y="13" width="18" height="6" rx="1"/><path d="M7 8h.01"/><path d="M7 16h.01"/><path d="M11 8h6"/><path d="M11 16h6"/></svg>
     Interfaces
   </a>
-  <a href="#router-ping-metrics" class="nav-link" data-page="router-ping-metrics">
+  <a href="#router-ping-metrics" class="nav-link router-item" data-page="router-ping-metrics">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6"/><path d="M6 20v-2"/><path d="M18 20v-10"/><path d="M3 20h18"/></svg>
     Ping Metrics
   </a>
-  <a href="#router-diagnostics" class="nav-link" data-page="router-diagnostics">
+  <a href="#router-diagnostics" class="nav-link router-item" data-page="router-diagnostics">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
     Diagnostics
   </a>
@@ -520,10 +522,10 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
       <div class="card"><div class="label">Obstruction Valid</div><div class="value" id="d-obst">—</div><div class="unit">s</div></div>
       <div class="card"><div class="label">Self Test</div><div class="value" id="d-snr">—</div></div>
       <div class="card"><div class="label">Alerts</div><div class="value" id="d-alerts">—</div></div>
-      <div class="card blue"><div class="label">WAN IP</div><div class="value" style="font-size:16px" id="rd-wan">—</div></div>
-      <div class="card"><div class="label">Router Uptime</div><div class="value" id="rd-uptime">—</div></div>
-      <div class="card"><div class="label">Total Clients</div><div class="value" id="rd-clients">—</div></div>
-      <div class="card"><div class="label">2.4 / 5 / Eth</div><div class="value" style="font-size:16px" id="rd-bands">—</div></div>
+      <div class="card blue router-item"><div class="label">WAN IP</div><div class="value" style="font-size:16px" id="rd-wan">—</div></div>
+      <div class="card router-item"><div class="label">Router Uptime</div><div class="value" id="rd-uptime">—</div></div>
+      <div class="card router-item"><div class="label">Total Clients</div><div class="value" id="rd-clients">—</div></div>
+      <div class="card router-item"><div class="label">2.4 / 5 / Eth</div><div class="value" style="font-size:16px" id="rd-bands">—</div></div>
     </div>
 
     <div style="height:20px"></div>
@@ -535,7 +537,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
       <div class="box-title">Dish Snapshot</div>
       <div id="dash-dish-summary"><span class="no-data">Load data to see summary</span></div>
     </div>
-    <div class="box">
+    <div class="box router-item">
       <div class="box-title">Router Snapshot</div>
       <div id="dash-router-summary"><span class="no-data">Load data to see summary</span></div>
     </div>
@@ -826,6 +828,16 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
     <div class="box">
+      <div class="box-title">Bypass Mode</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <label class="toggle-wrap" style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
+          <input type="checkbox" id="cfg-bypass-mode" onchange="setBypassMode(this.checked)" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer"/>
+          <span style="font-size:13px;color:var(--text2)">Hide all router info — useful when the Starlink router is bypassed / not present</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="box">
       <div class="box-title">Auto Refresh</div>
       <div class="form-row" style="align-items:center">
         <div class="form-group">
@@ -860,6 +872,7 @@ const cfg = {
 
 const STORAGE_KEYS = {
   refreshInterval: 'starlink_gui.refresh_interval_secs',
+  bypassMode:      'starlink_gui.bypass_mode',
 };
 
 let autoRefreshTimer = null;
@@ -990,7 +1003,20 @@ document.querySelectorAll('.nav-link').forEach(link => {
   });
 });
 
+function getBypassMode() {
+  try { return window.localStorage.getItem(STORAGE_KEYS.bypassMode) === '1'; } catch (_) { return false; }
+}
+
+function setBypassMode(enabled) {
+  try { window.localStorage.setItem(STORAGE_KEYS.bypassMode, enabled ? '1' : '0'); } catch (_) {}
+  document.body.classList.toggle('bypass-active', enabled);
+  const chk = document.getElementById('cfg-bypass-mode');
+  if (chk) chk.checked = enabled;
+  if (enabled && currentPage.startsWith('router-')) navigate('dashboard');
+}
+
 function navigate(page) {
+  if (getBypassMode() && page.startsWith('router-')) page = 'dashboard';
   document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
   currentPage = page;
@@ -2073,6 +2099,10 @@ async function init() {
   document.getElementById('cfg-router-host').value = cfg.routerHost;
   document.getElementById('cfg-router-port').value = cfg.routerPort;
   document.getElementById('cfg-interval').value    = String(getStoredRefreshInterval());
+
+  const bypass = getBypassMode();
+  document.getElementById('cfg-bypass-mode').checked = bypass;
+  document.body.classList.toggle('bypass-active', bypass);
 
   applyInterval(false);
   refreshDashboard();

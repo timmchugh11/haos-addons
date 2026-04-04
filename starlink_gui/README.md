@@ -23,6 +23,7 @@ open directly from the HA sidebar without publishing a separate public endpoint.
   - ping metrics
   - diagnostics
 - Auto-refresh support in the web UI
+- **Bypass mode** — hides all router pages and dashboard router cards when the Starlink router is not present (e.g., bypassed in favour of a third-party router)
 - Home Assistant ingress support plus optional direct access on port `3000`
 
 The UI is read-heavy by design. Dish control actions are available, but router
@@ -63,8 +64,12 @@ you can leave it internal and use ingress only.
 
 ## UI Notes
 
-- The default UI auto-refresh interval is `3` seconds
+- The default UI auto-refresh interval is `20` seconds
 - Device address overrides in the settings page are session-only
+- **Bypass mode** can be toggled in the Settings page. When enabled, all router
+  nav items, router dashboard cards, and the Router Snapshot box are hidden. The
+  setting persists in browser `localStorage`. Useful when the Starlink router is
+  bypassed and the router gRPC endpoint is unavailable.
 - Router pages are based on the fields your Starlink firmware actually returns;
   some fields may be sparse depending on hardware and firmware version
 
@@ -112,4 +117,4 @@ local Starlink devices.
 
 ## Current Version
 
-The add-on version is `1.0.7`.
+The add-on version is `1.0.8`.

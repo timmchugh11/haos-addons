@@ -24,10 +24,11 @@ thumbnails and more — accessible from any web browser.
 
 ### Starlink GUI
 
-[![version](https://img.shields.io/badge/version-1.0.7-blue.svg)](starlink_gui/config.yaml)
+[![version](https://img.shields.io/badge/version-1.0.8-blue.svg)](starlink_gui/config.yaml)
 
 Full router-style admin interface for your local Starlink dish and WiFi router. Connects
 directly to the dish via gRPC — no Starlink account or internet access required.
+Includes a bypass mode to hide all router pages when the Starlink router is not in use.
 
 **[Documentation](starlink_gui/README.md)**
 
