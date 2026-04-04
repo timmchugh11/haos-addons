@@ -1,0 +1,44 @@
+name: OpenWrt
+version: "1.0.0"
+slug: openwrt
+description: >-
+  OpenWrt virtual router running via QEMU/KVM with LuCI web interface.
+  Supports configurable LAN/WAN interfaces, WireGuard, Wi-Fi, and more.
+url: https://github.com/AlbrechtL/openwrt-docker
+arch:
+  - amd64
+  - aarch64
+startup: services
+boot: manual
+init: false
+
+# KVM and network virtualization require elevated privileges
+privileged: true
+host_pid: true
+devices:
+  - /dev/kvm
+
+ports:
+  8006/tcp: 8006
+  9000/tcp: 9000
+ports_description:
+  8006/tcp: "OpenWrt TTY console (web browser)"
+  9000/tcp: "OpenWrt LuCI web interface (HTTPS, requires forward_luci=true and lan_if=veth)"
+
+webui: http://[HOST]:[PORT:8006]/
+
+options:
+  wan_if: "host"
+  lan_if: "veth"
+  forward_luci: true
+  cpu_count: 1
+  ram_count: 256
+  debug: false
+
+schema:
+  wan_if: str
+  lan_if: str
+  forward_luci: bool
+  cpu_count: int
+  ram_count: int
+  debug: bool
