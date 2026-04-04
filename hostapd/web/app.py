@@ -351,6 +351,21 @@ def api_interfaces():
 # ---------------------------------------------------------------------------
 def _startup():
     print("==> Hostapd AP web manager starting...")
+
+    print("==> Scanning interfaces...")
+    ifaces = get_wireless_interfaces()
+    if ifaces:
+        for iface in ifaces:
+            info = get_interface_info(iface)
+            ap   = "AP:yes" if info.get("ap_supported") else "AP:no"
+            bands = "/".join(info.get("bands", [])) or "?"
+            usb  = f"  USB: {info['usb_info']}" if info.get("usb_info") else ""
+            spd  = f"  Speed: {info['usb_speed']}" if info.get("usb_speed") else ""
+            err  = f"  ERR: {info['error']}" if info.get("error") else ""
+            print(f"    {iface}  {ap}  bands={bands}{usb}{spd}{err}")
+    else:
+        print("    (no interfaces found)")
+
     if os.path.exists(CONFIG_FILE):
         print("==> Saved config found — applying on startup...")
         result = apply_config(load_config())
