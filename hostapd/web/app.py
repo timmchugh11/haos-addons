@@ -266,7 +266,10 @@ def api_interfaces():
 # Startup
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
+# ---------------------------------------------------------------------------
+# Startup — runs on import (gunicorn) and on direct execution
+# ---------------------------------------------------------------------------
+def _startup():
     print("==> Hostapd AP web manager starting...")
     if os.path.exists(CONFIG_FILE):
         print("==> Saved config found — applying on startup...")
@@ -274,4 +277,8 @@ if __name__ == "__main__":
         print(f"==> {result['message']}")
     else:
         print("==> No saved config yet — open the web UI to configure.")
-    app.run(host="0.0.0.0", port=8080, debug=False, threaded=True)
+
+_startup()
+
+if __name__ == "__main__":
+    pass
