@@ -1502,7 +1502,7 @@ async function loadLocation() {
     set('loc-src', typeof lat === 'number' && typeof lon === 'number' ? 'Yes' : 'No');
     const mapEl = document.getElementById('loc-map-link');
     if (typeof lat === 'number' && typeof lon === 'number') {
-      mapEl.innerHTML = `<div style="height:14px"></div><div class="box"><div class="box-title">Map Link</div><a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=12" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Open in OpenStreetMap ↗</a></div>`;
+      mapEl.innerHTML = `<div style="height:14px"></div><div class="box"><div class="box-title">Map Links</div><div class="btn-group"><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Open in Google Maps ↗</a><a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=12" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Open in OpenStreetMap ↗</a></div></div>`;
     } else {
       mapEl.innerHTML = '';
     }
