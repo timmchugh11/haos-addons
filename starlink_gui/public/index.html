@@ -214,6 +214,22 @@ main{
   color:var(--muted);
   border-bottom:1px solid var(--border);
 }
+.tbl thead th{
+  cursor:pointer;
+  user-select:none;
+  position:relative;
+  padding-right:24px;
+}
+.tbl thead th::after{
+  content:'';
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  opacity:0.35;
+}
+.tbl thead th.sort-asc::after{content:'▲';opacity:0.8}
+.tbl thead th.sort-desc::after{content:'▼';opacity:0.8}
 .tbl td{
   padding:9px 12px;
   border-bottom:1px solid rgba(255,255,255,0.04);
@@ -292,6 +308,24 @@ main{
 
 /* ── chart ── */
 .chart-wrap{position:relative;height:160px;width:100%}
+.chart-tip{
+  position:absolute;
+  pointer-events:none;
+  min-width:88px;
+  padding:8px 10px;
+  border:1px solid var(--border2);
+  border-radius:10px;
+  background:rgba(8,12,18,0.96);
+  color:var(--text);
+  box-shadow:0 10px 24px rgba(0,0,0,0.28);
+  font-size:12px;
+  line-height:1.35;
+  z-index:2;
+  transform:translate(-50%, calc(-100% - 10px));
+}
+.chart-tip[hidden]{display:none}
+.chart-tip .k{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.08em}
+.chart-tip .v{margin-top:3px;font-weight:600}
 canvas.chart{width:100%;height:100%;display:block}
 
 /* ── obstruction map ── */
@@ -831,6 +865,7 @@ const STORAGE_KEYS = {
 let autoRefreshTimer = null;
 let currentPage = 'dashboard';
 const pageLoaded = new Set();
+const tableSortState = new Map();
 
 function getStoredRefreshInterval() {
   try {
@@ -856,6 +891,91 @@ function preserveScroll(fn) {
   const top = main.scrollTop;
   fn();
   requestAnimationFrame(() => { main.scrollTop = top; });
+}
+
+function parseSortableValue(text) {
+  const raw = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (!raw || raw === '—') return { type: 'empty', value: '' };
+
+  const duration = raw.match(/^(?:(\d+)d\s*)?(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?$/i);
+  if (duration) {
+    const days = parseInt(duration[1] || '0', 10);
+    const hours = parseInt(duration[2] || '0', 10);
+    const mins = parseInt(duration[3] || '0', 10);
+    const secs = parseInt(duration[4] || '0', 10);
+    return { type: 'number', value: (((days * 24) + hours) * 60 + mins) * 60 + secs };
+  }
+
+  const bytes = raw.match(/^(-?\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB)$/i);
+  if (bytes) {
+    const unitPowers = { B: 0, KB: 1, MB: 2, GB: 3, TB: 4 };
+    const amount = parseFloat(bytes[1]);
+    const power = unitPowers[bytes[2].toUpperCase()] ?? 0;
+    return { type: 'number', value: amount * Math.pow(1024, power) };
+  }
+
+  const numericWithUnit = raw.match(/^(-?\d[\d,]*(?:\.\d+)?)\s*([a-z%]+)?$/i);
+  if (numericWithUnit) {
+    return { type: 'number', value: parseFloat(numericWithUnit[1].replace(/,/g, '')) };
+  }
+
+  return { type: 'text', value: raw.toLowerCase() };
+}
+
+function compareSortableValues(a, b) {
+  if (a.type === 'empty' && b.type === 'empty') return 0;
+  if (a.type === 'empty') return 1;
+  if (b.type === 'empty') return -1;
+  if (a.type === 'number' && b.type === 'number') return a.value - b.value;
+  return String(a.value).localeCompare(String(b.value), undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function getTableSortId(table) {
+  if (!table) return null;
+  if (table.dataset.sortId) return table.dataset.sortId;
+  const container = table.closest('[id]');
+  if (!container) return null;
+  const tables = Array.from(container.querySelectorAll('table.tbl'));
+  const index = Math.max(0, tables.indexOf(table));
+  return `${container.id}:${index}`;
+}
+
+function sortTableByHeader(th, forcedDirection = null) {
+  const table = th.closest('table');
+  const thead = table?.tHead;
+  const tbody = table?.tBodies?.[0];
+  if (!table || !thead || !tbody) return;
+
+  const headers = Array.from(thead.rows[0]?.cells || []);
+  const columnIndex = headers.indexOf(th);
+  if (columnIndex < 0) return;
+
+  const nextDirection = forcedDirection || (th.classList.contains('sort-asc') ? 'desc' : 'asc');
+  headers.forEach(header => header.classList.remove('sort-asc', 'sort-desc'));
+  th.classList.add(nextDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+
+  const rows = Array.from(tbody.rows);
+  rows.sort((rowA, rowB) => {
+    const valueA = parseSortableValue(rowA.cells[columnIndex]?.textContent || '');
+    const valueB = parseSortableValue(rowB.cells[columnIndex]?.textContent || '');
+    const result = compareSortableValues(valueA, valueB);
+    return nextDirection === 'asc' ? result : -result;
+  });
+
+  tbody.append(...rows);
+
+  const sortId = getTableSortId(table);
+  if (sortId) tableSortState.set(sortId, { columnIndex, direction: nextDirection });
+}
+
+function restoreTableSorts(root = document) {
+  root.querySelectorAll('table.tbl').forEach(table => {
+    const sortId = getTableSortId(table);
+    const state = sortId ? tableSortState.get(sortId) : null;
+    if (!state) return;
+    const th = table.tHead?.rows?.[0]?.cells?.[state.columnIndex];
+    if (th) sortTableByHeader(th, state.direction);
+  });
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1154,22 +1274,72 @@ async function loadDishyHistory() {
 function drawChart(id, data, color, unit) {
   const canvas = document.getElementById(id);
   const wrapper = canvas.parentElement;
+  let tip = wrapper.querySelector('.chart-tip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.className = 'chart-tip';
+    tip.hidden = true;
+    wrapper.appendChild(tip);
+  }
+
+  charts[id] = { id, canvas, wrapper, data, color, unit, hoverIndex: null, tip };
+  bindChartInteractions(id);
+  renderChart(id);
+}
+
+function bindChartInteractions(id) {
+  const chart = charts[id];
+  const { canvas } = chart;
+  if (canvas.dataset.tooltipBound === '1') return;
+  canvas.dataset.tooltipBound = '1';
+
+  canvas.addEventListener('mousemove', (event) => {
+    const current = charts[id];
+    if (!current?.points?.length) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    let nearestIndex = 0;
+    let nearestDistance = Infinity;
+    current.points.forEach((point, index) => {
+      const distance = Math.abs(point.x - x);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    });
+    current.hoverIndex = nearestIndex;
+    renderChart(id);
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    const current = charts[id];
+    if (!current) return;
+    current.hoverIndex = null;
+    renderChart(id);
+  });
+}
+
+function renderChart(id) {
+  const chart = charts[id];
+  if (!chart) return;
+
+  const { canvas, wrapper, data, color, unit, tip } = chart;
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   const w = wrapper.clientWidth || 800;
   const h = wrapper.clientHeight || 160;
-  // Pin CSS size to the wrapper so offsetWidth never drifts on re-read
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
   canvas.width = w * dpr;
   canvas.height = h * dpr;
-  ctx.scale(dpr, dpr);
-
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
   if (!data || data.length < 2) {
+    tip.hidden = true;
+    chart.points = [];
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.font = '13px Inter,sans-serif';
+    ctx.font = '13px sans-serif';
     ctx.fillText('No data', 10, h / 2);
     return;
   }
@@ -1179,37 +1349,65 @@ function drawChart(id, data, color, unit) {
   const ch = h - pad.top - pad.bottom;
   const maxV = Math.max(...data, 0.001);
   const minV = Math.min(...data, 0);
+  const range = Math.max(maxV - minV, 0.001);
+  const points = data.map((v, i) => ({
+    x: pad.left + (i / (data.length - 1)) * cw,
+    y: pad.top + ch - ((v - minV) / range) * ch,
+    value: v,
+    index: i,
+  }));
+  chart.points = points;
 
-  // grid
   ctx.strokeStyle = 'rgba(255,255,255,0.05)';
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const y = pad.top + ch - (i / 4) * ch;
-    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
-    const val = minV + (i / 4) * (maxV - minV);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(pad.left + cw, y);
+    ctx.stroke();
+    const val = minV + (i / 4) * range;
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.font = '10px Inter,sans-serif';
+    ctx.font = '10px sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(val.toFixed(1), pad.left - 4, y + 3);
   }
 
-  // line
   ctx.beginPath();
   ctx.strokeStyle = color;
   ctx.lineWidth = 1.5;
-  data.forEach((v, i) => {
-    const x = pad.left + (i / (data.length - 1)) * cw;
-    const y = pad.top + ch - ((v - minV) / (maxV - minV)) * ch;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  points.forEach((point, i) => {
+    if (i === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
   });
   ctx.stroke();
 
-  // fill
   ctx.lineTo(pad.left + cw, pad.top + ch);
   ctx.lineTo(pad.left, pad.top + ch);
   ctx.closePath();
   ctx.fillStyle = color + '22';
   ctx.fill();
+
+  if (chart.hoverIndex == null || !points[chart.hoverIndex]) {
+    tip.hidden = true;
+    return;
+  }
+
+  const point = points[chart.hoverIndex];
+  ctx.beginPath();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  tip.innerHTML = `<div class="v">${point.value.toFixed(3)} ${unit}</div>`;
+  tip.hidden = false;
+  const tipX = Math.min(Math.max(point.x, 52), w - 52);
+  const tipY = Math.max(point.y - 10, 16);
+  tip.style.left = `${tipX}px`;
+  tip.style.top = `${tipY}px`;
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1443,11 +1641,12 @@ async function loadRouterStatus() {
         <td>${n.clients5ghz ?? '—'}</td>
         <td>${(n.clientsEthernet ?? 0) + (n.clients2ghz ?? 0) + (n.clients5ghz ?? 0)}</td>
       </tr>`).join('');
-      hostedEl.innerHTML = `<table class="tbl">
+      hostedEl.innerHTML = `<table class="tbl" data-sort-id="router-status-networks">
         <thead><tr><th>IPv4 Range</th><th>IPv6</th><th>Ethernet</th><th>2.4 GHz</th><th>5 GHz</th><th>Total</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
     }
+    restoreTableSorts(hostedEl);
     preserveScroll(() => { el.innerHTML = renderJsonTable(data); });
     pageLoaded.add('router-status');
     set('rst-updated', 'Updated ' + now());
@@ -1511,7 +1710,7 @@ async function loadRouterClients() {
         </tr>`;
       }).join('');
       preserveScroll(() => {
-        tableEl.innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+        tableEl.innerHTML = `<div style="overflow-x:auto"><table class="tbl" data-sort-id="router-clients-list">
           <thead><tr>
             <th>Name</th><th>MAC</th><th>IP</th><th>Interface</th>
             <th>Signal</th><th>SNR</th><th>RX</th><th>TX</th><th>Uptime</th>
@@ -1519,6 +1718,7 @@ async function loadRouterClients() {
           <tbody>${rows}</tbody>
         </table></div>`;
       });
+      restoreTableSorts(tableEl);
     }
     set('rcl-updated', 'Updated ' + now());
   } catch(e) {
@@ -1585,7 +1785,7 @@ async function loadRouterInterfacesDetailed() {
           <td>${txPackets}</td>
         </tr>`;
       }).join('');
-      summaryEl.innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+      summaryEl.innerHTML = `<div style="overflow-x:auto"><table class="tbl" data-sort-id="router-interfaces-summary">
         <thead><tr>
           <th>Name</th><th>Type</th><th>Link</th><th>Speed</th><th>Duplex</th>
           <th>Autoneg</th><th>RX Bytes</th><th>RX Packets</th><th>TX Bytes</th><th>TX Packets</th>
@@ -1593,6 +1793,7 @@ async function loadRouterInterfacesDetailed() {
         <tbody>${rows}</tbody>
       </table></div>`;
     }
+    restoreTableSorts(summaryEl);
 
     pageLoaded.add('router-interfaces');
     set('rif-updated', 'Updated ' + now());
@@ -1642,13 +1843,14 @@ async function loadRouterPingMetricsDetailed() {
         <td>${e.latencyMs != null ? e.latencyMs.toFixed(3) : '—'}</td>
         <td>${e.dropRate != null ? (e.dropRate * 100).toFixed(2) + '%' : '0.00%'}</td>
       </tr>`).join('');
-      summaryEl.innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+      summaryEl.innerHTML = `<div style="overflow-x:auto"><table class="tbl" data-sort-id="router-ping-metrics-summary">
         <thead><tr>
           <th>Service</th><th>Location</th><th>Address</th><th>Key</th><th>Latency</th><th>Drop Rate</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`;
     }
+    restoreTableSorts(summaryEl);
 
     pageLoaded.add('router-ping-metrics');
     set('rpm-updated', 'Updated ' + now());
@@ -1848,6 +2050,12 @@ function fmtDuplex(v) {
 // ════════════════════════════════════════════════════════════════════
 
 async function init() {
+  document.addEventListener('click', (event) => {
+    const th = event.target.closest('.tbl thead th');
+    if (!th) return;
+    sortTableByHeader(th);
+  });
+
   // Load server-side defaults (from HA add-on options / env vars)
   try {
     const base = window.__BASE__ || '';
