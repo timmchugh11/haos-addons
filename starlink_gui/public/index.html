@@ -16,37 +16,34 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 :root{
-  /* backgrounds */
-  --bg:         #07080b;
-  --surface:    #0c0e14;
-  --surface2:   #12151d;
-  --surface3:   #181c26;
-  /* borders */
-  --border:     rgba(255,255,255,0.07);
-  --border2:    rgba(255,255,255,0.12);
-  /* brand */
-  --accent:     #009DFF;
-  --accent-dim: rgba(0,157,255,0.15);
-  --accent-glow:rgba(0,157,255,0.35);
+  --bg:         #0b0b0b;
+  --surface:    #111111;
+  --surface2:   #151515;
+  --surface3:   #1a1a1a;
+  --border:     #1a1a1a;
+  --border2:    #2a2a2a;
+  --accent:     #f2f2f2;
+  --accent-dim: rgba(255,255,255,0.06);
+  --accent-glow:rgba(255,255,255,0.08);
   /* semantic */
   --green:  #00D47E;
   --yellow: #FF9500;
   --red:    #FF3B30;
   /* text */
-  --text:   #FFFFFF;
-  --text2:  rgba(255,255,255,0.6);
-  --muted:  rgba(255,255,255,0.32);
+  --text:   #e6e6e6;
+  --text2:  #aaaaaa;
+  --muted:  #7a7a7a;
   /* layout */
-  --sidebar-w: 230px;
-  --header-h:  60px;
-  --radius-lg: 14px;
-  --radius-md: 10px;
-  --radius-sm: 7px;
+  --sidebar-w: 220px;
+  --header-h:  62px;
+  --radius-lg: 8px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
 }
 
 html,body{
   height:100%;
-  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
   background:var(--bg);
   color:var(--text);
   font-size:14px;
@@ -61,32 +58,39 @@ button{cursor:pointer;font-family:inherit;font-size:inherit}
 
 header{
   height:var(--header-h);
-  background:rgba(7,8,11,0.85);
-  backdrop-filter:blur(20px);
-  -webkit-backdrop-filter:blur(20px);
+  background:var(--bg);
   border-bottom:1px solid var(--border);
-  display:flex;align-items:center;padding:0 24px;gap:16px;
+  display:flex;align-items:center;padding:0 30px;gap:16px;
   position:sticky;top:0;z-index:100;
   flex-shrink:0;
 }
 header .logo{
   display:flex;align-items:center;gap:12px;
-  font-weight:700;font-size:15px;letter-spacing:0.02em;
+  font-weight:700;font-size:15px;letter-spacing:0.18em;text-transform:uppercase;
   color:var(--text);
 }
 header .logo-mark{
-  width:32px;height:32px;flex-shrink:0;
+  width:36px;height:36px;flex-shrink:0;display:block;object-fit:contain;
 }
 header .logo-wordmark{
   display:flex;flex-direction:column;line-height:1;
 }
-header .logo-wordmark .l1{font-size:13px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#fff}
-header .logo-wordmark .l2{font-size:10px;font-weight:500;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-top:1px}
+header .logo-wordmark .l1{font-size:20px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#fff}
+header .logo-wordmark .l2{font-size:10px;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-top:3px}
 header .spacer{flex:1}
+header .top-links{
+  display:flex;align-items:center;gap:20px;
+}
+header .top-links a{
+  color:var(--text2);
+  text-decoration:none;
+  font-size:14px;
+}
+header .top-links a:hover{color:#fff}
 header .conn-badge{
   display:inline-flex;align-items:center;gap:6px;
   font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-  padding:5px 12px;border-radius:20px;
+  padding:6px 12px;border-radius:999px;
 }
 header .conn-badge::before{
   content:"";display:block;width:6px;height:6px;border-radius:50%;
@@ -104,26 +108,26 @@ header .conn-badge.idle::before{background:var(--accent);animation:pulse 1.8s in
 /* ── sidebar ── */
 nav{
   width:var(--sidebar-w);flex-shrink:0;
-  background:var(--surface);
+  background:#0d0d0d;
   border-right:1px solid var(--border);
   overflow-y:auto;overflow-x:hidden;
-  padding:16px 0 24px;
+  padding:20px 0 24px;
   scrollbar-width:thin;scrollbar-color:var(--border) transparent;
 }
 nav .nav-group{
-  padding:20px 14px 6px;
-  font-size:10px;font-weight:600;
-  letter-spacing:0.14em;text-transform:uppercase;
+  padding:18px 20px 6px;
+  font-size:10px;font-weight:700;
+  letter-spacing:0.16em;text-transform:uppercase;
   color:var(--muted);
 }
-nav .nav-group:first-child{padding-top:8px}
+nav .nav-group:first-child{padding-top:0}
 nav .nav-divider{
-  height:1px;background:var(--border);margin:8px 14px;
+  height:1px;background:var(--border);margin:10px 20px;
 }
 nav a{
   display:flex;align-items:center;gap:10px;
-  padding:9px 14px;margin:1px 8px;
-  border-radius:var(--radius-sm);
+  padding:12px 20px;margin:0;
+  border-radius:0;
   color:var(--text2);
   font-size:13px;font-weight:500;
   transition:all .18s;
@@ -133,31 +137,31 @@ nav a svg{flex-shrink:0;opacity:0.6;transition:opacity .18s}
 nav a:hover{background:var(--surface2);color:var(--text)}
 nav a:hover svg{opacity:1}
 nav a.active{
-  background:var(--accent-dim);
-  color:var(--accent);
+  background:var(--surface3);
+  color:#fff;
   font-weight:600;
 }
-nav a.active svg{opacity:1;color:var(--accent)}
+nav a.active svg{opacity:1;color:#fff}
 
 /* ── main ── */
 main{
   flex:1;overflow-y:auto;overflow-x:hidden;
-  padding:28px 28px 48px;
+  padding:30px;
   scrollbar-width:thin;scrollbar-color:var(--border) transparent;
 }
 .page{display:none}
 .page.active{display:block}
 .page-title{
-  font-size:22px;font-weight:700;
-  letter-spacing:-0.01em;
-  margin-bottom:4px;
+  font-size:28px;font-weight:600;
+  letter-spacing:0;
+  margin-bottom:8px;
 }
-.page-sub{color:var(--text2);font-size:13px;margin-bottom:24px}
+.page-sub{color:var(--text2);font-size:14px;margin-bottom:24px}
 
 /* ── stat cards ── */
 .cards{
   display:grid;
-  gap:12px;
+  gap:15px;
   grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
   margin-bottom:24px;
 }
@@ -165,34 +169,34 @@ main{
   background:var(--surface);
   border:1px solid var(--border);
   border-radius:var(--radius-lg);
-  padding:18px 20px;
-  transition:border-color .2s;
+  padding:20px;
+  transition:border-color .2s, background-color .2s, box-shadow .2s;
 }
-.card:hover{border-color:var(--border2)}
+.card:hover{border-color:#333;background:var(--surface2);box-shadow:0 0 10px rgba(255,255,255,0.05)}
 .card .label{
-  font-size:10px;font-weight:600;
-  letter-spacing:0.12em;text-transform:uppercase;
+  font-size:12px;font-weight:500;
+  letter-spacing:0.04em;text-transform:none;
   color:var(--muted);margin-bottom:8px;
 }
-.card .value{font-size:26px;font-weight:700;line-height:1;word-break:break-all;letter-spacing:-0.02em}
+.card .value{font-size:28px;font-weight:500;line-height:1.1;word-break:break-all;letter-spacing:0}
 .card .unit{font-size:11px;color:var(--muted);margin-top:5px;font-weight:500}
 .card.green .value{color:var(--green)}
 .card.yellow .value{color:var(--yellow)}
 .card.red .value{color:var(--red)}
-.card.blue .value{color:var(--accent)}
-.card.blue{border-color:rgba(0,157,255,0.15)}
+.card.blue .value{color:#fff}
+.card.blue{border-color:var(--border)}
 
 /* ── box ── */
 .box{
   background:var(--surface);
   border:1px solid var(--border);
   border-radius:var(--radius-lg);
-  padding:22px 24px;
+  padding:20px;
   margin-bottom:16px;
 }
 .box-title{
-  font-size:13px;font-weight:600;
-  letter-spacing:0.02em;
+  font-size:14px;font-weight:500;
+  letter-spacing:0;
   margin-bottom:16px;
   display:flex;align-items:center;gap:8px;
   color:var(--text);
@@ -223,32 +227,32 @@ main{
 /* ── buttons ── */
 .btn{
   display:inline-flex;align-items:center;gap:7px;
-  padding:8px 18px;
+  padding:8px 14px;
   border-radius:var(--radius-sm);
   font-weight:600;font-size:12px;
-  letter-spacing:0.06em;text-transform:uppercase;
-  border:1px solid transparent;
+  letter-spacing:0.04em;text-transform:none;
+  border:1px solid var(--border2);
   transition:all .18s;
 }
 .btn-primary{
-  background:var(--accent);color:#fff;
-  border-color:var(--accent);
+  background:transparent;color:var(--text);
+  border-color:var(--border2);
 }
 .btn-primary:hover{
-  background:#33b3ff;
-  border-color:#33b3ff;
-  box-shadow:0 0 16px var(--accent-glow);
+  background:var(--surface2);
+  border-color:#555;
+  box-shadow:none;
 }
 .btn-danger{
-  background:rgba(255,59,48,0.1);color:var(--red);
+  background:transparent;color:var(--red);
   border-color:rgba(255,59,48,0.3);
 }
 .btn-danger:hover{background:var(--red);color:#fff;border-color:var(--red)}
 .btn-warn{
-  background:rgba(255,149,0,0.1);color:var(--yellow);
+  background:transparent;color:var(--yellow);
   border-color:rgba(255,149,0,0.3);
 }
-.btn-warn:hover{background:var(--yellow);color:#000;border-color:var(--yellow)}
+.btn-warn:hover{background:var(--surface2);color:#fff;border-color:#555}
 .btn-ghost{
   background:transparent;color:var(--text2);
   border-color:var(--border2);
@@ -318,7 +322,6 @@ canvas.chart{width:100%;height:100%;display:block}
   transition:border-color .18s;
 }
 .form-group input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
-
 /* ── toast ── */
 #toast-wrap{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:999}
 .toast{
@@ -348,7 +351,7 @@ canvas.chart{width:100%;height:100%;display:block}
 /* ── misc ── */
 .refresh-row{display:flex;align-items:center;gap:12px;margin-bottom:18px}
 .refresh-row .last-update{
-  font-size:11px;font-weight:500;
+  font-size:12px;font-weight:500;
   letter-spacing:0.04em;
   color:var(--muted);
 }
@@ -377,22 +380,16 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
 <!-- ── HEADER ── -->
 <header>
   <div class="logo">
-    <!-- Starlink-style dish / orbit mark -->
-    <svg class="logo-mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="16" cy="16" r="15" stroke="#009DFF" stroke-width="1.4"/>
-      <ellipse cx="16" cy="16" rx="15" ry="6" stroke="#009DFF" stroke-width="1" stroke-dasharray="2 2"/>
-      <circle cx="16" cy="16" r="3.5" fill="#009DFF" fill-opacity="0.3" stroke="#009DFF" stroke-width="1.2"/>
-      <line x1="16" y1="1" x2="16" y2="12.5" stroke="#009DFF" stroke-width="1" stroke-opacity="0.6"/>
-      <line x1="16" y1="19.5" x2="16" y2="31" stroke="#009DFF" stroke-width="1" stroke-opacity="0.6"/>
-      <line x1="1" y1="16" x2="12.5" y2="16" stroke="#009DFF" stroke-width="1" stroke-opacity="0.6"/>
-      <line x1="19.5" y1="16" x2="31" y2="16" stroke="#009DFF" stroke-width="1" stroke-opacity="0.6"/>
-    </svg>
     <div class="logo-wordmark">
       <span class="l1">Starlink</span>
-      <span class="l2">Network Admin</span>
     </div>
   </div>
   <div class="spacer"></div>
+  <div class="top-links">
+    <a href="#dashboard" onclick="navigate('dashboard'); return false;">Home</a>
+    <a href="#router-status" onclick="navigate('router-status'); return false;">Network</a>
+    <a href="#settings" onclick="navigate('settings'); return false;">Settings</a>
+  </div>
   <span id="conn-status" class="conn-badge idle">Connecting</span>
 </header>
 
@@ -435,8 +432,24 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
 
   <div class="nav-divider"></div>
   <div class="nav-group">Router</div>
-  <a href="#router-diagnostics" class="nav-link" data-page="router-diagnostics">
+  <a href="#router-status" class="nav-link" data-page="router-status">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+    Status
+  </a>
+  <a href="#router-clients" class="nav-link" data-page="router-clients">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Clients
+  </a>
+  <a href="#router-interfaces" class="nav-link" data-page="router-interfaces">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="6" rx="1"/><rect x="3" y="13" width="18" height="6" rx="1"/><path d="M7 8h.01"/><path d="M7 16h.01"/><path d="M11 8h6"/><path d="M11 16h6"/></svg>
+    Interfaces
+  </a>
+  <a href="#router-ping-metrics" class="nav-link" data-page="router-ping-metrics">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6"/><path d="M6 20v-2"/><path d="M18 20v-10"/><path d="M3 20h18"/></svg>
+    Ping Metrics
+  </a>
+  <a href="#router-diagnostics" class="nav-link" data-page="router-diagnostics">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
     Diagnostics
   </a>
 
@@ -465,20 +478,32 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
     </div>
 
     <div class="cards" id="dash-cards">
-      <div class="card"><div class="label">Dish Status</div><div class="value" id="d-state">—</div></div>
+      <div class="card"><div class="label">Dish Hardware</div><div class="value" style="font-size:16px" id="d-state">—</div></div>
       <div class="card blue"><div class="label">Downlink</div><div class="value" id="d-dl">—</div><div class="unit">Mbps</div></div>
       <div class="card blue"><div class="label">Uplink</div><div class="value" id="d-ul">—</div><div class="unit">Mbps</div></div>
       <div class="card"><div class="label">Latency</div><div class="value" id="d-lat">—</div><div class="unit">ms</div></div>
-      <div class="card"><div class="label">Uptime</div><div class="value" id="d-uptime">—</div></div>
-      <div class="card"><div class="label">Obstructed</div><div class="value" id="d-obst">—</div></div>
-      <div class="card"><div class="label">SNR Above Min</div><div class="value" id="d-snr">—</div></div>
+      <div class="card"><div class="label">Dish Uptime</div><div class="value" id="d-uptime">—</div></div>
+      <div class="card"><div class="label">Obstruction Valid</div><div class="value" id="d-obst">—</div><div class="unit">s</div></div>
+      <div class="card"><div class="label">Self Test</div><div class="value" id="d-snr">—</div></div>
       <div class="card"><div class="label">Alerts</div><div class="value" id="d-alerts">—</div></div>
+      <div class="card blue"><div class="label">WAN IP</div><div class="value" style="font-size:16px" id="rd-wan">—</div></div>
+      <div class="card"><div class="label">Router Uptime</div><div class="value" id="rd-uptime">—</div></div>
+      <div class="card"><div class="label">Total Clients</div><div class="value" id="rd-clients">—</div></div>
+      <div class="card"><div class="label">2.4 / 5 / Eth</div><div class="value" style="font-size:16px" id="rd-bands">—</div></div>
     </div>
 
     <div style="height:20px"></div>
     <div class="box">
       <div class="box-title">Dish Alerts</div>
       <div id="dash-alerts-list"><span class="no-data">Load data to see alerts</span></div>
+    </div>
+    <div class="box">
+      <div class="box-title">Dish Snapshot</div>
+      <div id="dash-dish-summary"><span class="no-data">Load data to see summary</span></div>
+    </div>
+    <div class="box">
+      <div class="box-title">Router Snapshot</div>
+      <div id="dash-router-summary"><span class="no-data">Load data to see summary</span></div>
     </div>
   </section>
 
@@ -556,9 +581,9 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
     <div class="box">
       <div class="box-title">Sky Obstruction View</div>
       <div id="obs-canvas-wrap"><canvas id="obs-canvas" width="400" height="400"></canvas></div>
-      <div class="cards" style="margin-top:14px">
-        <div class="card"><div class="label">Fraction Obstructed</div><div class="value" id="obs-frac">—</div></div>
-        <div class="card"><div class="label">Valid Samples</div><div class="value" id="obs-samples">—</div></div>
+    <div class="cards" style="margin-top:14px">
+        <div class="card"><div class="label">Grid Size</div><div class="value" id="obs-frac">—</div></div>
+        <div class="card"><div class="label">Tracked Cells</div><div class="value" id="obs-samples">—</div></div>
       </div>
     </div>
   </section>
@@ -576,7 +601,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
       <div class="card blue"><div class="label">Latitude</div><div class="value" id="loc-lat">—</div></div>
       <div class="card blue"><div class="label">Longitude</div><div class="value" id="loc-lon">—</div></div>
       <div class="card"><div class="label">Altitude (m)</div><div class="value" id="loc-alt">—</div></div>
-      <div class="card"><div class="label">Source</div><div class="value" style="font-size:14px" id="loc-src">—</div></div>
+      <div class="card"><div class="label">Fix Available</div><div class="value" style="font-size:14px" id="loc-src">—</div></div>
     </div>
     <div id="loc-map-link"></div>
     <div id="location-content"></div>
@@ -620,6 +645,107 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
       <span class="last-update" id="rdg-updated">Never updated</span>
     </div>
     <div id="router-diag-content"><span class="no-data">Click Refresh to load</span></div>
+  </section>
+
+  <!-- ════ ROUTER STATUS ════ -->
+  <section id="page-router-status" class="page">
+    <div class="page-title">Router Status</div>
+    <div class="page-sub">WAN address, device info, and live ping metrics</div>
+
+    <div class="refresh-row">
+      <button class="btn btn-primary btn-sm" onclick="loadRouterStatus()">Refresh</button>
+      <span class="last-update" id="rst-updated">Never updated</span>
+    </div>
+
+    <div class="cards">
+      <div class="card blue"><div class="label">WAN IP</div><div class="value" style="font-size:16px" id="rst-wan">—</div></div>
+      <div class="card"><div class="label">Ping Latency</div><div class="value" id="rst-lat">—</div><div class="unit">ms</div></div>
+      <div class="card"><div class="label">Ping Drop Rate</div><div class="value" id="rst-drop">—</div><div class="unit">%</div></div>
+      <div class="card"><div class="label">Uptime</div><div class="value" style="font-size:14px" id="rst-state">—</div></div>
+      <div class="card"><div class="label">Serial Number</div><div class="value" style="font-size:13px" id="rst-serial">—</div></div>
+      <div class="card"><div class="label">SKU</div><div class="value" style="font-size:13px" id="rst-sku">—</div></div>
+      <div class="card"><div class="label">Router ID</div><div class="value" style="font-size:13px" id="rnt-id">—</div></div>
+      <div class="card"><div class="label">Hardware</div><div class="value" style="font-size:13px" id="rnt-hw">—</div></div>
+      <div class="card"><div class="label">Software</div><div class="value" style="font-size:13px" id="rnt-sw">—</div></div>
+    </div>
+    <div class="box" style="margin-top:16px">
+      <div class="box-title">LAN Interfaces</div>
+      <div id="router-networks-hosted"><span class="no-data">Click Refresh to load</span></div>
+    </div>
+    <div id="router-status-content"></div>
+  </section>
+
+  <!-- ════ ROUTER CLIENTS ════ -->
+  <section id="page-router-clients" class="page">
+    <div class="page-title">Connected Clients</div>
+    <div class="page-sub">All devices currently connected to the router</div>
+
+    <div class="refresh-row">
+      <button class="btn btn-primary btn-sm" onclick="loadRouterClients()">Refresh</button>
+      <span class="last-update" id="rcl-updated">Never updated</span>
+    </div>
+
+    <div class="cards">
+      <div class="card blue"><div class="label">Total Clients</div><div class="value" id="rcl-total">—</div></div>
+      <div class="card"><div class="label">Ethernet</div><div class="value" id="rcl-eth">—</div></div>
+      <div class="card"><div class="label">2.4 GHz</div><div class="value" id="rcl-2g">—</div></div>
+      <div class="card"><div class="label">5 GHz</div><div class="value" id="rcl-5g">—</div></div>
+    </div>
+
+    <div class="box" style="margin-top:16px">
+      <div class="box-title">Client List</div>
+      <div id="router-clients-table"><span class="no-data">Click Refresh to load</span></div>
+    </div>
+  </section>
+
+  <!-- ════ ROUTER INTERFACES ════ -->
+  <section id="page-router-interfaces" class="page">
+    <div class="page-title">Router Interfaces</div>
+    <div class="page-sub">Read-only network interface data from <code>getNetworkInterfaces</code></div>
+
+    <div class="refresh-row">
+      <button class="btn btn-primary btn-sm" onclick="loadRouterInterfaces()">Refresh</button>
+      <span class="last-update" id="rif-updated">Never updated</span>
+    </div>
+
+    <div class="cards">
+      <div class="card blue"><div class="label">Interfaces</div><div class="value" id="rif-total">—</div></div>
+      <div class="card"><div class="label">Ethernet</div><div class="value" id="rif-eth">—</div></div>
+      <div class="card"><div class="label">WiFi</div><div class="value" id="rif-wifi">—</div></div>
+      <div class="card"><div class="label">Linked</div><div class="value" id="rif-linked">—</div></div>
+    </div>
+
+    <div class="box">
+      <div class="box-title">Interface Summary</div>
+      <div id="router-interfaces-summary"><span class="no-data">Click Refresh to load</span></div>
+    </div>
+
+  </section>
+
+  <!-- ════ ROUTER PING METRICS ════ -->
+  <section id="page-router-ping-metrics" class="page">
+    <div class="page-title">Router Ping Metrics</div>
+    <div class="page-sub">Read-only metrics from <code>getPing</code></div>
+
+    <div class="refresh-row">
+      <button class="btn btn-primary btn-sm" onclick="loadRouterPingMetrics()">Refresh</button>
+      <span class="last-update" id="rpm-updated">Never updated</span>
+    </div>
+
+    <div class="cards">
+      <div class="card blue"><div class="label">Targets</div><div class="value" id="rpm-total">—</div></div>
+      <div class="card green"><div class="label">Reachable</div><div class="value" id="rpm-ok">—</div></div>
+      <div class="card red"><div class="label">Dropped</div><div class="value" id="rpm-drop">—</div></div>
+      <div class="card"><div class="label">Best Latency</div><div class="value" id="rpm-best">—</div><div class="unit">ms</div></div>
+      <div class="card"><div class="label">Worst Latency</div><div class="value" id="rpm-worst">—</div><div class="unit">ms</div></div>
+      <div class="card"><div class="label">Average</div><div class="value" id="rpm-avg">—</div><div class="unit">ms</div></div>
+    </div>
+
+    <div class="box">
+      <div class="box-title">Ping Targets</div>
+      <div id="router-ping-metrics-summary"><span class="no-data">Click Refresh to load</span></div>
+    </div>
+
   </section>
 
   <!-- ════ SETTINGS ════ -->
@@ -737,6 +863,10 @@ function autoLoad(page) {
     'dishy-history': loadDishyHistory,
     'dishy-obstruction': loadObstruction,
     'dishy-location': loadLocation,
+    'router-status': loadRouterStatus,
+    'router-clients': loadRouterClients,
+    'router-interfaces': loadRouterInterfaces,
+    'router-ping-metrics': loadRouterPingMetrics,
     'router-diagnostics': loadRouterDiag,
   };
   if (map[page]) map[page]();
@@ -785,22 +915,37 @@ function toast(msg, type = 'info', dur = 4000) {
 async function refreshDashboard() {
   updateConnStatus('idle', 'Fetching…');
   try {
-    const status = await apiFetch('/dishy/status');
+    const [status, diagnostics, routerStatus, routerClients, routerNetworks] = await Promise.all([
+      apiFetch('/dishy/status'),
+      apiFetch('/dishy/diagnostics'),
+      apiFetch('/router/status'),
+      apiFetch('/router/clients'),
+      apiFetch('/router/networks'),
+    ]);
     const dev = status.deviceState || {};
-    const dish = status.dishStats || {};
-    const alerts = status.alerts || {};
+    const alerts = status.alerts || diagnostics.alerts || {};
+    const routerDev = routerStatus.deviceState || {};
+    const networks = routerNetworks.networks || [];
+    const clients = routerClients.clients || [];
+    const firstLan = networks[0] || {};
 
     const uptime = dev.uptimeS != null ? fmtUptime(dev.uptimeS) : '—';
-    const dl = dish.downlinkThroughputBps != null ? (dish.downlinkThroughputBps / 1e6).toFixed(1) : '—';
-    const ul = dish.uplinkThroughputBps != null ? (dish.uplinkThroughputBps / 1e6).toFixed(1) : '—';
-    const lat = dish.popPingLatencyMs != null ? dish.popPingLatencyMs.toFixed(1) : '—';
-    const obst = dish.fractionObstructedOvr60s != null ? (dish.fractionObstructedOvr60s * 100).toFixed(1) + '%' : '—';
-    const snr = dish.snrAboveNoiseFloor != null ? (dish.snrAboveNoiseFloor ? 'Yes' : 'No') : '—';
+    const dl = status.downlinkThroughputBps != null ? (status.downlinkThroughputBps / 1e6).toFixed(1) : '—';
+    const ul = status.uplinkThroughputBps != null ? (status.uplinkThroughputBps / 1e6).toFixed(1) : '—';
+    const lat = status.popPingLatencyMs != null ? status.popPingLatencyMs.toFixed(1) : '—';
+    const obst = status.obstructionStats?.validS != null ? String(status.obstructionStats.validS) : '—';
+    const snr = diagnostics.hardwareSelfTest ?? '—';
+    const dishHw = status.deviceInfo?.hardwareVersion ?? '—';
+    const routerUptime = routerDev.uptimeS != null ? fmtUptime(routerDev.uptimeS) : '—';
+    const wan = routerStatus.ipv4WanAddress ?? '—';
+    const totalClients = clients.length;
+    const eth = firstLan.clientsEthernet ?? clients.filter(c => c.iface === 1).length;
+    const g2 = firstLan.clients2ghz ?? clients.filter(c => c.iface === 2).length;
+    const g5 = firstLan.clients5ghz ?? clients.filter(c => c.iface === 3).length;
 
-    const state = dev.state || status.state || '—';
     const activeAlerts = Object.entries(alerts).filter(([,v]) => v === true);
 
-    set('d-state', state);
+    set('d-state', dishHw);
     set('d-dl', dl);
     set('d-ul', ul);
     set('d-lat', lat);
@@ -808,12 +953,17 @@ async function refreshDashboard() {
     set('d-obst', obst);
     set('d-snr', snr);
     set('d-alerts', activeAlerts.length);
+    set('rd-wan', wan);
+    set('rd-uptime', routerUptime);
+    set('rd-clients', String(totalClients));
+    set('rd-bands', `${g2} / ${g5} / ${eth}`);
 
     // colour
     colorCard('d-dl', parseFloat(dl) > 50 ? 'blue' : parseFloat(dl) > 10 ? 'yellow' : 'red');
     colorCard('d-ul', parseFloat(ul) > 10 ? 'blue' : parseFloat(ul) > 2 ? 'yellow' : 'red');
     colorCard('d-lat', parseFloat(lat) < 80 ? 'green' : parseFloat(lat) < 200 ? 'yellow' : 'red');
     colorCard('d-alerts', activeAlerts.length === 0 ? 'green' : 'red');
+    colorCard('rd-clients', totalClients > 0 ? 'blue' : 'yellow');
 
     const alertsEl = document.getElementById('dash-alerts-list');
     if (activeAlerts.length === 0) {
@@ -825,6 +975,33 @@ async function refreshDashboard() {
         `<span class="alert-chip clear">${fmtKey(k)}</span>`
       ).join('');
     }
+
+    const dishSummary = {
+      id: status.deviceInfo?.id ?? '—',
+      hardwareVersion: status.deviceInfo?.hardwareVersion ?? '—',
+      softwareVersion: status.deviceInfo?.softwareVersion ?? '—',
+      countryCode: status.deviceInfo?.countryCode ?? '—',
+      stowed: diagnostics.stowed ?? '—',
+      disablementCode: diagnostics.disablementCode ?? '—',
+      boresightAzimuthDeg: diagnostics.alignmentStats?.boresightAzimuthDeg ?? '—',
+      boresightElevationDeg: diagnostics.alignmentStats?.boresightElevationDeg ?? '—',
+      desiredAzimuthDeg: diagnostics.alignmentStats?.desiredBoresightAzimuthDeg ?? '—',
+      desiredElevationDeg: diagnostics.alignmentStats?.desiredBoresightElevationDeg ?? '—',
+    };
+    const routerSummary = {
+      id: routerStatus.deviceInfo?.id ?? routerNetworks.id ?? '—',
+      hardwareVersion: routerStatus.deviceInfo?.hardwareVersion ?? routerNetworks.hardwareVersion ?? '—',
+      softwareVersion: routerStatus.deviceInfo?.softwareVersion ?? routerNetworks.softwareVersion ?? '—',
+      countryCode: routerStatus.deviceInfo?.countryCode ?? '—',
+      wanIp: wan,
+      lanIpv4: firstLan.ipv4 ?? '—',
+      lanIpv6Count: Array.isArray(firstLan.ipv6) ? firstLan.ipv6.length : 0,
+      clientsEthernet: eth,
+      clients2ghz: g2,
+      clients5ghz: g5,
+    };
+    document.getElementById('dash-dish-summary').innerHTML = renderKVTable(dishSummary);
+    document.getElementById('dash-router-summary').innerHTML = renderKVTable(routerSummary);
 
     set('dash-updated', 'Updated ' + now());
     updateConnStatus('ok', 'Connected');
@@ -877,6 +1054,15 @@ async function loadDishyDiagnostics() {
 function renderDiagnostics(d) {
   let html = '';
 
+  if (d.location || d.alignmentStats || d.stowed != null || d.disablementCode != null || d.hardwareSelfTest != null) {
+    html += `<div class="cards">`;
+    html += `<div class="card ${d.stowed ? 'yellow' : 'green'}"><div class="label">Stowed</div><div class="value">${d.stowed == null ? '—' : (d.stowed ? 'Yes' : 'No')}</div></div>`;
+    html += `<div class="card"><div class="label">Self Test</div><div class="value">${d.hardwareSelfTest ?? '—'}</div></div>`;
+    html += `<div class="card"><div class="label">Disablement</div><div class="value">${d.disablementCode ?? '—'}</div></div>`;
+    html += `<div class="card"><div class="label">UTC Offset</div><div class="value">${d.utcOffsetS ?? '—'}</div><div class="unit">s</div></div>`;
+    html += `</div>`;
+  }
+
   // Alerts section
   if (d.alerts) {
     const active = Object.entries(d.alerts).filter(([,v]) => v);
@@ -894,8 +1080,12 @@ function renderDiagnostics(d) {
     html += renderKVBox('Location', d.location);
   }
 
+  if (d.alignmentStats) {
+    html += renderKVBox('Alignment', d.alignmentStats);
+  }
+
   // Everything else
-  const skip = new Set(['alerts','location']);
+  const skip = new Set(['alerts','location','alignmentStats','stowed','disablementCode','hardwareSelfTest','utcOffsetS']);
   const rest = Object.fromEntries(Object.entries(d).filter(([k]) => !skip.has(k)));
   if (Object.keys(rest).length) html += renderJsonTable(rest);
 
@@ -1008,8 +1198,10 @@ async function loadObstruction() {
   try {
     const data = await apiFetch('/dishy/obstruction-map');
     drawObstructionMap(data);
-    set('obs-frac',    data.fractionObstructed != null ? (data.fractionObstructed * 100).toFixed(2) + '%' : '—');
-    set('obs-samples', data.numRows != null ? String(data.numRows * (data.numCols || 0)) : '—');
+    const totalCells = (data.numRows || 0) * (data.numCols || 0);
+    const trackedCells = Array.isArray(data.snr) ? data.snr.filter(v => typeof v === 'number' && v >= 0).length : 0;
+    set('obs-frac',    totalCells ? `${data.numRows} x ${data.numCols}` : '—');
+    set('obs-samples', trackedCells ? trackedCells.toLocaleString() : '0');
     set('obs-updated', 'Updated ' + now());
   } catch(e) {
     toast('Obstruction error: ' + e.message, 'err');
@@ -1086,7 +1278,7 @@ async function loadLocation() {
     set('loc-lat', typeof lat === 'number' ? lat.toFixed(6) : '—');
     set('loc-lon', typeof lon === 'number' ? lon.toFixed(6) : '—');
     set('loc-alt', typeof alt === 'number' ? alt.toFixed(1) : '—');
-    set('loc-src', data.source ?? '—');
+    set('loc-src', typeof lat === 'number' && typeof lon === 'number' ? 'Yes' : 'No');
     const mapEl = document.getElementById('loc-map-link');
     if (typeof lat === 'number' && typeof lon === 'number') {
       mapEl.innerHTML = `<div style="height:14px"></div><div class="box"><div class="box-title">Map Link</div><a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=12" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Open in OpenStreetMap ↗</a></div>`;
@@ -1186,6 +1378,262 @@ function renderRouterDiag(d) {
   if (Object.keys(rest).length) html += renderJsonTable(rest);
 
   return html || renderJsonTable(d);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ROUTER STATUS
+// ════════════════════════════════════════════════════════════════════
+
+async function loadRouterStatus() {
+  if (!pageLoaded.has('router-status')) {
+    document.getElementById('router-status-content').innerHTML =
+      '<span class="skeleton" style="width:100%;height:120px;display:block"></span>';
+    document.getElementById('router-networks-hosted').innerHTML =
+      '<span class="skeleton" style="width:100%;height:120px;display:block"></span>';
+  }
+  try {
+    const [data, netData] = await Promise.all([
+      apiFetch('/router/status'),
+      apiFetch('/router/networks'),
+    ]);
+    const uptime = data.deviceState?.uptimeS != null ? fmtClockDuration(data.deviceState.uptimeS) : '—';
+    set('rst-wan',    data.ipv4WanAddress   ?? '—');
+    set('rst-lat',    data.pingLatencyMs    != null ? data.pingLatencyMs.toFixed(1) : '—');
+    set('rst-drop',   data.pingDropRate     != null ? (data.pingDropRate * 100).toFixed(2) : '—');
+    set('rst-state',  uptime);
+    set('rst-serial', data.serialNumber ?? data.deviceInfo?.id ?? '—');
+    set('rst-sku',    data.sku ?? data.deviceInfo?.hardwareVersion ?? '—');
+    set('rnt-id', netData.id ?? '—');
+    set('rnt-hw', netData.hardwareVersion ?? '—');
+    set('rnt-sw', netData.softwareVersion ?? '—');
+    const el = document.getElementById('router-status-content');
+    const hostedEl = document.getElementById('router-networks-hosted');
+    const networks = netData.networks || [];
+    if (!networks.length) {
+      hostedEl.innerHTML = '<span class="no-data">No LAN interfaces reported</span>';
+    } else {
+      const rows = networks.map(n => `<tr>
+        <td style="color:var(--text);font-weight:600">${n.ipv4 ?? '—'}</td>
+        <td>${(n.ipv6 || []).join('<br>') || '—'}</td>
+        <td>${n.clientsEthernet ?? '—'}</td>
+        <td>${n.clients2ghz ?? '—'}</td>
+        <td>${n.clients5ghz ?? '—'}</td>
+        <td>${(n.clientsEthernet ?? 0) + (n.clients2ghz ?? 0) + (n.clients5ghz ?? 0)}</td>
+      </tr>`).join('');
+      hostedEl.innerHTML = `<table class="tbl">
+        <thead><tr><th>IPv4 Range</th><th>IPv6</th><th>Ethernet</th><th>2.4 GHz</th><th>5 GHz</th><th>Total</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    }
+    preserveScroll(() => { el.innerHTML = renderJsonTable(data); });
+    pageLoaded.add('router-status');
+    set('rst-updated', 'Updated ' + now());
+  } catch(e) {
+    document.getElementById('router-status-content').innerHTML = renderError(e);
+    document.getElementById('router-networks-hosted').innerHTML = renderError(e);
+    toast('Router status error: ' + e.message, 'err');
+    set('rst-updated', 'Error');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ROUTER CLIENTS
+// ════════════════════════════════════════════════════════════════════
+
+const IFACE_LABEL = { 0: 'Unknown', 1: 'Ethernet', 2: '2.4 GHz', 3: '5 GHz' };
+
+async function loadRouterClients() {
+  try {
+    const data = await apiFetch('/router/clients');
+    const clients = data.clients || [];
+
+    let eth = 0, g2 = 0, g5 = 0;
+    clients.forEach(c => {
+      if      (c.iface === 1) eth++;
+      else if (c.iface === 2) g2++;
+      else if (c.iface === 3) g5++;
+    });
+
+    set('rcl-total', String(clients.length));
+    set('rcl-eth',   String(eth));
+    set('rcl-2g',    String(g2));
+    set('rcl-5g',    String(g5));
+
+    const tableEl = document.getElementById('router-clients-table');
+    if (!clients.length) {
+      tableEl.innerHTML = '<span class="no-data">No clients connected</span>';
+    } else {
+      const rows = clients.map(c => {
+        const iface = IFACE_LABEL[c.iface] ?? '—';
+        const signal = c.signalStrength != null ? c.signalStrength + ' dBm' : '—';
+        const snr = c.snr != null ? c.snr + ' dB' : '—';
+        const uptime = c.associatedTimeS != null ? fmtClockDuration(c.associatedTimeS) : '—';
+        const rxBytes = c.rxStats?.bytes != null ? fmtBytes(c.rxStats.bytes) : '—';
+        const txBytes = c.txStats?.bytes != null ? fmtBytes(c.txStats.bytes) : '—';
+        const mac = c.macAddress || c.mac || '—';
+        const ip = c.ipAddress || c.ipv4Address || c.ipv4 || '—';
+        const rawName = c.name || c.hostname || c.dhcpName || '';
+        const displayName = rawName || (ip !== '—' ? ip : mac);
+        const deviceLabel = rawName ? escHtml(rawName) : `<span class="muted">${escHtml(displayName)}</span>`;
+        return `<tr>
+          <td style="color:var(--text)">${deviceLabel}</td>
+          <td>${escHtml(mac)}</td>
+          <td>${escHtml(ip)}</td>
+          <td><span class="pill ${c.iface === 1 ? 'ok' : 'idle'}">${iface}</span></td>
+          <td>${signal}</td>
+          <td>${snr}</td>
+          <td>${rxBytes}</td>
+          <td>${txBytes}</td>
+          <td>${uptime}</td>
+        </tr>`;
+      }).join('');
+      preserveScroll(() => {
+        tableEl.innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+          <thead><tr>
+            <th>Name</th><th>MAC</th><th>IP</th><th>Interface</th>
+            <th>Signal</th><th>SNR</th><th>RX</th><th>TX</th><th>Uptime</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+      });
+    }
+    set('rcl-updated', 'Updated ' + now());
+  } catch(e) {
+    document.getElementById('router-clients-table').innerHTML = renderError(e);
+    toast('Clients error: ' + e.message, 'err');
+    set('rcl-updated', 'Error');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ROUTER WIFI NETWORKS
+// ════════════════════════════════════════════════════════════════════
+
+const BAND_LABEL = { 0: 'Unknown', 1: '2.4 GHz', 2: '5 GHz' };
+
+function loadRouterInterfaces() {
+  return loadRouterInterfacesDetailed();
+}
+
+function loadRouterPingMetrics() {
+  return loadRouterPingMetricsDetailed();
+}
+
+async function loadRouterInterfacesDetailed() {
+  const summaryEl = document.getElementById('router-interfaces-summary');
+  if (!pageLoaded.has('router-interfaces')) {
+    summaryEl.innerHTML = '<span class="skeleton" style="width:100%;height:120px;display:block"></span>';
+  }
+  try {
+    const data = await apiFetch('/router/interfaces');
+    const interfaces = data.networkInterfaces || data.getNetworkInterfaces?.networkInterfaces || [];
+    const ethernet = interfaces.filter(i => i.ethernet).length;
+    const wifi = interfaces.filter(i => i.wifi).length;
+    const linked = interfaces.filter(i => i.ethernet?.linkDetected).length;
+
+    set('rif-total', String(interfaces.length));
+    set('rif-eth', String(ethernet));
+    set('rif-wifi', String(wifi));
+    set('rif-linked', String(linked));
+
+    if (!interfaces.length) {
+      summaryEl.innerHTML = '<span class="no-data">No interfaces reported</span>';
+    } else {
+      const rows = interfaces.map(i => {
+        const rxBytes = fmtBytes(i.rxStats?.bytes);
+        const rxPackets = i.rxStats?.packets != null ? i.rxStats.packets.toLocaleString() : '—';
+        const txBytes = fmtBytes(i.txStats?.bytes);
+        const txPackets = i.txStats?.packets != null ? i.txStats.packets.toLocaleString() : '—';
+        const type = i.ethernet ? 'Ethernet' : i.wifi ? 'WiFi' : 'Bridge/Other';
+        const link = i.ethernet?.linkDetected == null ? '—' : (i.ethernet.linkDetected ? 'Linked' : 'Down');
+        const speed = i.ethernet?.speedMbps != null ? `${i.ethernet.speedMbps} Mbps` : '—';
+        const duplex = fmtDuplex(i.ethernet?.duplex);
+        const autoneg = i.ethernet?.autonegotiationOn == null ? '—' : (i.ethernet.autonegotiationOn ? 'On' : 'Off');
+        return `<tr>
+          <td style="color:var(--text)">${i.name || '—'}</td>
+          <td>${type}</td>
+          <td>${link}</td>
+          <td>${speed}</td>
+          <td>${duplex}</td>
+          <td>${autoneg}</td>
+          <td>${rxBytes}</td>
+          <td>${rxPackets}</td>
+          <td>${txBytes}</td>
+          <td>${txPackets}</td>
+        </tr>`;
+      }).join('');
+      summaryEl.innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+        <thead><tr>
+          <th>Name</th><th>Type</th><th>Link</th><th>Speed</th><th>Duplex</th>
+          <th>Autoneg</th><th>RX Bytes</th><th>RX Packets</th><th>TX Bytes</th><th>TX Packets</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+    }
+
+    pageLoaded.add('router-interfaces');
+    set('rif-updated', 'Updated ' + now());
+  } catch(e) {
+    summaryEl.innerHTML = renderError(e);
+    toast('Router interfaces error: ' + e.message, 'err');
+    set('rif-updated', 'Error');
+  }
+}
+
+async function loadRouterPingMetricsDetailed() {
+  const summaryEl = document.getElementById('router-ping-metrics-summary');
+  if (!pageLoaded.has('router-ping-metrics')) {
+    summaryEl.innerHTML = '<span class="skeleton" style="width:100%;height:120px;display:block"></span>';
+  }
+  try {
+    const data = await apiFetch('/router/ping-metrics');
+    const results = data.results || data.getPing?.results || [];
+    const entries = results.map(r => ({
+      key: r.key,
+      service: r.value?.target?.service ?? '—',
+      location: r.value?.target?.location ?? '—',
+      address: r.value?.target?.address ?? r.key ?? '—',
+      latencyMs: r.value?.latencyMs,
+      dropRate: r.value?.dropRate,
+    }));
+
+    const latencies = entries.map(e => e.latencyMs).filter(v => typeof v === 'number');
+    const dropped = entries.filter(e => (e.dropRate ?? 0) > 0 || e.latencyMs == null).length;
+    const reachable = entries.length - dropped;
+
+    set('rpm-total', String(entries.length));
+    set('rpm-ok', String(reachable));
+    set('rpm-drop', String(dropped));
+    set('rpm-best', latencies.length ? Math.min(...latencies).toFixed(1) : '—');
+    set('rpm-worst', latencies.length ? Math.max(...latencies).toFixed(1) : '—');
+    set('rpm-avg', latencies.length ? avg(latencies).toFixed(1) : '—');
+
+    if (!entries.length) {
+      summaryEl.innerHTML = '<span class="no-data">No ping targets returned</span>';
+    } else {
+      const rows = entries.map(e => `<tr>
+        <td style="color:var(--text)">${e.service}</td>
+        <td>${e.location}</td>
+        <td>${e.address}</td>
+        <td>${e.key || '—'}</td>
+        <td>${e.latencyMs != null ? e.latencyMs.toFixed(3) : '—'}</td>
+        <td>${e.dropRate != null ? (e.dropRate * 100).toFixed(2) + '%' : '0.00%'}</td>
+      </tr>`).join('');
+      summaryEl.innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+        <thead><tr>
+          <th>Service</th><th>Location</th><th>Address</th><th>Key</th><th>Latency</th><th>Drop Rate</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+    }
+
+    pageLoaded.add('router-ping-metrics');
+    set('rpm-updated', 'Updated ' + now());
+  } catch(e) {
+    summaryEl.innerHTML = renderError(e);
+    toast('Router ping error: ' + e.message, 'err');
+    set('rpm-updated', 'Error');
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1312,6 +1760,24 @@ function now() {
   return new Date().toLocaleTimeString();
 }
 
+function escHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function fmtClockDuration(s) {
+  if (s == null) return '—';
+  const total = Math.max(0, Math.floor(Number(s) || 0));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  return `${h}h ${m}m ${sec}s`;
+}
+
 function fmtUptime(s) {
   const d = Math.floor(s / 86400);
   const h = Math.floor((s % 86400) / 3600);
@@ -1334,6 +1800,21 @@ function fmtKey(k) {
 function avg(arr) {
   if (!arr || !arr.length) return 0;
   return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function fmtBytes(b) {
+  if (b == null) return '—';
+  if (b < 1024) return b + ' B';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+  if (b < 1024 * 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + ' MB';
+  return (b / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+}
+
+function fmtDuplex(v) {
+  if (v == null) return '—';
+  if (v === 1) return 'Half';
+  if (v === 2) return 'Full';
+  return String(v);
 }
 
 // ════════════════════════════════════════════════════════════════════
