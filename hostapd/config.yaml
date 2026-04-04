@@ -1,0 +1,36 @@
+name: Hostapd AP
+version: "0.1.0"
+slug: hostapd
+description: >-
+  Simple WiFi access point using hostapd and dnsmasq.
+  Requires a USB WiFi adapter that supports AP mode (e.g. wlan0).
+url: https://github.com/timmchugh11/haos-addons
+arch:
+  - amd64
+  - aarch64
+  - armv7
+  - armhf
+  - i386
+startup: services
+boot: manual
+init: false
+
+# Runs in the host network namespace so it can see WiFi adapters directly.
+host_network: true
+privileged:
+  - NET_ADMIN
+  - SYS_ADMIN
+
+options:
+  interface: "wlan0"
+  ssid: "HomeAssistant-AP"
+  password: "changeme123"
+  channel: 6
+  country_code: "US"
+
+schema:
+  interface: str
+  ssid: str
+  password: str
+  channel: "int(1,13)"
+  country_code: str

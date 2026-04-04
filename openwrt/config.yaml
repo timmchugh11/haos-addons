@@ -1,6 +1,6 @@
-name: OpenWrt
-version: "0.3.0"
-slug: openwrt
+#name: OpenWrt
+#version: "0.3.0"
+#slug: openwrt
 description: >-
   OpenWrt virtual router running via QEMU/KVM with LuCI web interface.
   Supports configurable LAN/WAN interfaces, WireGuard, Wi-Fi, and more.
