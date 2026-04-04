@@ -796,7 +796,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
       <div class="form-row" style="align-items:center">
         <div class="form-group">
           <label>Interval (seconds, 0 = disabled)</label>
-          <input id="cfg-interval" type="number" value="0" min="0" max="600" placeholder="0"/>
+          <input id="cfg-interval" type="number" value="3" min="0" max="600" placeholder="3"/>
         </div>
         <div style="padding-top:18px">
           <button class="btn btn-primary" onclick="applyInterval()">Apply</button>
@@ -824,9 +824,32 @@ const cfg = {
   routerPort: 9000,
 };
 
+const STORAGE_KEYS = {
+  refreshInterval: 'starlink_gui.refresh_interval_secs',
+};
+
 let autoRefreshTimer = null;
 let currentPage = 'dashboard';
 const pageLoaded = new Set();
+
+function getStoredRefreshInterval() {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.refreshInterval);
+    if (raw == null || raw === '') return 3;
+    const secs = parseInt(raw, 10);
+    return Number.isFinite(secs) && secs >= 0 ? secs : 3;
+  } catch (_) {
+    return 3;
+  }
+}
+
+function setStoredRefreshInterval(secs) {
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.refreshInterval, String(secs));
+  } catch (_) {
+    // Ignore storage failures and keep the in-memory setting.
+  }
+}
 
 function preserveScroll(fn) {
   const main = document.getElementById('main');
@@ -1649,14 +1672,17 @@ function saveSettings() {
   autoLoad(currentPage);
 }
 
-function applyInterval() {
+function applyInterval(notify = true) {
   const secs = parseInt(document.getElementById('cfg-interval').value || '0', 10);
+  const safeSecs = Number.isFinite(secs) && secs >= 0 ? secs : 3;
+  document.getElementById('cfg-interval').value = String(safeSecs);
   clearInterval(autoRefreshTimer);
-  if (secs > 0) {
-    autoRefreshTimer = setInterval(() => autoLoad(currentPage), secs * 1000);
-    toast(`Auto-refresh every ${secs}s enabled`, 'ok');
+  setStoredRefreshInterval(safeSecs);
+  if (safeSecs > 0) {
+    autoRefreshTimer = setInterval(() => autoLoad(currentPage), safeSecs * 1000);
+    if (notify) toast(`Auto-refresh every ${safeSecs}s enabled`, 'ok');
   } else {
-    toast('Auto-refresh disabled', 'info');
+    if (notify) toast('Auto-refresh disabled', 'info');
   }
 }
 
@@ -1838,7 +1864,9 @@ async function init() {
   document.getElementById('cfg-dish-port').value   = cfg.dishPort;
   document.getElementById('cfg-router-host').value = cfg.routerHost;
   document.getElementById('cfg-router-port').value = cfg.routerPort;
+  document.getElementById('cfg-interval').value    = String(getStoredRefreshInterval());
 
+  applyInterval(false);
   refreshDashboard();
 }
 
