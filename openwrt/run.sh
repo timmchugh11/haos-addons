@@ -17,8 +17,8 @@ if [ -f "$OPTIONS" ]; then
 else
     echo "WARNING: /data/options.json not found, using defaults"
     WAN_IF="host"
-    LAN_IF="veth"
-    FORWARD_LUCI="true"
+    LAN_IF="host"
+    FORWARD_LUCI="false"
     CPU_COUNT=1
     RAM_COUNT=256
     DEBUG="false"

@@ -1,5 +1,5 @@
 name: OpenWrt
-version: "0.2.0"
+version: "0.3.0"
 slug: openwrt
 description: >-
   OpenWrt virtual router running via QEMU/KVM with LuCI web interface.
@@ -26,6 +26,10 @@ apparmor: false
 privileged:
   - NET_ADMIN
   - SYS_ADMIN
+# /dev/kvm is required for QEMU hardware acceleration.
+# Listing it explicitly works even when Protection mode is on.
+devices:
+  - /dev/kvm
 
 ports:
   8006/tcp: 8006
@@ -38,8 +42,8 @@ webui: http://[HOST]:[PORT:8006]/
 
 options:
   wan_if: "host"
-  lan_if: "veth"
-  forward_luci: true
+  lan_if: "host"
+  forward_luci: false
   cpu_count: 1
   ram_count: 256
   debug: false
