@@ -68,16 +68,15 @@ def get_wireless_interfaces():
     except Exception:
         pass
 
-    # Fallback: include all /sys/class/net interfaces so adapters show up even
-    # when iw hasn't registered them (useful for testing).
-    all_ifaces = []
-    try:
-        all_ifaces = os.listdir("/sys/class/net")
-    except Exception:
-        pass
+    if iw_ifaces:
+        return iw_ifaces
 
-    combined = list(dict.fromkeys(iw_ifaces + all_ifaces))  # iw-reported first, then the rest
-    return combined if combined else iw_ifaces
+    # Fallback: if iw returned nothing, include wl* interfaces from /sys/class/net
+    # so adapters show up even when iw hasn't registered them (useful for testing).
+    try:
+        return [i for i in os.listdir("/sys/class/net") if i.startswith("wl")]
+    except Exception:
+        return []
 
 
 def get_interface_info(iface):
