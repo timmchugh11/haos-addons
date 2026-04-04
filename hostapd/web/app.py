@@ -23,11 +23,6 @@ DEFAULT_CONFIG = {
 # Tracks running subprocesses keyed by name
 _procs = {}
 
-IP_MAP = {
-    "2g": ("192.168.50.1", "192.168.50.10", "192.168.50.100"),
-    "5g": ("192.168.51.1", "192.168.51.10", "192.168.51.100"),
-}
-
 HW_MODE = {"2g": "g", "5g": "a"}
 
 
@@ -129,12 +124,83 @@ def get_interface_info(iface):
     return info
 
 
+def _uplink_interface():
+    """Return the host's default-route network interface."""
+    try:
+        out = subprocess.check_output(["ip", "route"], text=True)
+        for line in out.splitlines():
+            if line.startswith("default"):
+                parts = line.split()
+                idx = parts.index("dev") + 1
+                return parts[idx]
+    except Exception:
+        pass
+    return None
+
+
+def _bridge_name(band):
+    return f"br-ap-{band}"
+
+
+def _setup_bridge(bridge, uplink, wifi_iface):
+    """Create bridge, attach uplink + wifi iface.  Move uplink IP to bridge."""
+    # Grab current IP/prefix from uplink before we touch it
+    ip_prefix = None
+    try:
+        out = subprocess.check_output(["ip", "-o", "-4", "addr", "show", uplink], text=True)
+        for line in out.splitlines():
+            parts = line.split()
+            if "inet" in parts:
+                ip_prefix = parts[parts.index("inet") + 1]
+                break
+    except Exception:
+        pass
+
+    cmds = [
+        ["ip", "link", "add", "name", bridge, "type", "bridge"],
+        ["ip", "link", "set", uplink, "master", bridge],
+        ["ip", "link", "set", bridge, "up"],
+    ]
+    if ip_prefix:
+        cmds += [
+            ["ip", "addr", "flush", "dev", uplink],
+            ["ip", "addr", "add", ip_prefix, "dev", bridge],
+            ["ip", "route", "add", "default", "via",
+             str(ip_prefix.rsplit(".", 1)[0] + ".1"), "dev", bridge],
+        ]
+    for cmd in cmds:
+        subprocess.run(cmd, capture_output=True)
+
+
+def _teardown_bridge(bridge, uplink):
+    """Move uplink back out of bridge and delete bridge."""
+    ip_prefix = None
+    try:
+        out = subprocess.check_output(["ip", "-o", "-4", "addr", "show", bridge], text=True)
+        for line in out.splitlines():
+            parts = line.split()
+            if "inet" in parts:
+                ip_prefix = parts[parts.index("inet") + 1]
+                break
+    except Exception:
+        pass
+    cmds = [
+        ["ip", "link", "set", uplink, "nomaster"],
+        ["ip", "link", "set", bridge, "down"],
+        ["ip", "link", "del", bridge],
+    ]
+    if ip_prefix:
+        cmds += [
+            ["ip", "addr", "add", ip_prefix, "dev", uplink],
+        ]
+    for cmd in cmds:
+        subprocess.run(cmd, capture_output=True)
+
+
+
 # ---------------------------------------------------------------------------
 # AP lifecycle
 # ---------------------------------------------------------------------------
-
-def _kill(name):
-    proc = _procs.pop(name, None)
     if proc and proc.poll() is None:
         proc.terminate()
         try:
@@ -144,8 +210,13 @@ def _kill(name):
 
 
 def stop_ap():
-    for name in list(_procs.keys()):
-        _kill(name)
+    _kill("hostapd")
+    # Tear down bridges
+    for key in [k for k in list(_procs.keys()) if k.startswith("bridge_")]:
+        band = key[len("bridge_"):]
+        uplink = _procs.pop(key, None)  # stored uplink name
+        if uplink:
+            _teardown_bridge(_bridge_name(band), uplink)
 
 
 def apply_config(cfg):
@@ -153,7 +224,11 @@ def apply_config(cfg):
     country = cfg.get("country_code", "US")
     password = cfg.get("password", "changeme123")
     hostapd_confs = []
-    errors = []
+
+    uplink = _uplink_interface()
+    if not uplink:
+        return {"ok": False, "message": "Could not determine host uplink interface"}
+    print(f"==> Uplink interface: {uplink}")
 
     for radio in cfg.get("radios", []):
         if not radio.get("enabled"):
@@ -163,24 +238,26 @@ def apply_config(cfg):
         ssid = radio["ssid"]
         channel = int(radio["channel"])
         hw_mode = HW_MODE.get(band, "g")
-        ap_ip, dhcp_start, dhcp_end = IP_MAP.get(band, IP_MAP["2g"])
-        subnet = ".".join(ap_ip.split(".")[:3]) + ".0/24"
+        bridge = _bridge_name(band)
 
-        # Configure interface
+        # Create bridge and attach uplink
+        _setup_bridge(bridge, uplink, iface)
+        _procs[f"bridge_{band}"] = uplink  # remember uplink for teardown
+
+        # Bring wifi iface up without IP — hostapd manages it via the bridge
         for cmd in [
             ["ip", "link", "set", iface, "down"],
-            ["iw", "dev", iface, "set", "type", "ap"],
+            ["iw", "dev", iface, "set", "type", "__ap"],
             ["ip", "addr", "flush", "dev", iface],
-            ["ip", "addr", "add", f"{ap_ip}/24", "dev", iface],
             ["ip", "link", "set", iface, "up"],
-            ["iptables", "-t", "nat", "-A", "POSTROUTING", "-s", subnet, "!", "-d", subnet, "-j", "MASQUERADE"],
         ]:
             subprocess.run(cmd, capture_output=True)
 
-        # hostapd config
+        # hostapd config — bridge= hands client traffic to the bridge
         conf_path = f"/tmp/hostapd_{band}.conf"
         with open(conf_path, "w") as f:
             f.write(f"interface={iface}\n")
+            f.write(f"bridge={bridge}\n")
             f.write(f"driver=nl80211\n")
             f.write(f"ssid={ssid}\n")
             f.write(f"hw_mode={hw_mode}\n")
@@ -195,19 +272,9 @@ def apply_config(cfg):
             f.write(f"wpa_passphrase={password}\n")
         hostapd_confs.append(conf_path)
 
-        # dnsmasq config
-        dns_conf = f"/tmp/dnsmasq_{band}.conf"
-        with open(dns_conf, "w") as f:
-            f.write(f"interface={iface}\n")
-            f.write(f"bind-interfaces\n")
-            f.write(f"dhcp-range={dhcp_start},{dhcp_end},12h\n")
-            f.write(f"dhcp-option=3,{ap_ip}\n")
-            f.write(f"dhcp-option=6,1.1.1.1,8.8.8.8\n")
-        _procs[f"dnsmasq_{band}"] = subprocess.Popen(["dnsmasq", f"--conf-file={dns_conf}"])
-
     if hostapd_confs:
         _procs["hostapd"] = subprocess.Popen(["hostapd"] + hostapd_confs)
-        return {"ok": True, "message": f"AP started ({len(hostapd_confs)} radio(s))"}
+        return {"ok": True, "message": f"AP started ({len(hostapd_confs)} radio(s)) — bridged to {uplink}"}
 
     return {"ok": False, "message": "No radios enabled — nothing to start"}
 

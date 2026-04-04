@@ -33,6 +33,17 @@ directly to the dish via gRPC — no Starlink account or internet access require
 
 ---
 
+### Hostapd AP
+
+[![version](https://img.shields.io/badge/version-0.7.0-blue.svg)](hostapd/config.yaml)
+
+WiFi access point managed via a built-in web UI. Supports separate 2.4 GHz and 5 GHz
+radios using hostapd and dnsmasq. Requires a WiFi adapter with AP mode support.
+
+**[Documentation](hostapd/README.md)**
+
+---
+
 ## Support
 
 For issues with any add-on, open an issue in this repository.
