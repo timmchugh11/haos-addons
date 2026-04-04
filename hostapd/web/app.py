@@ -5,7 +5,7 @@ import json
 import os
 import subprocess
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, make_response
 
 app = Flask(__name__, static_folder="/web", static_url_path="")
 
@@ -136,6 +136,31 @@ def get_interface_info(iface):
     return info
 
 
+def get_station_dump(iface):
+    """Return list of stations from `iw dev <iface> station dump`."""
+    stations = []
+    try:
+        out = subprocess.check_output(
+            ["iw", "dev", iface, "station", "dump"], text=True, stderr=subprocess.DEVNULL
+        )
+    except Exception:
+        return stations
+    current = None
+    for line in out.splitlines():
+        if line.startswith("Station "):
+            if current:
+                stations.append(current)
+            current = {"mac": line.split()[1], "iface": iface}
+        elif current is None:
+            continue
+        elif ":" in line:
+            key, _, val = line.strip().partition(":")
+            current[key.strip().lower().replace(" ", "_")] = val.strip()
+    if current:
+        stations.append(current)
+    return stations
+
+
 def _uplink_interface():
     """Return the host's default-route network interface."""
     try:
@@ -213,6 +238,8 @@ def _teardown_bridge(bridge, uplink):
 # ---------------------------------------------------------------------------
 # AP lifecycle
 # ---------------------------------------------------------------------------
+def _kill(name):
+    proc = _procs.get(name)
     if proc and proc.poll() is None:
         proc.terminate()
         try:
@@ -297,7 +324,13 @@ def apply_config(cfg):
 
 @app.route("/")
 def index():
-    return send_from_directory("/web", "index.html")
+    base = request.headers.get("X-Ingress-Path", "")
+    with open("/web/index.html", "r") as f:
+        html = f.read()
+    html = html.replace("</head>", f"<script>window.__BASE__={json.dumps(base)};</script></head>", 1)
+    resp = make_response(html)
+    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+    return resp
 
 
 @app.route("/api/config", methods=["GET"])
@@ -329,16 +362,41 @@ def api_stop():
 def api_status():
     hostapd_proc = _procs.get("hostapd")
     running = bool(hostapd_proc and hostapd_proc.poll() is None)
-    return jsonify({
-        "ap_running": running,
-        "processes": {k: (v.poll() is None) for k, v in _procs.items()},
-    })
+    cfg = load_config()
+    radios = []
+    for radio in cfg.get("radios", []):
+        if not radio.get("enabled"):
+            continue
+        iface = radio.get("interface", "")
+        clients = get_station_dump(iface) if running else []
+        radios.append({
+            "band":         radio.get("band"),
+            "ssid":         radio.get("ssid"),
+            "channel":      radio.get("channel"),
+            "interface":    iface,
+            "client_count": len(clients),
+        })
+    return jsonify({"ap_running": running, "radios": radios})
 
 
 @app.route("/api/interfaces", methods=["GET"])
 def api_interfaces():
     ifaces = get_wireless_interfaces()
     return jsonify({iface: get_interface_info(iface) for iface in ifaces})
+
+
+@app.route("/api/clients", methods=["GET"])
+def api_clients():
+    cfg = load_config()
+    result = []
+    for radio in cfg.get("radios", []):
+        if not radio.get("enabled") or not radio.get("interface"):
+            continue
+        for sta in get_station_dump(radio["interface"]):
+            sta["band"] = radio.get("band", "?")
+            sta["ssid"] = radio.get("ssid", "?")
+            result.append(sta)
+    return jsonify(result)
 
 
 # ---------------------------------------------------------------------------

@@ -6,162 +6,240 @@
 <title>WiFi AP Manager</title>
 <style>
   :root {
-    --bg: #111318;
-    --surface: #1c1f26;
-    --border: #2e3340;
-    --accent: #3b82f6;
-    --accent-hover: #2563eb;
-    --danger: #ef4444;
-    --success: #22c55e;
-    --warn: #f59e0b;
-    --text: #e2e8f0;
-    --muted: #94a3b8;
-    --radius: 10px;
+    --bg:       #0b0b0b;
+    --surface:  #111111;
+    --surface2: #181818;
+    --border:   #1e1e1e;
+    --border2:  #2a2a2a;
+    --accent:   #3b82f6;
+    --accent-h: #2563eb;
+    --danger:   #ef4444;
+    --success:  #22c55e;
+    --warn:     #f59e0b;
+    --text:     #e2e8f0;
+    --text2:    #94a3b8;
+    --muted:    #475569;
+    --radius:   8px;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; min-height: 100vh; padding: 24px 16px; }
-  h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
-  h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
-  .row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-  .field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 140px; }
-  label { font-size: 12px; color: var(--muted); font-weight: 500; }
-  input, select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 8px 10px; font-size: 14px; width: 100%; outline: none; transition: border-color .15s; }
-  input:focus, select:focus { border-color: var(--accent); }
-  .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-  .toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
-  .toggle input { opacity: 0; width: 0; height: 0; }
-  .slider { position: absolute; inset: 0; background: var(--border); border-radius: 22px; cursor: pointer; transition: background .2s; }
-  .slider:before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
-  input:checked + .slider { background: var(--accent); }
-  input:checked + .slider:before { transform: translateX(18px); }
-  .toggle-label { font-weight: 600; }
-  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
-  button { padding: 9px 18px; border: none; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s, opacity .15s; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { background: var(--accent-hover); }
-  .btn-danger { background: var(--danger); color: #fff; }
-  .btn-danger:hover { opacity: .85; }
-  .btn-ghost { background: var(--border); color: var(--text); }
-  .btn-ghost:hover { background: #3a3f4e; }
-  button:disabled { opacity: .45; cursor: not-allowed; }
-  .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-  .dot-green { background: var(--success); box-shadow: 0 0 6px var(--success); }
-  .dot-red   { background: var(--danger); }
-  .dot-grey  { background: var(--muted); }
-  .status-row { display: flex; align-items: center; gap: 8px; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-  .badge-green { background: rgba(34,197,94,.15); color: var(--success); }
-  .badge-red   { background: rgba(239,68,68,.15);  color: var(--danger); }
-  .badge-warn  { background: rgba(245,158,11,.15); color: var(--warn); }
-  .iface-info { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
-  .iface-info span { display: inline-block; margin-right: 12px; }
-  #toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px; font-size: 13px; box-shadow: 0 4px 20px rgba(0,0,0,.4); transform: translateY(80px); opacity: 0; transition: all .25s; z-index: 999; }
-  #toast.show { transform: translateY(0); opacity: 1; }
-  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
-  @media (max-width: 480px) { .row { flex-direction: column; } }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;font-family:system-ui,-apple-system,sans-serif;font-size:14px;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+  button{cursor:pointer;font-family:inherit;font-size:inherit}
+  #app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  header{flex-shrink:0;height:58px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:14px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+  .logo svg{color:var(--accent);flex-shrink:0}
+  .spacer{flex:1}
+  .conn-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 12px;border-radius:999px}
+  .conn-badge::before{content:"";display:block;width:6px;height:6px;border-radius:50%}
+  .conn-badge.running{background:rgba(34,197,94,.12);color:var(--success);border:1px solid rgba(34,197,94,.3)}
+  .conn-badge.running::before{background:var(--success);box-shadow:0 0 6px var(--success)}
+  .conn-badge.stopped{background:rgba(239,68,68,.12);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+  .conn-badge.stopped::before{background:var(--danger)}
+  .conn-badge.idle{background:rgba(148,163,184,.1);color:var(--text2);border:1px solid var(--border2)}
+  .conn-badge.idle::before{background:var(--text2)}
+  nav{flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);display:flex;padding:0 24px;overflow-x:auto}
+  nav button{background:none;border:none;display:flex;align-items:center;gap:7px;padding:0 16px;height:44px;color:var(--text2);font-size:13px;font-weight:500;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s;cursor:pointer}
+  nav button:hover{color:var(--text)}
+  nav button.active{color:var(--text);border-bottom-color:var(--accent)}
+  nav button svg{opacity:.6}
+  nav button.active svg,nav button:hover svg{opacity:1}
+  .client-badge{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:700;background:rgba(59,130,246,.2);color:var(--accent);margin-left:4px}
+  main{flex:1;overflow-y:auto;padding:24px}
+  .page{display:none;max-width:900px}
+  .page.active{display:block}
+  .page-title{font-size:1.1rem;font-weight:700;margin-bottom:4px}
+  .page-sub{font-size:13px;color:var(--text2);margin-bottom:20px}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+  button.btn{padding:9px 18px;border:none;border-radius:7px;font-size:14px;font-weight:600;transition:background .15s,opacity .15s}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{background:var(--accent-h)}
+  .btn-danger{background:rgba(239,68,68,.15);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+  .btn-danger:hover{background:rgba(239,68,68,.25)}
+  .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border2)}
+  .btn-ghost:hover{background:var(--border2)}
+  .btn-sm{padding:6px 12px;font-size:12px}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .radio-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
+  .radio-box-header{padding:12px 18px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+  .radio-box-body{padding:14px 18px;display:flex;flex-wrap:wrap;gap:24px}
+  .rs{display:flex;flex-direction:column;gap:4px}
+  .rs-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .rs-value{font-size:14px;font-weight:600}
+  .box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
+  .box-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .box-title{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+  .box-body{padding:18px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead tr{background:var(--surface2)}
+  th{padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+  td{padding:11px 14px;border-top:1px solid var(--border);white-space:nowrap}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .form-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:160px}
+  label{font-size:12px;color:var(--text2);font-weight:500}
+  input,select{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:8px 10px;font-size:14px;width:100%;outline:none;transition:border-color .15s}
+  input:focus,select:focus{border-color:var(--accent)}
+  .toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .toggle{position:relative;width:40px;height:22px;flex-shrink:0}
+  .toggle input{opacity:0;width:0;height:0}
+  .slider{position:absolute;inset:0;background:var(--border2);border-radius:22px;cursor:pointer;transition:background .2s}
+  .slider:before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s}
+  input:checked+.slider{background:var(--accent)}
+  input:checked+.slider:before{transform:translateX(18px)}
+  .toggle-label{font-weight:600;font-size:14px}
+  .iface-info{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.8}
+  .iface-info span{display:inline-block;margin-right:12px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+  .badge-green{background:rgba(34,197,94,.15);color:var(--success)}
+  .badge-red{background:rgba(239,68,68,.15);color:var(--danger)}
+  .badge-warn{background:rgba(245,158,11,.15);color:var(--warn)}
+  .badge-blue{background:rgba(59,130,246,.15);color:var(--accent)}
+  .sig-good{color:var(--success)}
+  .sig-ok{color:var(--warn)}
+  .sig-bad{color:var(--danger)}
+  #toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 18px;font-size:13px;box-shadow:0 4px 20px rgba(0,0,0,.5);transform:translateY(80px);opacity:0;transition:all .25s;z-index:999;max-width:320px}
+  #toast.show{transform:translateY(0);opacity:1}
+  .no-data{color:var(--muted);font-size:13px;padding:24px 18px;text-align:center;display:block}
+  @media (max-width:520px){.form-row{flex-direction:column}}
 </style>
 </head>
 <body>
+<div id="app">
 
-<h1>
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
-  WiFi AP Manager
-</h1>
-
-<!-- Status -->
-<div class="card" id="status-card">
-  <h2>Status</h2>
-  <div class="status-row" style="margin-bottom:14px">
-    <div class="status-dot dot-grey" id="status-dot"></div>
-    <span id="status-text">Loading...</span>
+<header>
+  <div class="logo">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+    WiFi AP Manager
   </div>
+  <div class="spacer"></div>
+  <span id="ap-badge" class="conn-badge idle">Checking…</span>
+</header>
+
+<nav>
+  <button class="active" data-page="overview" onclick="navigate('overview')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Overview
+  </button>
+  <button data-page="clients" onclick="navigate('clients')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Clients
+    <span id="client-nav-badge" class="client-badge" style="display:none"></span>
+  </button>
+  <button data-page="configure" onclick="navigate('configure')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Configure
+  </button>
+</nav>
+
+<main>
+
+<!-- ══ OVERVIEW ══ -->
+<section id="page-overview" class="page active">
+  <div class="page-title">Overview</div>
+  <div class="page-sub">Access point status and active radios</div>
   <div class="actions">
-    <button class="btn-primary" id="btn-apply" onclick="applyAP()">Apply &amp; Start</button>
-    <button class="btn-danger"  id="btn-stop"  onclick="stopAP()">Stop AP</button>
+    <button class="btn btn-primary" onclick="applyAP()">
+      <svg width="12" height="12" style="vertical-align:-1px;margin-right:5px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Apply &amp; Start
+    </button>
+    <button class="btn btn-danger" onclick="stopAP()">
+      <svg width="12" height="12" style="vertical-align:-1px;margin-right:5px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+      Stop AP
+    </button>
+    <button class="btn btn-ghost btn-sm" onclick="refreshOverview()" style="margin-left:auto">
+      <svg width="12" height="12" style="vertical-align:-1px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Refresh
+    </button>
   </div>
-</div>
+  <div id="radio-list"><span class="no-data">Loading…</span></div>
+</section>
 
-<!-- Shared settings -->
-<div class="card">
-  <h2>Shared Settings</h2>
-  <div class="row">
-    <div class="field">
-      <label>WiFi Password</label>
-      <input type="password" id="password" placeholder="min 8 characters">
-    </div>
-    <div class="field">
-      <label>Country Code</label>
-      <input type="text" id="country_code" maxlength="2" placeholder="US">
-    </div>
+<!-- ══ CLIENTS ══ -->
+<section id="page-clients" class="page">
+  <div class="page-title">Connected Clients</div>
+  <div class="page-sub">Stations currently associated to the access point</div>
+  <div class="actions">
+    <button class="btn btn-ghost btn-sm" onclick="loadClients()">
+      <svg width="12" height="12" style="vertical-align:-1px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Refresh
+    </button>
   </div>
-</div>
+  <div class="box">
+    <div id="clients-wrap"><span class="no-data">Click Refresh to load</span></div>
+  </div>
+</section>
 
-<!-- 2.4 GHz -->
-<div class="card">
-  <div class="toggle-row">
-    <label class="toggle"><input type="checkbox" id="en_2g" onchange="toggleBand('2g')"><span class="slider"></span></label>
-    <span class="toggle-label">2.4 GHz Radio</span>
-  </div>
-  <div id="fields_2g">
-    <div class="row">
-      <div class="field">
-        <label>Interface</label>
-        <select id="iface_2g" onchange="loadIfaceInfo('2g')"><option value="">-- select --</option></select>
-      </div>
-      <div class="field">
-        <label>SSID</label>
-        <input type="text" id="ssid_2g" placeholder="HomeAssistant-AP">
-      </div>
-      <div class="field">
-        <label>Channel (1–13)</label>
-        <input type="number" id="ch_2g" min="1" max="13" value="6">
-      </div>
-    </div>
-    <div class="iface-info" id="info_2g"></div>
-  </div>
-</div>
+<!-- ══ CONFIGURE ══ -->
+<section id="page-configure" class="page">
+  <div class="page-title">Configure</div>
+  <div class="page-sub">Set up radios and shared network settings</div>
 
-<!-- 5 GHz -->
-<div class="card">
-  <div class="toggle-row">
-    <label class="toggle"><input type="checkbox" id="en_5g" onchange="toggleBand('5g')"><span class="slider"></span></label>
-    <span class="toggle-label">5 GHz Radio</span>
-  </div>
-  <div id="fields_5g" style="opacity:.4;pointer-events:none">
-    <div class="row">
-      <div class="field">
-        <label>Interface</label>
-        <select id="iface_5g" onchange="loadIfaceInfo('5g')"><option value="">-- select --</option></select>
-      </div>
-      <div class="field">
-        <label>SSID</label>
-        <input type="text" id="ssid_5g" placeholder="HomeAssistant-AP-5G">
-      </div>
-      <div class="field">
-        <label>Channel (36/40/44/48…)</label>
-        <input type="number" id="ch_5g" min="36" max="165" value="36">
+  <div class="box">
+    <div class="box-header"><div class="box-title">Shared Settings</div></div>
+    <div class="box-body">
+      <div class="form-row">
+        <div class="field">
+          <label>WiFi Password</label>
+          <input type="password" id="password" placeholder="min 8 characters">
+        </div>
+        <div class="field">
+          <label>Country Code</label>
+          <input type="text" id="country_code" maxlength="2" placeholder="US">
+        </div>
       </div>
     </div>
-    <div class="iface-info" id="info_5g"></div>
   </div>
-</div>
 
-<!-- Save -->
-<div class="actions">
-  <button class="btn-primary" onclick="saveConfig()">Save Config</button>
-  <button class="btn-ghost"   onclick="loadAll()">Discard Changes</button>
-</div>
+  <div class="box">
+    <div class="box-header">
+      <div class="box-title">2.4 GHz Radio</div>
+      <label class="toggle"><input type="checkbox" id="en_2g" onchange="toggleBand('2g')"><span class="slider"></span></label>
+    </div>
+    <div class="box-body" id="fields_2g">
+      <div class="form-row">
+        <div class="field"><label>Interface</label><select id="iface_2g" onchange="loadIfaceInfo('2g')"><option value="">-- select --</option></select></div>
+        <div class="field"><label>SSID</label><input type="text" id="ssid_2g" placeholder="HomeAssistant-AP"></div>
+        <div class="field"><label>Channel (1–13)</label><input type="number" id="ch_2g" min="1" max="13" value="6"></div>
+      </div>
+      <div class="iface-info" id="info_2g"></div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="box-header">
+      <div class="box-title">5 GHz Radio</div>
+      <label class="toggle"><input type="checkbox" id="en_5g" onchange="toggleBand('5g')"><span class="slider"></span></label>
+    </div>
+    <div class="box-body" id="fields_5g" style="opacity:.4;pointer-events:none">
+      <div class="form-row">
+        <div class="field"><label>Interface</label><select id="iface_5g" onchange="loadIfaceInfo('5g')"><option value="">-- select --</option></select></div>
+        <div class="field"><label>SSID</label><input type="text" id="ssid_5g" placeholder="HomeAssistant-AP-5G"></div>
+        <div class="field"><label>Channel (36/40/44/48…)</label><input type="number" id="ch_5g" min="36" max="165" value="36"></div>
+      </div>
+      <div class="iface-info" id="info_5g"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" onclick="saveConfig()">Save Config</button>
+    <button class="btn btn-ghost" onclick="loadAll()">Discard Changes</button>
+  </div>
+</section>
+
+</main>
+</div><!-- /app -->
 
 <div id="toast"></div>
 
 <script>
 let _interfaces = {};
+let _currentPage = 'overview';
 
 async function api(method, path, body) {
+  const base = window.__BASE__ || '';
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body !== undefined) opts.body = JSON.stringify(body);
-  const r = await fetch(path, opts);
+  const r = await fetch(base + path, opts);
   return r.json();
 }
 
@@ -170,30 +248,127 @@ function toast(msg, ok = true) {
   el.textContent = msg;
   el.style.borderColor = ok ? 'var(--success)' : 'var(--danger)';
   el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 3000);
+  setTimeout(() => el.classList.remove('show'), 3200);
 }
 
-// ---------------------------------------------------------------------------
-// Status polling
-// ---------------------------------------------------------------------------
-async function pollStatus() {
+function escHtml(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Navigation ──────────────────────────────────────────────────────────────
+function navigate(page) {
+  _currentPage = page;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
+  document.querySelector('main').scrollTop = 0;
+  if (page === 'clients') loadClients();
+}
+
+// ── Overview ────────────────────────────────────────────────────────────────
+async function refreshOverview() {
   try {
     const s = await api('GET', '/api/status');
-    const dot  = document.getElementById('status-dot');
-    const text = document.getElementById('status-text');
+    const badge = document.getElementById('ap-badge');
     if (s.ap_running) {
-      dot.className   = 'status-dot dot-green';
-      text.innerHTML  = '<span class="badge badge-green">RUNNING</span>';
+      badge.className = 'conn-badge running'; badge.textContent = 'Running';
     } else {
-      dot.className   = 'status-dot dot-red';
-      text.innerHTML  = '<span class="badge badge-red">STOPPED</span>';
+      badge.className = 'conn-badge stopped'; badge.textContent = 'Stopped';
     }
-  } catch { /* ignore */ }
+    const list = document.getElementById('radio-list');
+    if (!s.radios || s.radios.length === 0) {
+      list.innerHTML = '<span class="no-data">No active radios. Enable radios in Configure then click Apply &amp; Start.</span>';
+      return;
+    }
+    let total = 0;
+    list.innerHTML = s.radios.map(r => {
+      const bandLabel = r.band === '2g' ? '2.4 GHz' : '5 GHz';
+      const st = s.ap_running
+        ? '<span class="badge badge-green">Active</span>'
+        : '<span class="badge badge-red">Stopped</span>';
+      total += r.client_count || 0;
+      return `<div class="radio-box">
+        <div class="radio-box-header">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+          <strong>${bandLabel}</strong> ${st}
+        </div>
+        <div class="radio-box-body">
+          <div class="rs"><div class="rs-label">SSID</div><div class="rs-value">${escHtml(r.ssid||'—')}</div></div>
+          <div class="rs"><div class="rs-label">Channel</div><div class="rs-value">${r.channel||'—'}</div></div>
+          <div class="rs"><div class="rs-label">Interface</div><div class="rs-value" style="font-family:monospace;font-size:13px">${escHtml(r.interface||'—')}</div></div>
+          <div class="rs"><div class="rs-label">Clients</div><div class="rs-value">${r.client_count ?? '—'}</div></div>
+        </div>
+      </div>`;
+    }).join('');
+    const nb = document.getElementById('client-nav-badge');
+    if (total > 0) { nb.textContent = total; nb.style.display = 'inline-block'; }
+    else { nb.style.display = 'none'; }
+  } catch(e) { console.error(e); }
 }
 
-// ---------------------------------------------------------------------------
-// Interfaces
-// ---------------------------------------------------------------------------
+// ── Clients ─────────────────────────────────────────────────────────────────
+function fmtSignal(raw) {
+  if (!raw) return '—';
+  const m = raw.match(/-?\d+/);
+  if (!m) return raw;
+  const dbm = parseInt(m[0]);
+  const cls = dbm >= -65 ? 'sig-good' : dbm >= -75 ? 'sig-ok' : 'sig-bad';
+  return `<span class="${cls}">${dbm} dBm</span>`;
+}
+function fmtRate(raw) {
+  if (!raw) return '—';
+  const m = raw.match(/[\d.]+\s*MBit\/s/i);
+  return m ? m[0].replace(/MBit\/s/i, 'Mbps') : raw.split(' ').slice(0,2).join(' ');
+}
+function fmtTime(raw) {
+  if (!raw) return '—';
+  const m = raw.match(/\d+/);
+  if (!m) return raw;
+  let s = parseInt(m[0]);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s/60)}m ${s%60}s`;
+  return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+}
+function fmtBytes(raw) {
+  if (!raw) return '—';
+  const b = parseInt(raw);
+  if (isNaN(b)) return raw;
+  if (b < 1024) return `${b} B`;
+  if (b < 1048576) return `${(b/1024).toFixed(1)} KB`;
+  if (b < 1073741824) return `${(b/1048576).toFixed(1)} MB`;
+  return `${(b/1073741824).toFixed(2)} GB`;
+}
+
+async function loadClients() {
+  const wrap = document.getElementById('clients-wrap');
+  wrap.innerHTML = '<span class="no-data">Loading…</span>';
+  try {
+    const clients = await api('GET', '/api/clients');
+    if (!clients.length) { wrap.innerHTML = '<span class="no-data">No clients connected</span>'; return; }
+    wrap.innerHTML = `<table>
+      <thead><tr>
+        <th>MAC Address</th><th>Band</th><th>SSID</th>
+        <th>Signal</th><th>TX Rate</th><th>RX Rate</th>
+        <th>TX</th><th>RX</th><th>Connected</th><th>Inactive</th>
+      </tr></thead>
+      <tbody>${clients.map(c => `<tr>
+        <td style="font-family:monospace;font-size:12px">${escHtml(c.mac)}</td>
+        <td><span class="badge badge-blue">${c.band==='2g'?'2.4 GHz':c.band==='5g'?'5 GHz':escHtml(c.band||'?')}</span></td>
+        <td>${escHtml(c.ssid||'—')}</td>
+        <td>${fmtSignal(c.signal)}</td>
+        <td>${fmtRate(c.tx_bitrate)}</td>
+        <td>${fmtRate(c.rx_bitrate)}</td>
+        <td>${fmtBytes(c.tx_bytes)}</td>
+        <td>${fmtBytes(c.rx_bytes)}</td>
+        <td>${fmtTime(c.connected_time)}</td>
+        <td style="color:var(--muted)">${escHtml(c.inactive_time||'—')}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+    const nb = document.getElementById('client-nav-badge');
+    nb.textContent = clients.length; nb.style.display = 'inline-block';
+  } catch(e) { wrap.innerHTML = `<span class="no-data">Error: ${escHtml(e.message)}</span>`; }
+}
+
+// ── Interfaces ───────────────────────────────────────────────────────────────
 async function loadInterfaces() {
   _interfaces = await api('GET', '/api/interfaces');
   ['2g', '5g'].forEach(band => {
@@ -211,47 +386,37 @@ async function loadInterfaces() {
 }
 
 function renderIfaceInfo(band, iface) {
-  const el  = document.getElementById(`info_${band}`);
+  const el = document.getElementById(`info_${band}`);
   const inf = _interfaces[iface];
   if (!inf) { el.innerHTML = ''; return; }
-
   const apBadge = inf.ap_supported
     ? '<span class="badge badge-green">AP supported</span>'
     : '<span class="badge badge-red">AP NOT supported</span>';
   const bands = inf.bands.length ? inf.bands.join(' / ') : '?';
-  const usb   = inf.usb_info  ? `<span>USB: ${inf.usb_info}</span>`  : '';
-  const spd   = inf.usb_speed ? `<span>Speed: ${inf.usb_speed}</span>` : '';
-
+  const usb = inf.usb_info  ? `<span>USB: ${escHtml(inf.usb_info)}</span>` : '';
+  const spd = inf.usb_speed ? `<span>Speed: ${inf.usb_speed}</span>` : '';
   el.innerHTML = `${apBadge} <span>Bands: ${bands}</span>${usb}${spd}`;
 }
 
-function loadIfaceInfo(band) {
-  const iface = document.getElementById(`iface_${band}`).value;
-  renderIfaceInfo(band, iface);
-}
+function loadIfaceInfo(band) { renderIfaceInfo(band, document.getElementById(`iface_${band}`).value); }
 
-// ---------------------------------------------------------------------------
-// Config load / save
-// ---------------------------------------------------------------------------
+// ── Config ───────────────────────────────────────────────────────────────────
 async function loadConfig() {
   const cfg = await api('GET', '/api/config');
-  document.getElementById('password').value    = cfg.password    || '';
+  document.getElementById('password').value     = cfg.password     || '';
   document.getElementById('country_code').value = cfg.country_code || 'US';
-
   cfg.radios.forEach(r => {
-    const band = r.band;
-    document.getElementById(`en_${band}`).checked   = !!r.enabled;
-    document.getElementById(`iface_${band}`).value  = r.interface || '';
-    document.getElementById(`ssid_${band}`).value   = r.ssid      || '';
-    document.getElementById(`ch_${band}`).value     = r.channel   || (band === '2g' ? 6 : 36);
-    toggleBand(band);
-    renderIfaceInfo(band, r.interface);
+    document.getElementById(`en_${r.band}`).checked  = !!r.enabled;
+    document.getElementById(`iface_${r.band}`).value = r.interface || '';
+    document.getElementById(`ssid_${r.band}`).value  = r.ssid      || '';
+    document.getElementById(`ch_${r.band}`).value    = r.channel   || (r.band === '2g' ? 6 : 36);
+    toggleBand(r.band);
+    renderIfaceInfo(r.band, r.interface);
   });
 }
 
 async function saveConfig() {
-  const cfg = buildConfig();
-  const r = await api('POST', '/api/config', cfg);
+  const r = await api('POST', '/api/config', buildConfig());
   toast(r.ok ? 'Config saved' : 'Save failed', r.ok);
 }
 
@@ -269,31 +434,26 @@ function buildConfig() {
   };
 }
 
-// ---------------------------------------------------------------------------
-// AP control
-// ---------------------------------------------------------------------------
+// ── AP control ───────────────────────────────────────────────────────────────
 async function applyAP() {
-  const cfg = buildConfig();
-  await api('POST', '/api/config', cfg);
+  await api('POST', '/api/config', buildConfig());
   const r = await api('POST', '/api/apply');
   toast(r.message, r.ok);
-  pollStatus();
+  refreshOverview();
 }
 
 async function stopAP() {
   const r = await api('POST', '/api/stop');
   toast(r.message, r.ok);
-  pollStatus();
+  refreshOverview();
 }
 
-// ---------------------------------------------------------------------------
-// UI helpers
-// ---------------------------------------------------------------------------
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function toggleBand(band) {
   const enabled = document.getElementById(`en_${band}`).checked;
   const fields  = document.getElementById(`fields_${band}`);
-  fields.style.opacity        = enabled ? '1' : '0.4';
-  fields.style.pointerEvents  = enabled ? ''  : 'none';
+  fields.style.opacity       = enabled ? '1' : '0.4';
+  fields.style.pointerEvents = enabled ? '' : 'none';
 }
 
 async function loadAll() {
@@ -303,8 +463,8 @@ async function loadAll() {
 
 // Boot
 loadAll();
-pollStatus();
-setInterval(pollStatus, 5000);
+refreshOverview();
+setInterval(refreshOverview, 10000);
 </script>
 </body>
 </html>
