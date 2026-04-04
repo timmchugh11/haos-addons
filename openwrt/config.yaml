@@ -1,5 +1,5 @@
 name: OpenWrt
-version: "0.1.0"
+version: "0.2.0"
 slug: openwrt
 description: >-
   OpenWrt virtual router running via QEMU/KVM with LuCI web interface.
