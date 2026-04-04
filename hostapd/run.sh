@@ -24,6 +24,22 @@ echo "    SSID      : $SSID"
 echo "    Channel   : $CHANNEL"
 echo "    Country   : $COUNTRY"
 
+echo "==> Checking adapter AP mode support..."
+if iw dev "$INTERFACE" info >/dev/null 2>&1; then
+    MODES=$(iw list 2>/dev/null | grep -A 20 "Supported interface modes" | grep "\* " || echo "    (unable to read)")
+    echo "    Supported modes for $INTERFACE:"
+    echo "$MODES"
+    if echo "$MODES" | grep -q "\* AP"; then
+        echo "    AP mode: SUPPORTED"
+    else
+        echo "    AP mode: NOT SUPPORTED - this adapter cannot be used as an access point"
+        exit 1
+    fi
+else
+    echo "    WARNING: interface $INTERFACE not found - check it is plugged in and the name is correct"
+    exit 1
+fi
+
 # Put the interface into AP mode and assign an IP
 ip link set "$INTERFACE" down
 iw dev "$INTERFACE" set type ap 2>/dev/null || true
