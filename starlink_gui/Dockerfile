@@ -3,13 +3,14 @@ FROM $BUILD_FROM
 
 # Install Node.js and native build tools (better-sqlite3 requires compilation)
 RUN apk add --no-cache nodejs npm python3 make g++ linux-headers && \
-    npm config set python python3
+    npm config set python python3 && \
+    npm install -g node-gyp
 
 WORKDIR /app
 
 # Install dependencies first (layer cache friendly)
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 # Copy application files
 COPY server.js ./
