@@ -2,7 +2,8 @@ ARG BUILD_FROM
 FROM $BUILD_FROM
 
 # Install Node.js and native build tools (better-sqlite3 requires compilation)
-RUN apk add --no-cache nodejs npm python3 make g++
+RUN apk add --no-cache nodejs npm python3 make g++ linux-headers && \
+    npm config set python python3
 
 WORKDIR /app
 
