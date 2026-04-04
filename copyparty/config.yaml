@@ -1,0 +1,43 @@
+name: copyparty
+version: "1.0.4"
+slug: copyparty
+description: >-
+  Portable file server with resumable uploads, dedup, WebDAV, FTP, SFTP,
+  media indexer, thumbnails and more — accessible from any web browser.
+url: https://github.com/9001/copyparty
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+startup: application
+boot: auto
+init: false
+
+ports:
+  3923/tcp: 3923
+ports_description:
+  3923/tcp: "copyparty web interface (HTTP / WebDAV)"
+
+webui: http://[HOST]:[PORT:3923]/
+
+map:
+  - type: share
+    read_only: false
+  - type: media
+    read_only: false
+  - type: homeassistant_config
+    read_only: true
+  - type: addon_config
+    read_only: false
+
+options:
+  username: ""
+  password: ""
+  extra_args: ""
+
+schema:
+  username: "str?"
+  password: "password?"
+  extra_args: "str?"

@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Starlink Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+/* ══════════════════════════════════════════════════
+   STARLINK DESIGN SYSTEM
+══════════════════════════════════════════════════ */
+
+/* reset */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  /* backgrounds */
+  --bg:         #07080b;
+  --surface:    #0c0e14;
+  --surface2:   #12151d;
+  --surface3:   #181c26;
+  /* borders */
+  --border:     rgba(255,255,255,0.07);
+  --border2:    rgba(255,255,255,0.12);
+  /* brand */
+  --accent:     #009DFF;
+  --accent-dim: rgba(0,157,255,0.15);
+  --accent-glow:rgba(0,157,255,0.35);
+  /* semantic */
+  --green:  #00D47E;
+  --yellow: #FF9500;
+  --red:    #FF3B30;
+  /* text */
+  --text:   #FFFFFF;
+  --text2:  rgba(255,255,255,0.6);
+  --muted:  rgba(255,255,255,0.32);
+  /* layout */
+  --sidebar-w: 230px;
+  --header-h:  60px;
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-sm: 7px;
+}
+
+html,body{
+  height:100%;
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none}
+button{cursor:pointer;font-family:inherit;font-size:inherit}
+
+/* ── layout ── */
+#app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+header{
+  height:var(--header-h);
+  background:rgba(7,8,11,0.85);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 24px;gap:16px;
+  position:sticky;top:0;z-index:100;
+  flex-shrink:0;
+}
+header .logo{
+  display:flex;align-items:center;gap:12px;
+  font-weight:700;font-size:15px;letter-spacing:0.02em;
+  color:var(--text);
+}
+header .logo-mark{
+  width:32px;height:32px;flex-shrink:0;
+}
+header .logo-wordmark{
+  display:flex;flex-direction:column;line-height:1;
+}
+header .logo-wordmark .l1{font-size:13px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#fff}
+header .logo-wordmark .l2{font-size:10px;font-weight:500;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-top:1px}
+header .spacer{flex:1}
+header .conn-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+  padding:5px 12px;border-radius:20px;
+}
+header .conn-badge::before{
+  content:"";display:block;width:6px;height:6px;border-radius:50%;
+}
+header .conn-badge.ok{background:rgba(0,212,126,0.12);color:var(--green);border:1px solid rgba(0,212,126,0.3)}
+header .conn-badge.ok::before{background:var(--green);box-shadow:0 0 6px var(--green)}
+header .conn-badge.err{background:rgba(255,59,48,0.12);color:var(--red);border:1px solid rgba(255,59,48,0.3)}
+header .conn-badge.err::before{background:var(--red);box-shadow:0 0 6px var(--red)}
+header .conn-badge.idle{background:rgba(0,157,255,0.1);color:var(--accent);border:1px solid rgba(0,157,255,0.25)}
+header .conn-badge.idle::before{background:var(--accent);animation:pulse 1.8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+.body-wrap{display:flex;flex:1;overflow:hidden}
+
+/* ── sidebar ── */
+nav{
+  width:var(--sidebar-w);flex-shrink:0;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  overflow-y:auto;overflow-x:hidden;
+  padding:16px 0 24px;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+nav .nav-group{
+  padding:20px 14px 6px;
+  font-size:10px;font-weight:600;
+  letter-spacing:0.14em;text-transform:uppercase;
+  color:var(--muted);
+}
+nav .nav-group:first-child{padding-top:8px}
+nav .nav-divider{
+  height:1px;background:var(--border);margin:8px 14px;
+}
+nav a{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 14px;margin:1px 8px;
+  border-radius:var(--radius-sm);
+  color:var(--text2);
+  font-size:13px;font-weight:500;
+  transition:all .18s;
+  text-decoration:none;
+}
+nav a svg{flex-shrink:0;opacity:0.6;transition:opacity .18s}
+nav a:hover{background:var(--surface2);color:var(--text)}
+nav a:hover svg{opacity:1}
+nav a.active{
+  background:var(--accent-dim);
+  color:var(--accent);
+  font-weight:600;
+}
+nav a.active svg{opacity:1;color:var(--accent)}
+
+/* ── main ── */
+main{
+  flex:1;overflow-y:auto;overflow-x:hidden;
+  padding:28px 28px 48px;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+.page{display:none}
+.page.active{display:block}
+.page-title{
+  font-size:22px;font-weight:700;
+  letter-spacing:-0.01em;
+  margin-bottom:4px;
+}
+.page-sub{color:var(--text2);font-size:13px;margin-bottom:24px}
+
+/* ── stat cards ── */
+.cards{
+  display:grid;
+  gap:12px;
+  grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
+  margin-bottom:24px;
+}
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:18px 20px;
+  transition:border-color .2s;
+}
+.card:hover{border-color:var(--border2)}
+.card .label{
+  font-size:10px;font-weight:600;
+  letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:8px;
+}
+.card .value{font-size:26px;font-weight:700;line-height:1;word-break:break-all;letter-spacing:-0.02em}
+.card .unit{font-size:11px;color:var(--muted);margin-top:5px;font-weight:500}
+.card.green .value{color:var(--green)}
+.card.yellow .value{color:var(--yellow)}
+.card.red .value{color:var(--red)}
+.card.blue .value{color:var(--accent)}
+.card.blue{border-color:rgba(0,157,255,0.15)}
+
+/* ── box ── */
+.box{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:22px 24px;
+  margin-bottom:16px;
+}
+.box-title{
+  font-size:13px;font-weight:600;
+  letter-spacing:0.02em;
+  margin-bottom:16px;
+  display:flex;align-items:center;gap:8px;
+  color:var(--text);
+}
+.box-title .badge{
+  font-size:10px;font-weight:600;padding:2px 8px;letter-spacing:0.06em;
+  border-radius:20px;text-transform:uppercase;
+}
+
+/* ── table ── */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{
+  text-align:left;padding:8px 12px;
+  font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--muted);
+  border-bottom:1px solid var(--border);
+}
+.tbl td{
+  padding:9px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+  word-break:break-all;
+  color:var(--text2);
+}
+.tbl td:first-child{color:var(--muted);white-space:nowrap}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--surface2)}
+
+/* ── buttons ── */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 18px;
+  border-radius:var(--radius-sm);
+  font-weight:600;font-size:12px;
+  letter-spacing:0.06em;text-transform:uppercase;
+  border:1px solid transparent;
+  transition:all .18s;
+}
+.btn-primary{
+  background:var(--accent);color:#fff;
+  border-color:var(--accent);
+}
+.btn-primary:hover{
+  background:#33b3ff;
+  border-color:#33b3ff;
+  box-shadow:0 0 16px var(--accent-glow);
+}
+.btn-danger{
+  background:rgba(255,59,48,0.1);color:var(--red);
+  border-color:rgba(255,59,48,0.3);
+}
+.btn-danger:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.btn-warn{
+  background:rgba(255,149,0,0.1);color:var(--yellow);
+  border-color:rgba(255,149,0,0.3);
+}
+.btn-warn:hover{background:var(--yellow);color:#000;border-color:var(--yellow)}
+.btn-ghost{
+  background:transparent;color:var(--text2);
+  border-color:var(--border2);
+}
+.btn-ghost:hover{background:var(--surface2);color:var(--text)}
+.btn-sm{padding:5px 12px;font-size:11px;border-radius:6px}
+.btn-group{display:flex;gap:10px;flex-wrap:wrap}
+
+/* ── pill badges ── */
+.pill{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11px;font-weight:600;
+  letter-spacing:0.06em;text-transform:uppercase;
+  padding:4px 11px;border-radius:20px;
+}
+.pill::before{content:"";display:block;width:6px;height:6px;border-radius:50%}
+.pill.ok{
+  background:rgba(0,212,126,0.1);color:var(--green);
+  border:1px solid rgba(0,212,126,0.25);
+}
+.pill.ok::before{background:var(--green)}
+.pill.warn{
+  background:rgba(255,149,0,0.1);color:var(--yellow);
+  border:1px solid rgba(255,149,0,0.25);
+}
+.pill.warn::before{background:var(--yellow)}
+.pill.err{
+  background:rgba(255,59,48,0.1);color:var(--red);
+  border:1px solid rgba(255,59,48,0.25);
+}
+.pill.err::before{background:var(--red)}
+.pill.idle{
+  background:var(--accent-dim);color:var(--accent);
+  border:1px solid rgba(0,157,255,0.25);
+}
+.pill.idle::before{background:var(--accent)}
+
+/* ── chart ── */
+.chart-wrap{position:relative;height:160px;width:100%}
+canvas.chart{width:100%;height:100%;display:block}
+
+/* ── obstruction map ── */
+#obs-canvas-wrap{display:flex;justify-content:center;padding:10px 0}
+#obs-canvas{
+  border-radius:50%;
+  border:1px solid var(--border2);
+  background:#03060a;
+  box-shadow:0 0 40px rgba(0,157,255,0.08);
+}
+
+/* ── form ── */
+.form-row{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:14px}
+.form-group{display:flex;flex-direction:column;gap:6px;min-width:180px}
+.form-group label{
+  font-size:10px;font-weight:600;
+  letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--muted);
+}
+.form-group input{
+  background:var(--surface2);
+  border:1px solid var(--border2);
+  border-radius:var(--radius-sm);
+  padding:9px 12px;
+  color:var(--text);
+  font-size:13px;font-family:inherit;
+  outline:none;
+  transition:border-color .18s;
+}
+.form-group input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+
+/* ── toast ── */
+#toast-wrap{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:999}
+.toast{
+  padding:12px 18px;
+  border-radius:var(--radius-md);
+  font-size:12px;font-weight:600;
+  letter-spacing:0.04em;
+  box-shadow:0 8px 32px rgba(0,0,0,0.6);
+  animation:fadeUp .22s ease;
+  max-width:320px;
+}
+.toast.ok{background:#071a10;color:var(--green);border:1px solid rgba(0,212,126,0.3)}
+.toast.err{background:#1a0706;color:var(--red);border:1px solid rgba(255,59,48,0.3)}
+.toast.info{background:#040f1a;color:var(--accent);border:1px solid rgba(0,157,255,0.3)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── skeleton ── */
+.skeleton{
+  background:linear-gradient(90deg,var(--surface2) 25%,var(--surface3) 50%,var(--surface2) 75%);
+  background-size:400% 100%;
+  animation:shimmer 1.5s infinite;
+  border-radius:var(--radius-md);
+  display:inline-block;
+}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+
+/* ── misc ── */
+.refresh-row{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.refresh-row .last-update{
+  font-size:11px;font-weight:500;
+  letter-spacing:0.04em;
+  color:var(--muted);
+}
+.alert-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;font-weight:600;
+  letter-spacing:0.04em;
+  padding:4px 10px;margin:3px;
+  border-radius:6px;
+}
+.alert-chip.active{background:rgba(255,149,0,0.12);color:var(--yellow);border:1px solid rgba(255,149,0,0.28)}
+.alert-chip.clear{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.no-data{color:var(--muted);font-size:13px}
+hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
+
+/* ── scrollbar ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo">
+    <!-- Starlink-style dish / orbit mark -->
+    <svg class="logo-mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="16" cy="16" r="15" stroke="#009DFF" stroke-width="1.4"/>
+      <ellipse cx="16" cy="16" rx="15" ry="6" stroke="#009DFF" stroke-width="1" stroke-dasharray="2 2"/>
+      <circle cx="16" cy="16" r="3.5" fill="#009DFF" fill-opacity="0.3" stroke="#009DFF" stroke-width="1.2"/>
+      <line x1="16" y1="1" x2="16" y2="12.5" stroke="#009DFF" stroke-width="1" stroke-opacity="0.6"/>
+      <line x1="16" y1="19.5" x2="16" y2="31" stroke="#009DFF" stroke-width="1" stroke-opacity="0.6"/>
+      <line x1="1" y1="16" x2="12.5" y2="16" stroke="#009DFF" stroke-width="1" stroke-opacity="0.6"/>
+      <line x1="19.5" y1="16" x2="31" y2="16" stroke="#009DFF" stroke-width="1" stroke-opacity="0.6"/>
+    </svg>
+    <div class="logo-wordmark">
+      <span class="l1">Starlink</span>
+      <span class="l2">Network Admin</span>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <span id="conn-status" class="conn-badge idle">Connecting</span>
+</header>
+
+<div class="body-wrap">
+
+<!-- ── SIDEBAR ── -->
+<nav id="sidebar">
+  <div class="nav-group">Overview</div>
+  <a href="#dashboard" class="nav-link active" data-page="dashboard">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+    Dashboard
+  </a>
+
+  <div class="nav-divider"></div>
+  <div class="nav-group">Dish</div>
+  <a href="#dishy-status" class="nav-link" data-page="dishy-status">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+    Status
+  </a>
+  <a href="#dishy-diagnostics" class="nav-link" data-page="dishy-diagnostics">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Diagnostics
+  </a>
+  <a href="#dishy-history" class="nav-link" data-page="dishy-history">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    History &amp; Signal
+  </a>
+  <a href="#dishy-obstruction" class="nav-link" data-page="dishy-obstruction">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
+    Obstruction Map
+  </a>
+  <a href="#dishy-location" class="nav-link" data-page="dishy-location">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    Location
+  </a>
+  <a href="#dishy-controls" class="nav-link" data-page="dishy-controls">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    Controls
+  </a>
+
+  <div class="nav-divider"></div>
+  <div class="nav-group">Router</div>
+  <a href="#router-diagnostics" class="nav-link" data-page="router-diagnostics">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+    Diagnostics
+  </a>
+
+  <div class="nav-divider"></div>
+  <div class="nav-group">System</div>
+  <a href="#settings" class="nav-link" data-page="settings">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Settings
+  </a>
+</nav>
+
+<!-- ── MAIN ── -->
+<main id="main">
+
+  <!-- ════ DASHBOARD ════ -->
+  <section id="page-dashboard" class="page active">
+    <div class="page-title">Dashboard</div>
+    <div class="page-sub">Live overview of your Starlink system</div>
+
+    <div class="refresh-row">
+      <button class="btn btn-primary btn-sm" onclick="refreshDashboard()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Refresh
+      </button>
+      <span class="last-update" id="dash-updated">Never updated</span>
+    </div>
+
+    <div class="cards" id="dash-cards">
+      <div class="card"><div class="label">Dish Status</div><div class="value" id="d-state">—</div></div>
+      <div class="card blue"><div class="label">Downlink</div><div class="value" id="d-dl">—</div><div class="unit">Mbps</div></div>
+      <div class="card blue"><div class="label">Uplink</div><div class="value" id="d-ul">—</div><div class="unit">Mbps</div></div>
+      <div class="card"><div class="label">Latency</div><div class="value" id="d-lat">—</div><div class="unit">ms</div></div>
+      <div class="card"><div class="label">Uptime</div><div class="value" id="d-uptime">—</div></div>
+      <div class="card"><div class="label">Obstructed</div><div class="value" id="d-obst">—</div></div>
+      <div class="card"><div class="label">SNR Above Min</div><div class="value" id="d-snr">—</div></div>
+      <div class="card"><div class="label">Alerts</div><div class="value" id="d-alerts">—</div></div>
+    </div>
+
+    <div style="height:20px"></div>
+    <div class="box">
+      <div class="box-title">Dish Alerts</div>
+      <div id="dash-alerts-list"><span class="no-data">Load data to see alerts</span></div>
+    </div>
+  </section>
+
+  <!-- ════ DISHY STATUS ════ -->
+  <section id="page-dishy-status" class="page">
+    <div class="page-title">Dish Status</div>
+    <div class="page-sub">Real-time status from the Dishy gRPC API</div>
+
+    <div class="refresh-row">
+      <button class="btn btn-primary btn-sm" onclick="loadDishyStatus()">Refresh</button>
+      <span class="last-update" id="status-updated">Never updated</span>
+    </div>
+    <div id="dishy-status-content"><span class="no-data">Click Refresh to load</span></div>
+  </section>
+
+  <!-- ════ DISHY DIAGNOSTICS ════ -->
+  <section id="page-dishy-diagnostics" class="page">
+    <div class="page-title">Dish Diagnostics</div>
+    <div class="page-sub">Detailed diagnostics, alerts, and test results</div>
+
+    <div class="refresh-row">
+      <button class="btn btn-primary btn-sm" onclick="loadDishyDiagnostics()">Refresh</button>
+      <span class="last-update" id="diag-updated">Never updated</span>
+    </div>
+    <div id="dishy-diag-content"><span class="no-data">Click Refresh to load</span></div>
+  </section>
+
+  <!-- ════ DISHY HISTORY ════ -->
+  <section id="page-dishy-history" class="page">
+    <div class="page-title">History &amp; Signal Charts</div>
+    <div class="page-sub">Recent throughput, latency, and packet loss history</div>
+
+    <div class="refresh-row">
+      <button class="btn btn-primary btn-sm" onclick="loadDishyHistory()">Refresh</button>
+      <span class="last-update" id="hist-updated">Never updated</span>
+    </div>
+
+    <div class="box">
+      <div class="box-title">Download Throughput (Mbps)</div>
+      <div class="chart-wrap"><canvas id="chart-dl"></canvas></div>
+    </div>
+    <div class="box">
+      <div class="box-title">Upload Throughput (Mbps)</div>
+      <div class="chart-wrap"><canvas id="chart-ul"></canvas></div>
+    </div>
+    <div class="box">
+      <div class="box-title">Latency (ms)</div>
+      <div class="chart-wrap"><canvas id="chart-lat"></canvas></div>
+    </div>
+    <div class="box">
+      <div class="box-title">Packet Loss (%)</div>
+      <div class="chart-wrap"><canvas id="chart-loss"></canvas></div>
+    </div>
+    <div id="hist-raw-content"></div>
+  </section>
+
+  <!-- ════ DISHY OBSTRUCTION MAP ════ -->
+  <section id="page-dishy-obstruction" class="page">
+    <div class="page-title">Obstruction Map</div>
+    <div class="page-sub">Sky view showing obstructions in the satellite path</div>
+
+    <div class="refresh-row">
+      <button class="btn btn-primary btn-sm" onclick="loadObstruction()">Refresh</button>
+      <span class="last-update" id="obs-updated">Never updated</span>
+    </div>
+    <div class="box">
+      <div class="box-title">Sky Obstruction View</div>
+      <div id="obs-canvas-wrap"><canvas id="obs-canvas" width="400" height="400"></canvas></div>
+      <div id="obs-stats" style="margin-top:14px"></div>
+    </div>
+  </section>
+
+  <!-- ════ DISHY LOCATION ════ -->
+  <section id="page-dishy-location" class="page">
+    <div class="page-title">Location</div>
+    <div class="page-sub">GPS coordinates from the dish (must be enabled in dish settings)</div>
+
+    <div class="refresh-row">
+      <button class="btn btn-primary btn-sm" onclick="loadLocation()">Refresh</button>
+      <span class="last-update" id="loc-updated">Never updated</span>
+    </div>
+    <div id="location-content"><span class="no-data">Click Refresh to load</span></div>
+  </section>
+
+  <!-- ════ DISHY CONTROLS ════ -->
+  <section id="page-dishy-controls" class="page">
+    <div class="page-title">Dish Controls</div>
+    <div class="page-sub">Send commands directly to the dish hardware</div>
+
+    <div class="box">
+      <div class="box-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12H3l9-9 9 9h-2"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+        Stow / Unstow
+      </div>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Stow retracts the dish to its travel position. Unstow deploys it for satellite tracking.</p>
+      <div class="btn-group">
+        <button class="btn btn-warn" onclick="dishyAction('stow')">Stow Dish</button>
+        <button class="btn btn-primary" onclick="dishyAction('unstow')">Unstow Dish</button>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="box-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        System Reboot
+      </div>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Issues a reboot command to the dish. The dish will go offline briefly.</p>
+      <button class="btn btn-danger" onclick="confirmReboot()">Reboot Dish</button>
+    </div>
+    <div id="controls-result"></div>
+  </section>
+
+  <!-- ════ ROUTER DIAGNOSTICS ════ -->
+  <section id="page-router-diagnostics" class="page">
+    <div class="page-title">Router Diagnostics</div>
+    <div class="page-sub">WiFi Router diagnostics via local gRPC API</div>
+
+    <div class="refresh-row">
+      <button class="btn btn-primary btn-sm" onclick="loadRouterDiag()">Refresh</button>
+      <span class="last-update" id="rdg-updated">Never updated</span>
+    </div>
+    <div id="router-diag-content"><span class="no-data">Click Refresh to load</span></div>
+  </section>
+
+  <!-- ════ SETTINGS ════ -->
+  <section id="page-settings" class="page">
+    <div class="page-title">Settings</div>
+    <div class="page-sub">Configure device addresses. When running as a Home Assistant add-on, defaults are loaded from the add-on options in HA.</div>
+
+    <div class="box" style="border-color:rgba(0,157,255,0.2);background:rgba(0,157,255,0.04)">
+      <div class="box-title" style="color:var(--accent)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Home Assistant Add-on
+      </div>
+      <p style="font-size:13px;color:var(--text2);line-height:1.6">
+        Running as an HA add-on? Set <strong style="color:var(--text)">dish_host</strong>, <strong style="color:var(--text)">dish_port</strong>,
+        <strong style="color:var(--text)">router_host</strong>, and <strong style="color:var(--text)">router_port</strong> in the
+        add-on <em>Configuration</em> tab — they become the server-side defaults.
+        Overrides below are per-session only (they reset on refresh).
+      </p>
+    </div>
+
+    <div class="box">
+      <div class="box-title">Device Addresses</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Dish IP Address</label>
+          <input id="cfg-dish-host" type="text" placeholder="192.168.100.1"/>
+        </div>
+        <div class="form-group">
+          <label>Dish gRPC Port</label>
+          <input id="cfg-dish-port" type="number" placeholder="9200"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Router IP Address</label>
+          <input id="cfg-router-host" type="text" placeholder="192.168.1.1"/>
+        </div>
+        <div class="form-group">
+          <label>Router gRPC Port</label>
+          <input id="cfg-router-port" type="number" placeholder="9000"/>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveSettings()">Save &amp; Apply</button>
+    </div>
+
+    <div class="box">
+      <div class="box-title">Auto Refresh</div>
+      <div class="form-row" style="align-items:center">
+        <div class="form-group">
+          <label>Interval (seconds, 0 = disabled)</label>
+          <input id="cfg-interval" type="number" value="0" min="0" max="600" placeholder="0"/>
+        </div>
+        <div style="padding-top:18px">
+          <button class="btn btn-primary" onclick="applyInterval()">Apply</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main><!-- /main -->
+</div><!-- /body-wrap -->
+</div><!-- /app -->
+
+<!-- ── TOAST CONTAINER ── -->
+<div id="toast-wrap"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// CONFIG & STATE
+// ════════════════════════════════════════════════════════════════════
+
+const cfg = {
+  dishHost: '192.168.100.1',
+  dishPort: 9200,
+  routerHost: '192.168.1.1',
+  routerPort: 9000,
+};
+
+let autoRefreshTimer = null;
+let currentPage = 'dashboard';
+
+// ════════════════════════════════════════════════════════════════════
+// ROUTING
+// ════════════════════════════════════════════════════════════════════
+
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    const page = link.dataset.page;
+    navigate(page);
+  });
+});
+
+function navigate(page) {
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
+  currentPage = page;
+  autoLoad(page);
+}
+
+function autoLoad(page) {
+  const map = {
+    'dashboard': refreshDashboard,
+    'dishy-status': loadDishyStatus,
+    'dishy-diagnostics': loadDishyDiagnostics,
+    'dishy-history': loadDishyHistory,
+    'dishy-obstruction': loadObstruction,
+    'dishy-location': loadLocation,
+    'router-diagnostics': loadRouterDiag,
+  };
+  if (map[page]) map[page]();
+}
+
+// ════════════════════════════════════════════════════════════════════
+// API HELPERS
+// ════════════════════════════════════════════════════════════════════
+
+function qs() {
+  return `?dishHost=${encodeURIComponent(cfg.dishHost)}&dishPort=${cfg.dishPort}&routerHost=${encodeURIComponent(cfg.routerHost)}&routerPort=${cfg.routerPort}`;
+}
+
+async function apiFetch(path) {
+  const r = await fetch('/api' + path + qs());
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'Unknown error');
+  return j.data;
+}
+
+async function apiPost(path) {
+  const r = await fetch('/api' + path + qs(), { method: 'POST' });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'Unknown error');
+  return j.data;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════════════════════════════
+
+function toast(msg, type = 'info', dur = 4000) {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.getElementById('toast-wrap').appendChild(el);
+  setTimeout(() => el.remove(), dur);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════════════════
+
+async function refreshDashboard() {
+  updateConnStatus('idle', 'Fetching…');
+  try {
+    const status = await apiFetch('/dishy/status');
+    const dev = status.deviceState || {};
+    const dish = status.dishStats || {};
+    const alerts = status.alerts || {};
+
+    const uptime = dev.uptimeS != null ? fmtUptime(dev.uptimeS) : '—';
+    const dl = dish.downlinkThroughputBps != null ? (dish.downlinkThroughputBps / 1e6).toFixed(1) : '—';
+    const ul = dish.uplinkThroughputBps != null ? (dish.uplinkThroughputBps / 1e6).toFixed(1) : '—';
+    const lat = dish.popPingLatencyMs != null ? dish.popPingLatencyMs.toFixed(1) : '—';
+    const obst = dish.fractionObstructedOvr60s != null ? (dish.fractionObstructedOvr60s * 100).toFixed(1) + '%' : '—';
+    const snr = dish.snrAboveNoiseFloor != null ? (dish.snrAboveNoiseFloor ? 'Yes' : 'No') : '—';
+
+    const state = dev.state || status.state || '—';
+    const activeAlerts = Object.entries(alerts).filter(([,v]) => v === true);
+
+    set('d-state', state);
+    set('d-dl', dl);
+    set('d-ul', ul);
+    set('d-lat', lat);
+    set('d-uptime', uptime);
+    set('d-obst', obst);
+    set('d-snr', snr);
+    set('d-alerts', activeAlerts.length);
+
+    // colour
+    colorCard('d-dl', parseFloat(dl) > 50 ? 'blue' : parseFloat(dl) > 10 ? 'yellow' : 'red');
+    colorCard('d-ul', parseFloat(ul) > 10 ? 'blue' : parseFloat(ul) > 2 ? 'yellow' : 'red');
+    colorCard('d-lat', parseFloat(lat) < 80 ? 'green' : parseFloat(lat) < 200 ? 'yellow' : 'red');
+    colorCard('d-alerts', activeAlerts.length === 0 ? 'green' : 'red');
+
+    const alertsEl = document.getElementById('dash-alerts-list');
+    if (activeAlerts.length === 0) {
+      alertsEl.innerHTML = '<span class="pill ok">No active alerts</span>';
+    } else {
+      alertsEl.innerHTML = activeAlerts.map(([k]) =>
+        `<span class="alert-chip active">${fmtKey(k)}</span>`
+      ).join('') + Object.entries(alerts).filter(([,v]) => !v).map(([k]) =>
+        `<span class="alert-chip clear">${fmtKey(k)}</span>`
+      ).join('');
+    }
+
+    set('dash-updated', 'Updated ' + now());
+    updateConnStatus('ok', 'Connected');
+  } catch(e) {
+    updateConnStatus('err', 'Error');
+    toast('Dashboard error: ' + e.message, 'err');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DISHY STATUS
+// ════════════════════════════════════════════════════════════════════
+
+async function loadDishyStatus() {
+  const el = document.getElementById('dishy-status-content');
+  el.innerHTML = '<span class="skeleton" style="width:100%;height:200px;display:block"></span>';
+  try {
+    const data = await apiFetch('/dishy/status');
+    el.innerHTML = renderJsonTable(data);
+    set('status-updated', 'Updated ' + now());
+  } catch(e) {
+    el.innerHTML = renderError(e);
+    toast('Status error: ' + e.message, 'err');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DISHY DIAGNOSTICS
+// ════════════════════════════════════════════════════════════════════
+
+async function loadDishyDiagnostics() {
+  const el = document.getElementById('dishy-diag-content');
+  el.innerHTML = '<span class="skeleton" style="width:100%;height:200px;display:block"></span>';
+  try {
+    const data = await apiFetch('/dishy/diagnostics');
+    el.innerHTML = renderDiagnostics(data);
+    set('diag-updated', 'Updated ' + now());
+  } catch(e) {
+    el.innerHTML = renderError(e);
+    toast('Diagnostics error: ' + e.message, 'err');
+  }
+}
+
+function renderDiagnostics(d) {
+  let html = '';
+
+  // Alerts section
+  if (d.alerts) {
+    const active = Object.entries(d.alerts).filter(([,v]) => v);
+    const clear = Object.entries(d.alerts).filter(([,v]) => !v);
+    html += `<div class="box"><div class="box-title">Alerts <span class="badge ${active.length ? 'pill err' : 'pill ok'}">${active.length} active</span></div>`;
+    html += active.map(([k]) => `<span class="alert-chip active">${fmtKey(k)}</span>`).join('');
+    if (active.length === 0) html += '<span class="pill ok" style="margin:4px">All clear</span>';
+    html += '<hr class="sep">';
+    html += clear.map(([k]) => `<span class="alert-chip clear">${fmtKey(k)}</span>`).join('');
+    html += '</div>';
+  }
+
+  // Location
+  if (d.location) {
+    html += renderKVBox('Location', d.location);
+  }
+
+  // Everything else
+  const skip = new Set(['alerts','location']);
+  const rest = Object.fromEntries(Object.entries(d).filter(([k]) => !skip.has(k)));
+  if (Object.keys(rest).length) html += renderJsonTable(rest);
+
+  return html || renderJsonTable(d);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DISHY HISTORY & CHARTS
+// ════════════════════════════════════════════════════════════════════
+
+const charts = {};
+
+async function loadDishyHistory() {
+  const el = document.getElementById('hist-raw-content');
+  set('hist-updated', 'Loading…');
+  try {
+    const data = await apiFetch('/dishy/history');
+    const dl  = (data.downlinkThroughputBps || []).map(v => +(v / 1e6).toFixed(3));
+    const ul  = (data.uplinkThroughputBps   || []).map(v => +(v / 1e6).toFixed(3));
+    const lat = data.popPingLatencyMs        || [];
+    const loss= data.popPingDropRate         || [];
+
+drawChart('chart-dl',  dl,   '#009DFF', 'Mbps');
+  drawChart('chart-ul',  ul,   '#00D47E', 'Mbps');
+  drawChart('chart-lat', lat,  '#FF9500', 'ms');
+  drawChart('chart-loss',loss.map(v => +(v*100).toFixed(2)), '#FF3B30', '%');
+
+    // Stats summary
+    const summary = [
+      { label:'Avg Download', value: (avg(dl)).toFixed(1) + ' Mbps' },
+      { label:'Peak Download', value: (Math.max(...dl)).toFixed(1) + ' Mbps' },
+      { label:'Avg Upload', value: (avg(ul)).toFixed(1) + ' Mbps' },
+      { label:'Avg Latency', value: (avg(lat)).toFixed(1) + ' ms' },
+      { label:'Min Latency', value: (Math.min(...lat.filter(v=>v>0))||0).toFixed(1) + ' ms' },
+      { label:'Max Latency', value: (Math.max(...lat)).toFixed(1) + ' ms' },
+      { label:'Avg Loss', value: (avg(loss)*100).toFixed(2) + '%' },
+      { label:'Samples', value: dl.length },
+    ];
+    el.innerHTML = '<div class="cards">' + summary.map(s =>
+      `<div class="card blue"><div class="label">${s.label}</div><div class="value">${s.value}</div></div>`
+    ).join('') + '</div>';
+
+    set('hist-updated', 'Updated ' + now());
+  } catch(e) {
+    el.innerHTML = renderError(e);
+    toast('History error: ' + e.message, 'err');
+  }
+}
+
+function drawChart(id, data, color, unit) {
+  const canvas = document.getElementById(id);
+  const wrapper = canvas.parentElement;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = wrapper.clientWidth || 800;
+  const h = wrapper.clientHeight || 160;
+  // Pin CSS size to the wrapper so offsetWidth never drifts on re-read
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  ctx.scale(dpr, dpr);
+
+  ctx.clearRect(0, 0, w, h);
+
+  if (!data || data.length < 2) {
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '13px Inter,sans-serif';
+    ctx.fillText('No data', 10, h / 2);
+    return;
+  }
+
+  const pad = { top: 10, right: 10, bottom: 24, left: 44 };
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
+  const maxV = Math.max(...data, 0.001);
+  const minV = Math.min(...data, 0);
+
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + ch - (i / 4) * ch;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    const val = minV + (i / 4) * (maxV - minV);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '10px Inter,sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(1), pad.left - 4, y + 3);
+  }
+
+  // line
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  data.forEach((v, i) => {
+    const x = pad.left + (i / (data.length - 1)) * cw;
+    const y = pad.top + ch - ((v - minV) / (maxV - minV)) * ch;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // fill
+  ctx.lineTo(pad.left + cw, pad.top + ch);
+  ctx.lineTo(pad.left, pad.top + ch);
+  ctx.closePath();
+  ctx.fillStyle = color + '22';
+  ctx.fill();
+}
+
+// ════════════════════════════════════════════════════════════════════
+// OBSTRUCTION MAP
+// ════════════════════════════════════════════════════════════════════
+
+async function loadObstruction() {
+  const statsEl = document.getElementById('obs-stats');
+  set('obs-updated', 'Loading…');
+  statsEl.innerHTML = '';
+  try {
+    const data = await apiFetch('/dishy/obstruction-map');
+    drawObstructionMap(data);
+
+    const stats = [
+      { label: 'Fraction Obstructed', value: data.fractionObstructed != null ? (data.fractionObstructed * 100).toFixed(2) + '%' : '—' },
+      { label: 'Valid Samples', value: data.numRows != null ? (data.numRows * (data.numCols || 0)) : '—' },
+    ];
+    statsEl.innerHTML = '<div class="cards">' + stats.map(s =>
+      `<div class="card"><div class="label">${s.label}</div><div class="value">${s.value}</div></div>`
+    ).join('') + '</div>';
+    set('obs-updated', 'Updated ' + now());
+  } catch(e) {
+    statsEl.innerHTML = renderError(e);
+    toast('Obstruction error: ' + e.message, 'err');
+  }
+}
+
+function drawObstructionMap(data) {
+  const canvas = document.getElementById('obs-canvas');
+  const ctx = canvas.getContext('2d');
+  const size = 400;
+  canvas.width = size;
+  canvas.height = size;
+  ctx.clearRect(0, 0, size, size);
+
+  const snr = data.snr || [];
+  const rows = data.numRows || 1;
+  const cols = data.numCols || snr.length / rows;
+
+  if (!snr.length) {
+    ctx.fillStyle = '#8b949e';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No obstruction data', size / 2, size / 2);
+    return;
+  }
+
+  ctx.fillStyle = '#040a0f';
+  ctx.fillRect(0, 0, size, size);
+
+  const cellW = size / cols;
+  const cellH = size / rows;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
+      const val = snr[idx] || 0;
+      const norm = Math.max(0, Math.min(1, val));
+      if (norm < 0.01) {
+        ctx.fillStyle = '#f85149aa';
+      } else {
+        const g = Math.round(40 + norm * 155);
+        ctx.fillStyle = `rgba(0,${g},40,0.85)`;
+      }
+      ctx.fillRect(c * cellW, r * cellH, cellW + 1, cellH + 1);
+    }
+  }
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(size/2, size/2, size/2 - 2, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = 'bold 11px Inter,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('N', size/2, 16);
+  ctx.fillText('S', size/2, size - 4);
+  ctx.fillText('W', 10, size/2 + 4);
+  ctx.fillText('E', size - 10, size/2 + 4);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// LOCATION
+// ════════════════════════════════════════════════════════════════════
+
+async function loadLocation() {
+  const el = document.getElementById('location-content');
+  el.innerHTML = '<span class="skeleton" style="width:100%;height:120px;display:block"></span>';
+  try {
+    const data = await apiFetch('/dishy/location');
+    const lat  = data.lla?.lat  ?? data.latitude  ?? '—';
+    const lon  = data.lla?.lon  ?? data.longitude ?? '—';
+    const alt  = data.lla?.alt  ?? data.altitude  ?? '—';
+    const src  = data.source ?? '—';
+    el.innerHTML = `
+      <div class="cards">
+        <div class="card blue"><div class="label">Latitude</div><div class="value">${typeof lat === 'number' ? lat.toFixed(6) : lat}</div></div>
+        <div class="card blue"><div class="label">Longitude</div><div class="value">${typeof lon === 'number' ? lon.toFixed(6) : lon}</div></div>
+        <div class="card"><div class="label">Altitude (m)</div><div class="value">${typeof alt === 'number' ? alt.toFixed(1) : alt}</div></div>
+        <div class="card"><div class="label">Source</div><div class="value" style="font-size:14px">${src}</div></div>
+      </div>
+      <div style="height:14px"></div>
+      ${typeof lat === 'number' && typeof lon === 'number' ? `<div class="box"><div class="box-title">Map Link</div><a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=12" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Open in OpenStreetMap ↗</a></div>` : ''}
+      ${renderJsonTable(data)}
+    `;
+    set('loc-updated', 'Updated ' + now());
+  } catch(e) {
+    el.innerHTML = renderError(e);
+    toast('Location error: ' + e.message, 'err');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// CONTROLS
+// ════════════════════════════════════════════════════════════════════
+
+async function dishyAction(action) {
+  const el = document.getElementById('controls-result');
+  el.innerHTML = '<span class="pill idle">Sending command…</span>';
+  try {
+    const ok = await apiPost('/dishy/' + action);
+    el.innerHTML = `<span class="pill ok">Command '${action}' sent successfully (result: ${ok})</span>`;
+    toast(`Dish ${action} command sent`, 'ok');
+  } catch(e) {
+    el.innerHTML = renderError(e);
+    toast(`${action} failed: ${e.message}`, 'err');
+  }
+}
+
+async function confirmReboot() {
+  if (!confirm('Are you sure you want to reboot the dish? It will go offline briefly.')) return;
+  await dishyAction('reboot');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ROUTER DIAGNOSTICS
+// ════════════════════════════════════════════════════════════════════
+
+async function loadRouterDiag() {
+  const el = document.getElementById('router-diag-content');
+  el.innerHTML = '<span class="skeleton" style="width:100%;height:200px;display:block"></span>';
+  try {
+    const data = await apiFetch('/router/diagnostics');
+    el.innerHTML = renderRouterDiag(data);
+    set('rdg-updated', 'Updated ' + now());
+  } catch(e) {
+    el.innerHTML = renderError(e);
+    toast('Router diag error: ' + e.message, 'err');
+  }
+}
+
+function renderRouterDiag(d) {
+  let html = '';
+
+  // Network info
+  if (d.networks || d.network) {
+    const nets = d.networks || (d.network ? [d.network] : []);
+    html += `<div class="box"><div class="box-title">Networks</div>`;
+    nets.forEach(n => {
+      html += `<div style="margin-bottom:12px">${renderKVTable(n)}</div>`;
+    });
+    html += '</div>';
+  }
+
+  // Clients / stations
+  if (d.clients || d.stations) {
+    const clients = d.clients || d.stations || [];
+    html += `<div class="box"><div class="box-title">Connected Clients (${clients.length})</div>`;
+    if (clients.length) {
+      html += `<table class="tbl"><thead><tr><th>MAC / ID</th><th>Interface</th><th>Signal (dBm)</th><th>TX (Mbps)</th><th>RX (Mbps)</th></tr></thead><tbody>`;
+      clients.forEach(c => {
+        html += `<tr>
+          <td>${c.mac || c.id || '—'}</td>
+          <td>${c.interface || c.iface || '—'}</td>
+          <td>${c.signalStrength ?? c.rssi ?? '—'}</td>
+          <td>${c.txThroughputBps != null ? (c.txThroughputBps/1e6).toFixed(2) : '—'}</td>
+          <td>${c.rxThroughputBps != null ? (c.rxThroughputBps/1e6).toFixed(2) : '—'}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+    } else {
+      html += '<span class="no-data">No clients</span>';
+    }
+    html += '</div>';
+  }
+
+  // WAN / uptime
+  const skip = new Set(['networks','network','clients','stations']);
+  const rest = Object.fromEntries(Object.entries(d).filter(([k]) => !skip.has(k)));
+  if (Object.keys(rest).length) html += renderJsonTable(rest);
+
+  return html || renderJsonTable(d);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SETTINGS
+// ════════════════════════════════════════════════════════════════════
+
+function saveSettings() {
+  cfg.dishHost   = document.getElementById('cfg-dish-host').value.trim()   || '192.168.100.1';
+  cfg.dishPort   = parseInt(document.getElementById('cfg-dish-port').value  || '9200', 10);
+  cfg.routerHost = document.getElementById('cfg-router-host').value.trim() || '192.168.1.1';
+  cfg.routerPort = parseInt(document.getElementById('cfg-router-port').value || '9000', 10);
+  toast('Settings saved. Refreshing current data…', 'ok');
+  autoLoad(currentPage);
+}
+
+function applyInterval() {
+  const secs = parseInt(document.getElementById('cfg-interval').value || '0', 10);
+  clearInterval(autoRefreshTimer);
+  if (secs > 0) {
+    autoRefreshTimer = setInterval(() => autoLoad(currentPage), secs * 1000);
+    toast(`Auto-refresh every ${secs}s enabled`, 'ok');
+  } else {
+    toast('Auto-refresh disabled', 'info');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// RENDER HELPERS
+// ════════════════════════════════════════════════════════════════════
+
+function renderJsonTable(obj, depth = 0) {
+  if (obj == null) return '<span class="no-data">null</span>';
+  if (typeof obj !== 'object') return `<span>${String(obj)}</span>`;
+  if (Array.isArray(obj)) {
+    if (!obj.length) return '<span class="no-data">Empty array</span>';
+    if (typeof obj[0] === 'object') {
+      // table
+      const keys = [...new Set(obj.flatMap(r => Object.keys(r || {})))];
+      return `<div style="overflow-x:auto"><table class="tbl"><thead><tr>${keys.map(k => `<th>${fmtKey(k)}</th>`).join('')}</tr></thead><tbody>${
+        obj.map(r => `<tr>${keys.map(k => `<td>${renderCell(r[k])}</td>`).join('')}</tr>`).join('')
+      }</tbody></table></div>`;
+    }
+    return obj.map(v => `<span style="display:inline-block;margin:2px 4px;padding:2px 6px;background:var(--surface2);border-radius:4px;font-size:12px">${v}</span>`).join('');
+  }
+
+  const entries = Object.entries(obj);
+  if (!entries.length) return '<span class="no-data">Empty</span>';
+
+  const isLeaf = e => typeof e[1] !== 'object' || e[1] === null;
+  const flat = entries.every(isLeaf);
+
+  if (flat || depth > 1) {
+    return `<div class="box" style="${depth > 0 ? 'margin-bottom:8px' : ''}"><table class="tbl">${
+      entries.map(([k,v]) => `<tr><td style="color:var(--muted);white-space:nowrap;width:200px">${fmtKey(k)}</td><td>${renderCell(v)}</td></tr>`).join('')
+    }</table></div>`;
+  }
+
+  // nested
+  let html = '';
+  entries.forEach(([k, v]) => {
+    if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      html += `<div class="box"><div class="box-title">${fmtKey(k)}</div>${renderJsonTable(v, depth + 1)}</div>`;
+    } else if (Array.isArray(v)) {
+      html += `<div class="box"><div class="box-title">${fmtKey(k)} <span style="color:var(--muted);font-weight:400">[${v.length}]</span></div>${renderJsonTable(v, depth + 1)}</div>`;
+    } else {
+      html += `<div class="box"><table class="tbl"><tr><td style="color:var(--muted);width:200px">${fmtKey(k)}</td><td>${renderCell(v)}</td></tr></table></div>`;
+    }
+  });
+  return html;
+}
+
+function renderKVBox(title, obj) {
+  return `<div class="box"><div class="box-title">${title}</div>${renderKVTable(obj)}</div>`;
+}
+
+function renderKVTable(obj) {
+  if (!obj || typeof obj !== 'object') return String(obj);
+  return `<table class="tbl">${Object.entries(obj).map(([k,v]) =>
+    `<tr><td style="color:var(--muted);white-space:nowrap;width:200px">${fmtKey(k)}</td><td>${renderCell(v)}</td></tr>`
+  ).join('')}</table>`;
+}
+
+function renderCell(v) {
+  if (v === null || v === undefined) return '<span style="color:var(--muted)">—</span>';
+  if (typeof v === 'boolean') return v
+    ? '<span class="pill ok" style="padding:1px 8px">true</span>'
+    : '<span class="pill err" style="padding:1px 8px">false</span>';
+  if (typeof v === 'number') return `<span style="font-variant-numeric: tabular-nums">${v.toLocaleString()}</span>`;
+  if (Array.isArray(v)) {
+    if (!v.length) return '<span style="color:var(--muted)">[]</span>';
+    if (typeof v[0] === 'object') return `<em style="color:var(--muted);font-size:12px">[${v.length} items]</em>`;
+    return v.slice(0, 20).map(x => `<span style="display:inline-block;margin:1px 2px;padding:1px 5px;background:var(--surface2);border-radius:3px;font-size:11px">${x}</span>`).join('') + (v.length > 20 ? `<em style="color:var(--muted);font-size:11px"> +${v.length - 20} more</em>` : '');
+  }
+  if (typeof v === 'object') return `<em style="color:var(--muted);font-size:12px">{object}</em>`;
+  return String(v);
+}
+
+function renderError(e) {
+  return `<div class="box" style="border-color:var(--red)"><div style="color:var(--red);font-weight:700;margin-bottom:6px">Error</div><div style="color:var(--muted)">${e.message}</div></div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════════════════════
+
+function set(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function colorCard(valueId, colorClass) {
+  const el = document.getElementById(valueId)?.closest('.card');
+  if (!el) return;
+  el.className = 'card ' + colorClass;
+}
+
+function updateConnStatus(type, label) {
+  const el = document.getElementById('conn-status');
+  el.className = 'conn-badge ' + type;
+  el.textContent = label;
+}
+
+function now() {
+  return new Date().toLocaleTimeString();
+}
+
+function fmtUptime(s) {
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const parts = [];
+  if (d) parts.push(d + 'd');
+  if (h) parts.push(h + 'h');
+  parts.push(m + 'm');
+  return parts.join(' ');
+}
+
+function fmtKey(k) {
+  return String(k)
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .trim();
+}
+
+function avg(arr) {
+  if (!arr || !arr.length) return 0;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════════
+
+async function init() {
+  // Load server-side defaults (from HA add-on options / env vars)
+  try {
+    const r = await fetch('/api/config');
+    const defaults = await r.json();
+    cfg.dishHost   = defaults.dishHost   || cfg.dishHost;
+    cfg.dishPort   = defaults.dishPort   || cfg.dishPort;
+    cfg.routerHost = defaults.routerHost || cfg.routerHost;
+    cfg.routerPort = defaults.routerPort || cfg.routerPort;
+  } catch (_) { /* fall back to hard-coded defaults */ }
+
+  // Pre-populate settings form
+  document.getElementById('cfg-dish-host').value   = cfg.dishHost;
+  document.getElementById('cfg-dish-port').value   = cfg.dishPort;
+  document.getElementById('cfg-router-host').value = cfg.routerHost;
+  document.getElementById('cfg-router-port').value = cfg.routerPort;
+
+  refreshDashboard();
+}
+
+init();
+</script>
+</body>
+</html>

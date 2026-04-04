@@ -1,0 +1,39 @@
+name: "Starlink GUI"
+description: "Full router-style admin interface for your local Starlink dish and WiFi router via gRPC"
+version: "1.0.0"
+slug: "starlink_gui"
+init: false
+
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+
+startup: services
+boot: auto
+
+# Web UI via HA ingress (no port exposure needed)
+ingress: true
+ingress_port: 3000
+panel_icon: mdi:satellite-uplink
+panel_title: Starlink
+
+# Optional direct port access (0 = disabled by default)
+ports:
+  3000/tcp: null
+ports_description:
+  3000/tcp: "Starlink GUI web interface (optional direct access)"
+
+options:
+  dish_host: "192.168.100.1"
+  dish_port: 9200
+  router_host: "192.168.1.1"
+  router_port: 9000
+
+schema:
+  dish_host: str
+  dish_port: int
+  router_host: str
+  router_port: int
