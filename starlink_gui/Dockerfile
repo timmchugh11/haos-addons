@@ -1,8 +1,8 @@
 ARG BUILD_FROM
 FROM $BUILD_FROM
 
-# Install Node.js (base images are Alpine-based)
-RUN apk add --no-cache nodejs npm
+# Install Node.js and native build tools (better-sqlite3 requires compilation)
+RUN apk add --no-cache nodejs npm python3 make g++
 
 WORKDIR /app
 
