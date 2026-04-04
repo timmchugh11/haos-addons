@@ -35,16 +35,12 @@ echo "    RAM_COUNT    = $RAM_COUNT MB"
 echo "    DEBUG        = $DEBUG"
 
 # ---------------------------------------------------------------------------
-# The upstream image expects persistent storage at /storage.  Map that to
-# /data/storage so the OpenWrt disk image survives add-on restarts/updates.
+# The upstream image declares VOLUME /storage, so Docker creates that
+# directory before our CMD runs — a symlink is too late.  Use a bind mount
+# so the OpenWrt disk image persists across add-on restarts/updates.
 # ---------------------------------------------------------------------------
 mkdir -p /data/storage
-
-if [ ! -e /storage ]; then
-    ln -s /data/storage /storage
-elif [ ! -L /storage ]; then
-    echo "WARNING: /storage already exists and is not a symlink — data may not persist across restarts."
-fi
+mount --bind /data/storage /storage
 
 # ---------------------------------------------------------------------------
 # Hand off to the upstream openwrt-docker entrypoint.

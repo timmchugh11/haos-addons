@@ -1,5 +1,5 @@
 name: OpenWrt
-version: "1.0.0"
+version: "0.1.0"
 slug: openwrt
 description: >-
   OpenWrt virtual router running via QEMU/KVM with LuCI web interface.
@@ -19,6 +19,7 @@ init: false
 # in the add-on Info tab for host_pid and full_access to take effect.
 full_access: true
 host_pid: true
+apparmor: false
 
 ports:
   8006/tcp: 8006
