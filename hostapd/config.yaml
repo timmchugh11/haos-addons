@@ -1,5 +1,5 @@
 name: Hostapd AP
-version: "0.1.0"
+version: "0.2.0"
 slug: hostapd
 description: >-
   Simple WiFi access point using hostapd and dnsmasq.

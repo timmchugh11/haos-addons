@@ -31,8 +31,8 @@ ip addr flush dev "$INTERFACE"
 ip addr add "${AP_IP}/24" dev "$INTERFACE"
 ip link set "$INTERFACE" up
 
-# Enable IP forwarding so AP clients can reach the rest of the network
-echo 1 > /proc/sys/net/ipv4/ip_forward
+# Enable IP forwarding — /proc/sys is read-only in the container but
+# HAOS already has forwarding enabled on the host network namespace.
 
 # NAT all AP client traffic out through whatever upstream interface has a default route
 iptables -t nat -A POSTROUTING -s 192.168.50.0/24 ! -d 192.168.50.0/24 -j MASQUERADE 2>/dev/null || true
