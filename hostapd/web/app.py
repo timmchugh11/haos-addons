@@ -179,9 +179,26 @@ def _bridge_name(band):
     return f"br-ap-{band}"
 
 
+def _get_default_gateway(iface=None):
+    """Return the current default gateway IP, optionally for a specific device."""
+    try:
+        out = subprocess.check_output(["ip", "route"], text=True)
+        for line in out.splitlines():
+            if not line.startswith("default"):
+                continue
+            if iface and f"dev {iface}" not in line:
+                continue
+            parts = line.split()
+            if "via" in parts:
+                return parts[parts.index("via") + 1]
+    except Exception:
+        pass
+    return None
+
+
 def _setup_bridge(bridge, uplink, wifi_iface):
-    """Create bridge, attach uplink + wifi iface.  Move uplink IP to bridge."""
-    # Grab current IP/prefix from uplink before we touch it
+    """Create bridge, attach uplink.  Move uplink IP/gateway to bridge."""
+    # Snapshot IP and gateway BEFORE touching anything
     ip_prefix = None
     try:
         out = subprocess.check_output(["ip", "-o", "-4", "addr", "show", uplink], text=True)
@@ -193,6 +210,8 @@ def _setup_bridge(bridge, uplink, wifi_iface):
     except Exception:
         pass
 
+    gateway = _get_default_gateway()
+
     cmds = [
         ["ip", "link", "add", "name", bridge, "type", "bridge"],
         ["ip", "link", "set", uplink, "master", bridge],
@@ -202,15 +221,21 @@ def _setup_bridge(bridge, uplink, wifi_iface):
         cmds += [
             ["ip", "addr", "flush", "dev", uplink],
             ["ip", "addr", "add", ip_prefix, "dev", bridge],
-            ["ip", "route", "add", "default", "via",
-             str(ip_prefix.rsplit(".", 1)[0] + ".1"), "dev", bridge],
+        ]
+    if gateway:
+        # Remove old default route first (it may be tied to uplink), then re-add via bridge
+        cmds += [
+            ["ip", "route", "del", "default"],
+            ["ip", "route", "add", "default", "via", gateway, "dev", bridge],
         ]
     for cmd in cmds:
         subprocess.run(cmd, capture_output=True)
 
+    return gateway  # caller stores this for teardown
 
-def _teardown_bridge(bridge, uplink):
-    """Move uplink back out of bridge and delete bridge."""
+
+def _teardown_bridge(bridge, uplink, gateway=None):
+    """Move uplink back out of bridge, delete bridge, restore default route."""
     ip_prefix = None
     try:
         out = subprocess.check_output(["ip", "-o", "-4", "addr", "show", bridge], text=True)
@@ -221,6 +246,13 @@ def _teardown_bridge(bridge, uplink):
                 break
     except Exception:
         pass
+
+    # Restore default route via uplink before dismantling the bridge
+    if gateway:
+        subprocess.run(["ip", "route", "del", "default"], capture_output=True)
+        subprocess.run(["ip", "route", "add", "default", "via", gateway, "dev", uplink],
+                       capture_output=True)
+
     cmds = [
         ["ip", "link", "set", uplink, "nomaster"],
         ["ip", "link", "set", bridge, "down"],
@@ -253,9 +285,10 @@ def stop_ap():
     # Tear down bridges
     for key in [k for k in list(_procs.keys()) if k.startswith("bridge_")]:
         band = key[len("bridge_"):]
-        uplink = _procs.pop(key, None)  # stored uplink name
-        if uplink:
-            _teardown_bridge(_bridge_name(band), uplink)
+        val = _procs.pop(key, None)
+        if val:
+            uplink, gateway = val if isinstance(val, tuple) else (val, None)
+            _teardown_bridge(_bridge_name(band), uplink, gateway)
 
 
 def apply_config(cfg):
@@ -280,8 +313,8 @@ def apply_config(cfg):
         bridge = _bridge_name(band)
 
         # Create bridge and attach uplink
-        _setup_bridge(bridge, uplink, iface)
-        _procs[f"bridge_{band}"] = uplink  # remember uplink for teardown
+        gateway = _setup_bridge(bridge, uplink, iface)
+        _procs[f"bridge_{band}"] = (uplink, gateway)  # remember for teardown
 
         # Bring wifi iface up without IP — hostapd manages it via the bridge
         for cmd in [
