@@ -532,7 +532,16 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
       <div class="box-title">Packet Loss (%)</div>
       <div class="chart-wrap"><canvas id="chart-loss"></canvas></div>
     </div>
-    <div id="hist-raw-content"></div>
+    <div class="cards" id="hist-summary">
+      <div class="card blue"><div class="label">Avg Download</div><div class="value" id="hs-avg-dl">—</div><div class="unit">Mbps</div></div>
+      <div class="card blue"><div class="label">Peak Download</div><div class="value" id="hs-peak-dl">—</div><div class="unit">Mbps</div></div>
+      <div class="card blue"><div class="label">Avg Upload</div><div class="value" id="hs-avg-ul">—</div><div class="unit">Mbps</div></div>
+      <div class="card"><div class="label">Avg Latency</div><div class="value" id="hs-avg-lat">—</div><div class="unit">ms</div></div>
+      <div class="card"><div class="label">Min Latency</div><div class="value" id="hs-min-lat">—</div><div class="unit">ms</div></div>
+      <div class="card"><div class="label">Max Latency</div><div class="value" id="hs-max-lat">—</div><div class="unit">ms</div></div>
+      <div class="card"><div class="label">Avg Loss</div><div class="value" id="hs-avg-loss">—</div><div class="unit">%</div></div>
+      <div class="card"><div class="label">Samples</div><div class="value" id="hs-samples">—</div></div>
+    </div>
   </section>
 
   <!-- ════ DISHY OBSTRUCTION MAP ════ -->
@@ -547,7 +556,10 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
     <div class="box">
       <div class="box-title">Sky Obstruction View</div>
       <div id="obs-canvas-wrap"><canvas id="obs-canvas" width="400" height="400"></canvas></div>
-      <div id="obs-stats" style="margin-top:14px"></div>
+      <div class="cards" style="margin-top:14px">
+        <div class="card"><div class="label">Fraction Obstructed</div><div class="value" id="obs-frac">—</div></div>
+        <div class="card"><div class="label">Valid Samples</div><div class="value" id="obs-samples">—</div></div>
+      </div>
     </div>
   </section>
 
@@ -560,7 +572,14 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
       <button class="btn btn-primary btn-sm" onclick="loadLocation()">Refresh</button>
       <span class="last-update" id="loc-updated">Never updated</span>
     </div>
-    <div id="location-content"><span class="no-data">Click Refresh to load</span></div>
+    <div class="cards">
+      <div class="card blue"><div class="label">Latitude</div><div class="value" id="loc-lat">—</div></div>
+      <div class="card blue"><div class="label">Longitude</div><div class="value" id="loc-lon">—</div></div>
+      <div class="card"><div class="label">Altitude (m)</div><div class="value" id="loc-alt">—</div></div>
+      <div class="card"><div class="label">Source</div><div class="value" style="font-size:14px" id="loc-src">—</div></div>
+    </div>
+    <div id="loc-map-link"></div>
+    <div id="location-content"></div>
   </section>
 
   <!-- ════ DISHY CONTROLS ════ -->
@@ -681,6 +700,14 @@ const cfg = {
 
 let autoRefreshTimer = null;
 let currentPage = 'dashboard';
+const pageLoaded = new Set();
+
+function preserveScroll(fn) {
+  const main = document.getElementById('main');
+  const top = main.scrollTop;
+  fn();
+  requestAnimationFrame(() => { main.scrollTop = top; });
+}
 
 // ════════════════════════════════════════════════════════════════════
 // ROUTING
@@ -698,6 +725,7 @@ function navigate(page) {
   document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
   currentPage = page;
+  document.getElementById('main').scrollTop = 0;
   autoLoad(page);
 }
 
@@ -723,14 +751,16 @@ function qs() {
 }
 
 async function apiFetch(path) {
-  const r = await fetch('/api' + path + qs());
+  const base = window.__BASE__ || '';
+  const r = await fetch(base + '/api' + path + qs());
   const j = await r.json();
   if (!j.ok) throw new Error(j.error || 'Unknown error');
   return j.data;
 }
 
 async function apiPost(path) {
-  const r = await fetch('/api' + path + qs(), { method: 'POST' });
+  const base = window.__BASE__ || '';
+  const r = await fetch(base + '/api' + path + qs(), { method: 'POST' });
   const j = await r.json();
   if (!j.ok) throw new Error(j.error || 'Unknown error');
   return j.data;
@@ -810,10 +840,13 @@ async function refreshDashboard() {
 
 async function loadDishyStatus() {
   const el = document.getElementById('dishy-status-content');
-  el.innerHTML = '<span class="skeleton" style="width:100%;height:200px;display:block"></span>';
+  if (!pageLoaded.has('dishy-status')) {
+    el.innerHTML = '<span class="skeleton" style="width:100%;height:200px;display:block"></span>';
+  }
   try {
     const data = await apiFetch('/dishy/status');
-    el.innerHTML = renderJsonTable(data);
+    preserveScroll(() => { el.innerHTML = renderJsonTable(data); });
+    pageLoaded.add('dishy-status');
     set('status-updated', 'Updated ' + now());
   } catch(e) {
     el.innerHTML = renderError(e);
@@ -827,10 +860,13 @@ async function loadDishyStatus() {
 
 async function loadDishyDiagnostics() {
   const el = document.getElementById('dishy-diag-content');
-  el.innerHTML = '<span class="skeleton" style="width:100%;height:200px;display:block"></span>';
+  if (!pageLoaded.has('dishy-diagnostics')) {
+    el.innerHTML = '<span class="skeleton" style="width:100%;height:200px;display:block"></span>';
+  }
   try {
     const data = await apiFetch('/dishy/diagnostics');
-    el.innerHTML = renderDiagnostics(data);
+    preserveScroll(() => { el.innerHTML = renderDiagnostics(data); });
+    pageLoaded.add('dishy-diagnostics');
     set('diag-updated', 'Updated ' + now());
   } catch(e) {
     el.innerHTML = renderError(e);
@@ -873,39 +909,32 @@ function renderDiagnostics(d) {
 const charts = {};
 
 async function loadDishyHistory() {
-  const el = document.getElementById('hist-raw-content');
   set('hist-updated', 'Loading…');
   try {
     const data = await apiFetch('/dishy/history');
-    const dl  = (data.downlinkThroughputBps || []).map(v => +(v / 1e6).toFixed(3));
-    const ul  = (data.uplinkThroughputBps   || []).map(v => +(v / 1e6).toFixed(3));
-    const lat = data.popPingLatencyMs        || [];
-    const loss= data.popPingDropRate         || [];
+    const dl   = (data.downlinkThroughputBps || []).map(v => +(v / 1e6).toFixed(3));
+    const ul   = (data.uplinkThroughputBps   || []).map(v => +(v / 1e6).toFixed(3));
+    const lat  = data.popPingLatencyMs        || [];
+    const loss = data.popPingDropRate         || [];
 
-drawChart('chart-dl',  dl,   '#009DFF', 'Mbps');
-  drawChart('chart-ul',  ul,   '#00D47E', 'Mbps');
-  drawChart('chart-lat', lat,  '#FF9500', 'ms');
-  drawChart('chart-loss',loss.map(v => +(v*100).toFixed(2)), '#FF3B30', '%');
+    drawChart('chart-dl',   dl,                                  '#009DFF', 'Mbps');
+    drawChart('chart-ul',   ul,                                  '#00D47E', 'Mbps');
+    drawChart('chart-lat',  lat,                                 '#FF9500', 'ms');
+    drawChart('chart-loss', loss.map(v => +(v*100).toFixed(2)),  '#FF3B30', '%');
 
-    // Stats summary
-    const summary = [
-      { label:'Avg Download', value: (avg(dl)).toFixed(1) + ' Mbps' },
-      { label:'Peak Download', value: (Math.max(...dl)).toFixed(1) + ' Mbps' },
-      { label:'Avg Upload', value: (avg(ul)).toFixed(1) + ' Mbps' },
-      { label:'Avg Latency', value: (avg(lat)).toFixed(1) + ' ms' },
-      { label:'Min Latency', value: (Math.min(...lat.filter(v=>v>0))||0).toFixed(1) + ' ms' },
-      { label:'Max Latency', value: (Math.max(...lat)).toFixed(1) + ' ms' },
-      { label:'Avg Loss', value: (avg(loss)*100).toFixed(2) + '%' },
-      { label:'Samples', value: dl.length },
-    ];
-    el.innerHTML = '<div class="cards">' + summary.map(s =>
-      `<div class="card blue"><div class="label">${s.label}</div><div class="value">${s.value}</div></div>`
-    ).join('') + '</div>';
+    set('hs-avg-dl',   avg(dl).toFixed(1));
+    set('hs-peak-dl',  (dl.length  ? Math.max(...dl)  : 0).toFixed(1));
+    set('hs-avg-ul',   avg(ul).toFixed(1));
+    set('hs-avg-lat',  avg(lat).toFixed(1));
+    set('hs-min-lat',  (lat.filter(v => v > 0).length ? Math.min(...lat.filter(v => v > 0)) : 0).toFixed(1));
+    set('hs-max-lat',  (lat.length ? Math.max(...lat) : 0).toFixed(1));
+    set('hs-avg-loss', (avg(loss) * 100).toFixed(2));
+    set('hs-samples',  String(dl.length));
 
     set('hist-updated', 'Updated ' + now());
   } catch(e) {
-    el.innerHTML = renderError(e);
     toast('History error: ' + e.message, 'err');
+    set('hist-updated', 'Error');
   }
 }
 
@@ -975,24 +1004,16 @@ function drawChart(id, data, color, unit) {
 // ════════════════════════════════════════════════════════════════════
 
 async function loadObstruction() {
-  const statsEl = document.getElementById('obs-stats');
   set('obs-updated', 'Loading…');
-  statsEl.innerHTML = '';
   try {
     const data = await apiFetch('/dishy/obstruction-map');
     drawObstructionMap(data);
-
-    const stats = [
-      { label: 'Fraction Obstructed', value: data.fractionObstructed != null ? (data.fractionObstructed * 100).toFixed(2) + '%' : '—' },
-      { label: 'Valid Samples', value: data.numRows != null ? (data.numRows * (data.numCols || 0)) : '—' },
-    ];
-    statsEl.innerHTML = '<div class="cards">' + stats.map(s =>
-      `<div class="card"><div class="label">${s.label}</div><div class="value">${s.value}</div></div>`
-    ).join('') + '</div>';
+    set('obs-frac',    data.fractionObstructed != null ? (data.fractionObstructed * 100).toFixed(2) + '%' : '—');
+    set('obs-samples', data.numRows != null ? String(data.numRows * (data.numCols || 0)) : '—');
     set('obs-updated', 'Updated ' + now());
   } catch(e) {
-    statsEl.innerHTML = renderError(e);
     toast('Obstruction error: ' + e.message, 'err');
+    set('obs-updated', 'Error');
   }
 }
 
@@ -1056,29 +1077,29 @@ function drawObstructionMap(data) {
 // ════════════════════════════════════════════════════════════════════
 
 async function loadLocation() {
-  const el = document.getElementById('location-content');
-  el.innerHTML = '<span class="skeleton" style="width:100%;height:120px;display:block"></span>';
+  set('loc-updated', 'Loading…');
   try {
     const data = await apiFetch('/dishy/location');
-    const lat  = data.lla?.lat  ?? data.latitude  ?? '—';
-    const lon  = data.lla?.lon  ?? data.longitude ?? '—';
-    const alt  = data.lla?.alt  ?? data.altitude  ?? '—';
-    const src  = data.source ?? '—';
-    el.innerHTML = `
-      <div class="cards">
-        <div class="card blue"><div class="label">Latitude</div><div class="value">${typeof lat === 'number' ? lat.toFixed(6) : lat}</div></div>
-        <div class="card blue"><div class="label">Longitude</div><div class="value">${typeof lon === 'number' ? lon.toFixed(6) : lon}</div></div>
-        <div class="card"><div class="label">Altitude (m)</div><div class="value">${typeof alt === 'number' ? alt.toFixed(1) : alt}</div></div>
-        <div class="card"><div class="label">Source</div><div class="value" style="font-size:14px">${src}</div></div>
-      </div>
-      <div style="height:14px"></div>
-      ${typeof lat === 'number' && typeof lon === 'number' ? `<div class="box"><div class="box-title">Map Link</div><a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=12" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Open in OpenStreetMap ↗</a></div>` : ''}
-      ${renderJsonTable(data)}
-    `;
+    const lat = data.lla?.lat ?? data.latitude  ?? null;
+    const lon = data.lla?.lon ?? data.longitude ?? null;
+    const alt = data.lla?.alt ?? data.altitude  ?? null;
+    set('loc-lat', typeof lat === 'number' ? lat.toFixed(6) : '—');
+    set('loc-lon', typeof lon === 'number' ? lon.toFixed(6) : '—');
+    set('loc-alt', typeof alt === 'number' ? alt.toFixed(1) : '—');
+    set('loc-src', data.source ?? '—');
+    const mapEl = document.getElementById('loc-map-link');
+    if (typeof lat === 'number' && typeof lon === 'number') {
+      mapEl.innerHTML = `<div style="height:14px"></div><div class="box"><div class="box-title">Map Link</div><a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=12" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Open in OpenStreetMap ↗</a></div>`;
+    } else {
+      mapEl.innerHTML = '';
+    }
+    const el = document.getElementById('location-content');
+    preserveScroll(() => { el.innerHTML = renderJsonTable(data); });
     set('loc-updated', 'Updated ' + now());
   } catch(e) {
-    el.innerHTML = renderError(e);
+    document.getElementById('location-content').innerHTML = renderError(e);
     toast('Location error: ' + e.message, 'err');
+    set('loc-updated', 'Error');
   }
 }
 
@@ -1110,10 +1131,13 @@ async function confirmReboot() {
 
 async function loadRouterDiag() {
   const el = document.getElementById('router-diag-content');
-  el.innerHTML = '<span class="skeleton" style="width:100%;height:200px;display:block"></span>';
+  if (!pageLoaded.has('router-diagnostics')) {
+    el.innerHTML = '<span class="skeleton" style="width:100%;height:200px;display:block"></span>';
+  }
   try {
     const data = await apiFetch('/router/diagnostics');
-    el.innerHTML = renderRouterDiag(data);
+    preserveScroll(() => { el.innerHTML = renderRouterDiag(data); });
+    pageLoaded.add('router-diagnostics');
     set('rdg-updated', 'Updated ' + now());
   } catch(e) {
     el.innerHTML = renderError(e);
@@ -1319,7 +1343,8 @@ function avg(arr) {
 async function init() {
   // Load server-side defaults (from HA add-on options / env vars)
   try {
-    const r = await fetch('/api/config');
+    const base = window.__BASE__ || '';
+    const r = await fetch(base + '/api/config');
     const defaults = await r.json();
     cfg.dishHost   = defaults.dishHost   || cfg.dishHost;
     cfg.dishPort   = defaults.dishPort   || cfg.dishPort;
