@@ -1,6 +1,6 @@
 name: "Starlink GUI"
 description: "Full router-style admin interface for your local Starlink dish and WiFi router via gRPC"
-version: "1.0.1"
+version: "1.0.2"
 slug: "starlink_gui"
 init: false
 
@@ -22,7 +22,7 @@ panel_title: Starlink
 
 # Optional direct port access (0 = disabled by default)
 ports:
-  3000/tcp: null
+  3000/tcp: 3000
 ports_description:
   3000/tcp: "Starlink GUI web interface (optional direct access)"
 
