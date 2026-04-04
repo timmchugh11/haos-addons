@@ -60,11 +60,24 @@ def _phy_for(iface):
 
 def get_wireless_interfaces():
     """Return list of wireless interface names."""
+    # TODO: revert to iw-only for production
+    iw_ifaces = []
     try:
         out = subprocess.check_output(["iw", "dev"], text=True, stderr=subprocess.DEVNULL)
-        return [l.strip().split()[1] for l in out.splitlines() if l.strip().startswith("Interface ")]
+        iw_ifaces = [l.strip().split()[1] for l in out.splitlines() if l.strip().startswith("Interface ")]
     except Exception:
-        return []
+        pass
+
+    # Fallback: include all /sys/class/net interfaces so adapters show up even
+    # when iw hasn't registered them (useful for testing).
+    all_ifaces = []
+    try:
+        all_ifaces = os.listdir("/sys/class/net")
+    except Exception:
+        pass
+
+    combined = list(dict.fromkeys(iw_ifaces + all_ifaces))  # iw-reported first, then the rest
+    return combined if combined else iw_ifaces
 
 
 def get_interface_info(iface):
