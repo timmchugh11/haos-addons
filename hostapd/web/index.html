@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WiFi AP Manager</title>
+<style>
+  :root {
+    --bg: #111318;
+    --surface: #1c1f26;
+    --border: #2e3340;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --warn: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; min-height: 100vh; padding: 24px 16px; }
+  h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+  h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 140px; }
+  label { font-size: 12px; color: var(--muted); font-weight: 500; }
+  input, select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 8px 10px; font-size: 14px; width: 100%; outline: none; transition: border-color .15s; }
+  input:focus, select:focus { border-color: var(--accent); }
+  .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: var(--border); border-radius: 22px; cursor: pointer; transition: background .2s; }
+  .slider:before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
+  input:checked + .slider { background: var(--accent); }
+  input:checked + .slider:before { transform: translateX(18px); }
+  .toggle-label { font-weight: 600; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+  button { padding: 9px 18px; border: none; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s, opacity .15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { opacity: .85; }
+  .btn-ghost { background: var(--border); color: var(--text); }
+  .btn-ghost:hover { background: #3a3f4e; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dot-green { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .dot-red   { background: var(--danger); }
+  .dot-grey  { background: var(--muted); }
+  .status-row { display: flex; align-items: center; gap: 8px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-green { background: rgba(34,197,94,.15); color: var(--success); }
+  .badge-red   { background: rgba(239,68,68,.15);  color: var(--danger); }
+  .badge-warn  { background: rgba(245,158,11,.15); color: var(--warn); }
+  .iface-info { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+  .iface-info span { display: inline-block; margin-right: 12px; }
+  #toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px; font-size: 13px; box-shadow: 0 4px 20px rgba(0,0,0,.4); transform: translateY(80px); opacity: 0; transition: all .25s; z-index: 999; }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  @media (max-width: 480px) { .row { flex-direction: column; } }
+</style>
+</head>
+<body>
+
+<h1>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+  WiFi AP Manager
+</h1>
+
+<!-- Status -->
+<div class="card" id="status-card">
+  <h2>Status</h2>
+  <div class="status-row" style="margin-bottom:14px">
+    <div class="status-dot dot-grey" id="status-dot"></div>
+    <span id="status-text">Loading...</span>
+  </div>
+  <div class="actions">
+    <button class="btn-primary" id="btn-apply" onclick="applyAP()">Apply &amp; Start</button>
+    <button class="btn-danger"  id="btn-stop"  onclick="stopAP()">Stop AP</button>
+  </div>
+</div>
+
+<!-- Shared settings -->
+<div class="card">
+  <h2>Shared Settings</h2>
+  <div class="row">
+    <div class="field">
+      <label>WiFi Password</label>
+      <input type="password" id="password" placeholder="min 8 characters">
+    </div>
+    <div class="field">
+      <label>Country Code</label>
+      <input type="text" id="country_code" maxlength="2" placeholder="US">
+    </div>
+  </div>
+</div>
+
+<!-- 2.4 GHz -->
+<div class="card">
+  <div class="toggle-row">
+    <label class="toggle"><input type="checkbox" id="en_2g" onchange="toggleBand('2g')"><span class="slider"></span></label>
+    <span class="toggle-label">2.4 GHz Radio</span>
+  </div>
+  <div id="fields_2g">
+    <div class="row">
+      <div class="field">
+        <label>Interface</label>
+        <select id="iface_2g" onchange="loadIfaceInfo('2g')"><option value="">-- select --</option></select>
+      </div>
+      <div class="field">
+        <label>SSID</label>
+        <input type="text" id="ssid_2g" placeholder="HomeAssistant-AP">
+      </div>
+      <div class="field">
+        <label>Channel (1–13)</label>
+        <input type="number" id="ch_2g" min="1" max="13" value="6">
+      </div>
+    </div>
+    <div class="iface-info" id="info_2g"></div>
+  </div>
+</div>
+
+<!-- 5 GHz -->
+<div class="card">
+  <div class="toggle-row">
+    <label class="toggle"><input type="checkbox" id="en_5g" onchange="toggleBand('5g')"><span class="slider"></span></label>
+    <span class="toggle-label">5 GHz Radio</span>
+  </div>
+  <div id="fields_5g" style="opacity:.4;pointer-events:none">
+    <div class="row">
+      <div class="field">
+        <label>Interface</label>
+        <select id="iface_5g" onchange="loadIfaceInfo('5g')"><option value="">-- select --</option></select>
+      </div>
+      <div class="field">
+        <label>SSID</label>
+        <input type="text" id="ssid_5g" placeholder="HomeAssistant-AP-5G">
+      </div>
+      <div class="field">
+        <label>Channel (36/40/44/48…)</label>
+        <input type="number" id="ch_5g" min="36" max="165" value="36">
+      </div>
+    </div>
+    <div class="iface-info" id="info_5g"></div>
+  </div>
+</div>
+
+<!-- Save -->
+<div class="actions">
+  <button class="btn-primary" onclick="saveConfig()">Save Config</button>
+  <button class="btn-ghost"   onclick="loadAll()">Discard Changes</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let _interfaces = {};
+
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+function toast(msg, ok = true) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.borderColor = ok ? 'var(--success)' : 'var(--danger)';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ---------------------------------------------------------------------------
+// Status polling
+// ---------------------------------------------------------------------------
+async function pollStatus() {
+  try {
+    const s = await api('GET', '/api/status');
+    const dot  = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    if (s.ap_running) {
+      dot.className   = 'status-dot dot-green';
+      text.innerHTML  = '<span class="badge badge-green">RUNNING</span>';
+    } else {
+      dot.className   = 'status-dot dot-red';
+      text.innerHTML  = '<span class="badge badge-red">STOPPED</span>';
+    }
+  } catch { /* ignore */ }
+}
+
+// ---------------------------------------------------------------------------
+// Interfaces
+// ---------------------------------------------------------------------------
+async function loadInterfaces() {
+  _interfaces = await api('GET', '/api/interfaces');
+  ['2g', '5g'].forEach(band => {
+    const sel = document.getElementById(`iface_${band}`);
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">-- select --</option>';
+    Object.entries(_interfaces).forEach(([iface, info]) => {
+      const opt = document.createElement('option');
+      opt.value = iface;
+      opt.textContent = iface + (info.ap_supported ? '' : ' ⚠ no AP mode');
+      if (iface === cur) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+function renderIfaceInfo(band, iface) {
+  const el  = document.getElementById(`info_${band}`);
+  const inf = _interfaces[iface];
+  if (!inf) { el.innerHTML = ''; return; }
+
+  const apBadge = inf.ap_supported
+    ? '<span class="badge badge-green">AP supported</span>'
+    : '<span class="badge badge-red">AP NOT supported</span>';
+  const bands = inf.bands.length ? inf.bands.join(' / ') : '?';
+  const usb   = inf.usb_info  ? `<span>USB: ${inf.usb_info}</span>`  : '';
+  const spd   = inf.usb_speed ? `<span>Speed: ${inf.usb_speed}</span>` : '';
+
+  el.innerHTML = `${apBadge} <span>Bands: ${bands}</span>${usb}${spd}`;
+}
+
+function loadIfaceInfo(band) {
+  const iface = document.getElementById(`iface_${band}`).value;
+  renderIfaceInfo(band, iface);
+}
+
+// ---------------------------------------------------------------------------
+// Config load / save
+// ---------------------------------------------------------------------------
+async function loadConfig() {
+  const cfg = await api('GET', '/api/config');
+  document.getElementById('password').value    = cfg.password    || '';
+  document.getElementById('country_code').value = cfg.country_code || 'US';
+
+  cfg.radios.forEach(r => {
+    const band = r.band;
+    document.getElementById(`en_${band}`).checked   = !!r.enabled;
+    document.getElementById(`iface_${band}`).value  = r.interface || '';
+    document.getElementById(`ssid_${band}`).value   = r.ssid      || '';
+    document.getElementById(`ch_${band}`).value     = r.channel   || (band === '2g' ? 6 : 36);
+    toggleBand(band);
+    renderIfaceInfo(band, r.interface);
+  });
+}
+
+async function saveConfig() {
+  const cfg = buildConfig();
+  const r = await api('POST', '/api/config', cfg);
+  toast(r.ok ? 'Config saved' : 'Save failed', r.ok);
+}
+
+function buildConfig() {
+  return {
+    password:     document.getElementById('password').value,
+    country_code: document.getElementById('country_code').value.toUpperCase(),
+    radios: ['2g', '5g'].map(band => ({
+      band,
+      enabled:   document.getElementById(`en_${band}`).checked,
+      interface: document.getElementById(`iface_${band}`).value,
+      ssid:      document.getElementById(`ssid_${band}`).value,
+      channel:   parseInt(document.getElementById(`ch_${band}`).value, 10),
+    })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// AP control
+// ---------------------------------------------------------------------------
+async function applyAP() {
+  const cfg = buildConfig();
+  await api('POST', '/api/config', cfg);
+  const r = await api('POST', '/api/apply');
+  toast(r.message, r.ok);
+  pollStatus();
+}
+
+async function stopAP() {
+  const r = await api('POST', '/api/stop');
+  toast(r.message, r.ok);
+  pollStatus();
+}
+
+// ---------------------------------------------------------------------------
+// UI helpers
+// ---------------------------------------------------------------------------
+function toggleBand(band) {
+  const enabled = document.getElementById(`en_${band}`).checked;
+  const fields  = document.getElementById(`fields_${band}`);
+  fields.style.opacity        = enabled ? '1' : '0.4';
+  fields.style.pointerEvents  = enabled ? ''  : 'none';
+}
+
+async function loadAll() {
+  await loadInterfaces();
+  await loadConfig();
+}
+
+// Boot
+loadAll();
+pollStatus();
+setInterval(pollStatus, 5000);
+</script>
+</body>
+</html>
