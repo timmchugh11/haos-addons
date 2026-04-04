@@ -20,6 +20,12 @@ init: false
 full_access: true
 host_pid: true
 apparmor: false
+# Explicit caps for when Protection mode is on (full_access is then ignored).
+# NET_ADMIN: needed for nsenter ip-link commands to set up veth/macvtap.
+# SYS_ADMIN: needed for bind-mount of persistent storage.
+privileged:
+  - NET_ADMIN
+  - SYS_ADMIN
 
 ports:
   8006/tcp: 8006

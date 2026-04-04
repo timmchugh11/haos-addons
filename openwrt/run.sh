@@ -36,11 +36,22 @@ echo "    DEBUG        = $DEBUG"
 
 # ---------------------------------------------------------------------------
 # The upstream image declares VOLUME /storage, so Docker creates that
-# directory before our CMD runs — a symlink is too late.  Use a bind mount
-# so the OpenWrt disk image persists across add-on restarts/updates.
+# directory before our CMD runs.  Prefer a bind mount (needs SYS_ADMIN /
+# Protection mode off); fall back to a periodic copy-sync if unavailable.
 # ---------------------------------------------------------------------------
 mkdir -p /data/storage
-mount --bind /data/storage /storage
+
+if mount --bind /data/storage /storage 2>/dev/null; then
+    echo "==> Storage bind-mounted from /data/storage"
+else
+    echo "==> Bind mount unavailable - using copy-sync (disable Protection mode for full persistence)"
+    # Restore any previously saved data into the volume
+    if [ -n "$(ls -A /data/storage 2>/dev/null)" ]; then
+        cp -a /data/storage/. /storage/
+    fi
+    # Background loop: flush /storage -> /data/storage every 60 seconds
+    ( while sleep 60; do cp -a /storage/. /data/storage/ 2>/dev/null || true; done ) &
+fi
 
 # ---------------------------------------------------------------------------
 # Hand off to the upstream openwrt-docker entrypoint.
