@@ -1,7 +1,8 @@
 # Hostapd AP
 
-WiFi access point managed via a built-in web UI. Uses `hostapd` for AP mode and
-`dnsmasq` for DHCP. Supports independent 2.4 GHz and 5 GHz radios.
+WiFi access point managed via a built-in web UI. Uses `hostapd` for AP mode and bridges
+WiFi clients directly onto your existing network — no separate DHCP server, no NAT.
+Supports independent 2.4 GHz and 5 GHz radios.
 
 ---
 
@@ -41,6 +42,18 @@ AP mode is not supported, and displays USB device info and USB bus speed on sele
 
 ---
 
+## Networking
+
+WiFi clients are **bridged directly to your existing network**. The add-on automatically
+detects your host's uplink interface, creates a Linux bridge (`br-ap-2g` / `br-ap-5g`),
+and attaches both the uplink and the WiFi interface to it.
+
+- WiFi clients get their IP, gateway, and DNS from **your existing router's DHCP server**
+- No separate subnet, no NAT, no dnsmasq required
+- Clients appear on the same LAN as every other device
+
+---
+
 ## Adapter compatibility
 
 The add-on checks AP mode support on startup and logs the result. To be usable as an AP,
@@ -55,12 +68,27 @@ or
 AP mode: NOT SUPPORTED — this adapter cannot be used as an access point
 ```
 
-## Networking
+### Recommended chipsets
 
-| Band | AP gateway IP | DHCP range |
+| Chipset | Band | Notes |
 |---|---|---|
-| 2.4 GHz | `192.168.50.1` | `192.168.50.10` – `192.168.50.100` |
-| 5 GHz | `192.168.51.1` | `192.168.51.10` – `192.168.51.100` |
+| **Mediatek MT7612U** | 5 GHz | In-kernel `mt76` driver. Most adapters pair with a MT7603U for 2.4 GHz. |
+| **Mediatek MT7603U** | 2.4 GHz | In-kernel `mt76` driver, reliable AP mode. |
+| **Mediatek MT7921AU** | 2.4 + 5 GHz | In-kernel, WiFi 6, single chip dual-band. |
+| **Ralink RT5572** | 2.4 + 5 GHz | Older but well-supported. |
 
-Connected clients are NAT-masqueraded through the HAOS host's upstream connection.
-DNS is set to `1.1.1.1` / `8.8.8.8`.
+### Adapters to avoid
+
+- Most **Realtek RTL8188 / RTL8192** nano adapters — client mode only
+- Generic "AC600 nano" sticks — usually no AP mode
+
+---
+
+## Dual-band with a single USB adapter
+
+Many adapters labelled "dual-band" contain two chips on one USB dongle — for example a
+MT7612U (5 GHz) paired with a MT7603U (2.4 GHz). Linux exposes these as two separate
+interfaces (e.g. `wlan0` and `wlan1`). Assign each to the corresponding radio in the UI.
+
+**Note:** both radios share the same USB bus bandwidth. For light home use this is fine.
+

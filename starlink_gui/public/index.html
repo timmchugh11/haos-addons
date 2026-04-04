@@ -830,7 +830,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
       <div class="form-row" style="align-items:center">
         <div class="form-group">
           <label>Interval (seconds, 0 = disabled)</label>
-          <input id="cfg-interval" type="number" value="3" min="0" max="600" placeholder="3"/>
+          <input id="cfg-interval" type="number" value="20" min="0" max="600" placeholder="20"/>
         </div>
         <div style="padding-top:18px">
           <button class="btn btn-primary" onclick="applyInterval()">Apply</button>
@@ -870,9 +870,9 @@ const tableSortState = new Map();
 function getStoredRefreshInterval() {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEYS.refreshInterval);
-    if (raw == null || raw === '') return 3;
+    if (raw == null || raw === '') return 20;
     const secs = parseInt(raw, 10);
-    return Number.isFinite(secs) && secs >= 0 ? secs : 3;
+    return Number.isFinite(secs) && secs >= 0 ? secs : 20;
   } catch (_) {
     return 3;
   }
