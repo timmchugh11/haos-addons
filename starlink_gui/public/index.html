@@ -601,7 +601,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
       <div class="card"><div class="label">Min Latency</div><div class="value" id="hs-min-lat">—</div><div class="unit">ms</div></div>
       <div class="card"><div class="label">Max Latency</div><div class="value" id="hs-max-lat">—</div><div class="unit">ms</div></div>
       <div class="card"><div class="label">Avg Loss</div><div class="value" id="hs-avg-loss">—</div><div class="unit">%</div></div>
-      <div class="card"><div class="label">Samples</div><div class="value" id="hs-samples">—</div></div>
+      <div class="card"><div class="label">Samples</div><div class="value" id="hs-samples">—</div><div class="unit" id="hs-timespan"></div></div>
     </div>
   </section>
 
@@ -1289,6 +1289,31 @@ async function loadDishyHistory() {
     set('hs-max-lat',  (lat.length ? Math.max(...lat) : 0).toFixed(1));
     set('hs-avg-loss', (avg(loss) * 100).toFixed(2));
     set('hs-samples',  String(dl.length));
+
+    // ── Time span estimation ──────────────────────────────────────────
+    // Starlink history is a ring buffer sampled at 1 s/sample.
+    // data.current is the absolute write-head counter; modulo buffer
+    // length it wraps, so min(current, length) = valid filled samples.
+    const _bufSize = dl.length;
+    const _current = data.current !== undefined ? Number(data.current) : NaN;
+    const _valid   = !isNaN(_current) ? Math.min(_current, _bufSize) : _bufSize;
+    const _spanSec = _valid;                              // 1 sample = 1 s
+    const _spanMin = Math.floor(_spanSec / 60);
+    const _spanSub = _spanSec % 60;
+    const _spanStr = _spanMin > 0 ? `${_spanMin}m ${_spanSub}s` : `${_spanSec}s`;
+    console.log('[History] ── time-span calc ────────────────────────────────');
+    console.log(`[History] Buffer size  : ${_bufSize} samples`);
+    console.log(`[History] Write head   : ${isNaN(_current) ? '(not in response)' : _current}`);
+    console.log(`[History] Valid samples: ${_valid}  (min(write-head, buffer))`);
+    console.log(`[History] Span @ 1s/pt : ${_valid} × 1 s = ${_spanSec} s ≈ ${_spanStr}`);
+    console.log('[History] Raw interval fields →', {
+      current: data.current,
+      currentInterval: data.currentInterval,
+      sampleInterval: data.sampleInterval,
+      interval: data.interval,
+    });
+    set('hs-timespan', _spanStr);
+    // ─────────────────────────────────────────────────────────────────
 
     set('hist-updated', 'Updated ' + now());
   } catch(e) {

@@ -1,6 +1,6 @@
 name: "Starlink GUI"
 description: "Full router-style admin interface for your local Starlink dish and WiFi router via gRPC"
-version: "1.0.8"
+version: "1.0.9"
 slug: "starlink_gui"
 init: false
 
