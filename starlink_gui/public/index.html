@@ -1295,29 +1295,6 @@ async function loadDishyHistory() {
     set('hs-samples',  String(dl.length));
 
     // ── Time span estimation ──────────────────────────────────────────
-    // data.current is the dish's absolute ring-buffer write-head counter.
-    // By comparing consecutive values we can measure the real sample interval
-    // without relying on any undocumented API field.
-    const _bufSize  = dl.length;
-    const _now      = Date.now();
-    const _current  = data.current !== undefined ? Number(data.current) : NaN;
-    const _valid    = !isNaN(_current) ? Math.min(_current, _bufSize) : _bufSize;
-
-    let _intervalSec = _histIntervalSec;  // carry forward last known value
-    if (_histPrev && !isNaN(_current) && _current > _histPrev.current) {
-      const deltaSamples = _current - _histPrev.current;
-      const deltaMs      = _now - _histPrev.ts;
-      _intervalSec = deltaMs / 1000 / deltaSamples;   // real seconds per sample
-      _histIntervalSec = _intervalSec;                // persist for tooltip use
-    }
-    _histBufSize  = _bufSize;
-    _histLoadedAt = _now;
-    _histPrev = { current: _current, ts: _now };
-
-    const _spanSec  = _intervalSec !== null ? Math.round(_valid * _intervalSec) : null;
-    const _fmtSpan  = s => { const m = Math.floor(s / 60), r = Math.round(s % 60); return m > 0 ? `${m}m ${r}s` : `${r}s`; };
-    const _spanStr  = _spanSec !== null ? _fmtSpan(_spanSec) : `${_valid} pts`;
-
     set('hs-timespan', _spanStr);
     // ─────────────────────────────────────────────────────────────────
 
