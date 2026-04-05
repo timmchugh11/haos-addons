@@ -36,7 +36,7 @@ Includes a bypass mode to hide all router pages when the Starlink router is not 
 
 ### Hostapd AP
 
-[![version](https://img.shields.io/badge/version-0.9.3-blue.svg)](hostapd/config.yaml)
+[![version](https://img.shields.io/badge/version-0.9.4-blue.svg)](hostapd/config.yaml)
 
 WiFi access point managed via a built-in web UI. Bridges WiFi clients directly onto your
 existing network — clients get DHCP from your router with no separate subnet or NAT.
