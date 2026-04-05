@@ -1293,10 +1293,11 @@ async function loadDishyHistory() {
     set('hs-max-lat',  (lat.length ? Math.max(...lat) : 0).toFixed(1));
     set('hs-avg-loss', (avg(loss) * 100).toFixed(2));
     set('hs-samples',  String(dl.length));
-
-    // ── Time span estimation ──────────────────────────────────────────
-    set('hs-timespan', _spanStr);
-    // ─────────────────────────────────────────────────────────────────
+    _histBufSize  = dl.length;
+    _histLoadedAt = Date.now();
+    const _spanSec = dl.length * HIST_INTERVAL_SEC;
+    const _spanMin = Math.floor(_spanSec / 60), _spanRem = _spanSec % 60;
+    set('hs-timespan', _spanRem > 0 ? `${_spanMin}m ${_spanRem}s` : `${_spanMin}m`);
 
     set('hist-updated', 'Updated ' + now());
   } catch(e) {
