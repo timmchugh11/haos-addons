@@ -385,6 +385,8 @@ main:has(#page-dishy-obstruction.active){
   font-size:12px;
 }
 #obs-helper{letter-spacing:0.02em}
+#obs-stats{display:flex;align-items:center;gap:16px;color:var(--muted);font-size:12px}
+#obs-stats span span{color:var(--text2);margin-left:3px;font-family:monospace}
 #obs-overlay .cards{margin-bottom:0}
 #obs-overlay .card{
   background:rgba(10,20,32,0.72);
@@ -400,7 +402,7 @@ main:has(#page-dishy-obstruction.active){
   letter-spacing:0.1em;text-transform:uppercase;
   color:var(--muted);
 }
-.form-group input{
+.form-group input:not([type=color]){
   background:var(--surface2);
   border:1px solid var(--border2);
   border-radius:var(--radius-sm);
@@ -410,7 +412,19 @@ main:has(#page-dishy-obstruction.active){
   outline:none;
   transition:border-color .18s;
 }
-.form-group input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.form-group input:not([type=color]):focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.form-group input[type=color]{
+  width:48px;height:36px;
+  padding:2px;
+  border:1px solid var(--border2);
+  border-radius:var(--radius-sm);
+  background:none;
+  cursor:pointer;
+  outline:none;
+}
+.form-group input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+.form-group input[type=color]::-webkit-color-swatch{border:none;border-radius:3px}
+.form-group input[type=color]::-moz-color-swatch{border:none;border-radius:3px}
 /* ── toast ── */
 #toast-wrap{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:999}
 .toast{
@@ -692,9 +706,10 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
             <button id="obs-dir" style="pointer-events:auto;margin-left:8px;font-size:11px;padding:2px 8px" class="btn btn-primary btn-sm"
               onclick="obstructionView.baseYawVel*=-1;this.textContent=obstructionView.baseYawVel>=0?'CW':'CCW'">CW</button>
           </div>
-          <div class="cards">
-            <div class="card"><div class="label">Grid Size</div><div class="value" id="obs-frac">—</div></div>
-            <div class="card"><div class="label">Tracked Cells</div><div class="value" id="obs-samples">—</div></div>
+          <div id="obs-stats">
+            <span>Tracked <span id="obs-samples">—</span></span>
+            <span id="obs-obstructed-wrap" style="display:none">Obstructed <span id="obs-obstructed">—</span></span>
+            <span>Untracked <span id="obs-untracked">—</span></span>
           </div>
         </div>
       </div>
@@ -926,6 +941,20 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
         </div>
       </div>
     </div>
+
+    <div class="box">
+      <div class="box-title">Obstruction Map Colours</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Clear / Good Signal</label>
+          <input id="cfg-color-clear" type="color" value="#42e0f5" oninput="saveObstructionColors()"/>
+        </div>
+        <div class="form-group">
+          <label>Obstructed</label>
+          <input id="cfg-color-obstructed" type="color" value="#f7524a" oninput="saveObstructionColors()"/>
+        </div>
+      </div>
+    </div>
   </section>
 
 </main><!-- /main -->
@@ -948,8 +977,9 @@ const cfg = {
 };
 
 const STORAGE_KEYS = {
-  refreshInterval: 'starlink_gui.refresh_interval_secs',
-  bypassMode:      'starlink_gui.bypass_mode',
+  refreshInterval:   'starlink_gui.refresh_interval_secs',
+  bypassMode:        'starlink_gui.bypass_mode',
+  obstructionColors: 'starlink_gui.obstruction_colors',
 };
 
 let autoRefreshTimer = null;
@@ -1090,6 +1120,28 @@ function setBypassMode(enabled) {
   const chk = document.getElementById('cfg-bypass-mode');
   if (chk) chk.checked = enabled;
   if (enabled && currentPage.startsWith('router-')) navigate('dashboard');
+}
+
+function getObstructionColors() {
+  const defaults = { clear: '#00ffff', obstructed: '#ff4444' };
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.obstructionColors);
+    if (!raw) return defaults;
+    return { ...defaults, ...JSON.parse(raw) };
+  } catch (_) { return defaults; }
+}
+
+let _saveColorsRaf = null;
+function saveObstructionColors() {
+  const clear      = document.getElementById('cfg-color-clear').value;
+  const obstructed = document.getElementById('cfg-color-obstructed').value;
+  try { window.localStorage.setItem(STORAGE_KEYS.obstructionColors, JSON.stringify({ clear, obstructed })); } catch (_) {}
+  // Debounce the expensive mesh rebuild to ~60ms while dragging the picker
+  cancelAnimationFrame(_saveColorsRaf);
+  _saveColorsRaf = requestAnimationFrame(() => {
+    if (obstructionView.cells.length) buildCellMesh();
+    if (obstructionView.renderer) renderObstructionMap();
+  });
 }
 
 function navigate(page) {
@@ -1549,7 +1601,7 @@ const obstructionView = {
   canvas: null, renderer: null, scene: null, camera: null,
   obsGroup: null,  // cells + dish — rotates with yaw AND pitch
   yawGroup: null,  // compass ring — rotates with yaw only
-  cellMesh: null, THREE: null,
+  cellMesh: null, cellMeshes: [], THREE: null,
   dishLoadStarted: false,
   cells: [],
   yaw: 0, pitch: 0.5, zoom: 1.27,
@@ -1569,14 +1621,15 @@ async function loadObstruction() {
     const rows = data.numRows || 1;
     const cols = data.numCols || Math.round(snr.length / rows);
     obstructionView.cells = [];
+    let untracked = 0;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const val = snr[r * cols + c];
-        if (val == null || val < 0) continue;
         const x = ((cols - 1 - c + 0.5) / cols) * 2 - 1;
         const y = ((r + 0.5) / rows) * 2 - 1;
         const radial = x * x + y * y;
         if (radial > 1) continue;
+        if (val == null || val < 0) { untracked++; continue; }
         obstructionView.cells.push({ x, y, z: Math.sqrt(1 - radial), value: Math.min(1, Math.max(0, val)) });
       }
     }
@@ -1585,8 +1638,11 @@ async function loadObstruction() {
       renderObstructionMap();
       startObstructionSpin();
     }
-    set('obs-frac',    `${rows} x ${cols}`);
-    set('obs-samples', obstructionView.cells.length.toLocaleString());
+    const obstructed = obstructionView.cells.filter(c => c.value < 0.02).length;
+    set('obs-samples',   obstructionView.cells.length.toLocaleString());
+    set('obs-untracked', untracked.toLocaleString());
+    set('obs-obstructed', obstructed.toLocaleString());
+    document.getElementById('obs-obstructed-wrap').style.display = obstructed > 0 ? '' : 'none';
     set('obs-updated', 'Updated ' + now());
   } catch(e) {
     toast('Obstruction error: ' + e.message, 'err');
@@ -1760,39 +1816,40 @@ function buildCompassRing(THREE, yawGroup) {
 function buildCellMesh() {
   const THREE = obstructionView.THREE, obsGroup = obstructionView.obsGroup;
   if (!THREE || !obsGroup) return;
-  if (obstructionView.cellMesh) {
-    obsGroup.remove(obstructionView.cellMesh);
-    obstructionView.cellMesh.geometry.dispose();
-    obstructionView.cellMesh.material.dispose();
-    obstructionView.cellMesh = null;
+  for (const m of obstructionView.cellMeshes) {
+    obsGroup.remove(m);
+    m.geometry.dispose();
+    m.material.dispose();
   }
+  obstructionView.cellMeshes = [];
   const cells = obstructionView.cells;
   if (!cells.length) return;
 
-  const geom = new THREE.BoxGeometry(0.022, 0.01, 0.022);
-  const mat  = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, transparent: true, opacity: 0.72, depthWrite: false });
-  const mesh = new THREE.InstancedMesh(geom, mat, cells.length);
-  mesh.frustumCulled = false;
-  const dummy = new THREE.Object3D(), color = new THREE.Color();
-  for (let i = 0; i < cells.length; i++) {
-    const { x, y, z, value } = cells[i];
-    // Grid coords: x=E/W (E=+1), y=N/S (N=-1, S=+1), z=height (zenith=1)
-    // Three.js: x=E/W, y=height(up), z=N/S (N=-Z matches camera-far=screen-top)
-    dummy.position.set(x, z, y);
-    dummy.rotation.set(0, 0, 0);
-    dummy.updateMatrix();
-    mesh.setMatrixAt(i, dummy.matrix);
-    if (value < 0.02) {
-      color.setRGB(0.97, 0.32, 0.29);
-    } else {
-      color.setRGB(0.26, 0.51 + value * 0.37, 0.84 + value * 0.12);
+  const geom = new THREE.BoxGeometry(0.022, 0.001, 0.022);
+  const matOpts = { transparent: true, opacity: 0.5, depthWrite: false };
+  const cols = getObstructionColors();
+  const clearMat   = new THREE.MeshBasicMaterial({ ...matOpts, color: new THREE.Color(cols.clear) });
+  const blockedMat = new THREE.MeshBasicMaterial({ ...matOpts, color: new THREE.Color(cols.obstructed) });
+
+  const clearCells   = cells.filter(c => c.value >= 0.02);
+  const blockedCells = cells.filter(c => c.value <  0.02);
+
+  const dummy = new THREE.Object3D();
+  for (const [subset, mat] of [[clearCells, clearMat], [blockedCells, blockedMat]]) {
+    if (!subset.length) continue;
+    const mesh = new THREE.InstancedMesh(geom, mat, subset.length);
+    mesh.frustumCulled = false;
+    for (let i = 0; i < subset.length; i++) {
+      const { x, y, z } = subset[i];
+      dummy.position.set(x, z, y);
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
     }
-    mesh.setColorAt(i, color);
+    mesh.instanceMatrix.needsUpdate = true;
+    obstructionView.cellMeshes.push(mesh);
+    obsGroup.add(mesh);
   }
-  mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  obstructionView.cellMesh = mesh;
-  obsGroup.add(mesh);
 }
 
 function startObstructionSpin() {
@@ -2443,6 +2500,10 @@ async function init() {
   document.getElementById('cfg-router-host').value = cfg.routerHost;
   document.getElementById('cfg-router-port').value = cfg.routerPort;
   document.getElementById('cfg-interval').value    = String(getStoredRefreshInterval());
+
+  const cols = getObstructionColors();
+  document.getElementById('cfg-color-clear').value      = cols.clear;
+  document.getElementById('cfg-color-obstructed').value = cols.obstructed;
 
   const bypass = getBypassMode();
   document.getElementById('cfg-bypass-mode').checked = bypass;

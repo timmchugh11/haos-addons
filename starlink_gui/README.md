@@ -13,7 +13,7 @@ open directly from the HA sidebar without publishing a separate public endpoint.
   - status
   - diagnostics
   - history and signal charts
-  - obstruction map
+  - 3D interactive sky obstruction map
   - location
   - basic controls (`reboot`, `stow`, `unstow`)
 - Router pages for:
@@ -73,6 +73,32 @@ you can leave it internal and use ingress only.
 - Router pages are based on the fields your Starlink firmware actually returns;
   some fields may be sparse depending on hardware and firmware version
 
+## Sky Obstruction Map
+
+The obstruction map page shows a live interactive 3D view of the sky above your
+dish, rendered from the signal data reported by the dish firmware.
+
+- **Drag** to rotate the view 
+- **Scroll** to zoom in and out
+- **Reset View** button returns to the default orientation
+- Cell colours: clear/tracked cells are shown in the "clear" colour, obstructed
+  cells (SNR < 0.02) are shown in the "obstructed" colour
+- Stats below the map show: **Tracked** cells, **Obstructed** cells (only shown
+  when non-zero), and **Untracked** cells (within the dish boundary but with no
+  reported signal data)
+
+### Obstruction Map Colour Settings
+
+The cell colours can be customised in the **Settings** page under
+**Obstruction Map Colours**:
+
+| Setting | Default | Description |
+|---|---|---|
+| Clear / Good Signal | `#42e0f5` (cyan) | Colour for cells with a clear sky view |
+| Obstructed | `#f7524a` (red) | Colour for cells blocked by obstructions |
+
+Colours are saved to browser `localStorage` and applied immediately.
+
 ## API Surface In This Add-on
 
 The backend exposes internal JSON endpoints used by the frontend, including:
@@ -117,4 +143,4 @@ local Starlink devices.
 
 ## Current Version
 
-The add-on version is `1.0.8`.
+The add-on version is `1.1.6`.
