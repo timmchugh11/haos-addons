@@ -1267,10 +1267,9 @@ function renderDiagnostics(d) {
 // ════════════════════════════════════════════════════════════════════
 
 const charts = {};
-let _histPrev        = null; // { current, ts } from last successful history load
-let _histIntervalSec = null; // measured seconds-per-sample
-let _histBufSize     = 0;    // total samples in current buffer
-let _histLoadedAt    = null; // Date.now() when last fetch completed (≈ time of newest sample)
+const HIST_INTERVAL_SEC = 1;   // Starlink dishes sample at 1 s/sample
+let _histBufSize  = 0;
+let _histLoadedAt = null;
 
 async function loadDishyHistory() {
   set('hist-updated', 'Loading…');
@@ -1461,8 +1460,8 @@ function renderChart(id) {
   ctx.stroke();
 
   let _timeLabel = '';
-  if (_histIntervalSec !== null && _histBufSize > 0 && _histLoadedAt !== null) {
-    const secsAgo = Math.round((_histBufSize - 1 - point.index) * _histIntervalSec);
+  if (_histBufSize > 0 && _histLoadedAt !== null) {
+    const secsAgo = (_histBufSize - 1 - point.index) * HIST_INTERVAL_SEC;
     const ptTime  = new Date(_histLoadedAt - secsAgo * 1000);
     const hh = String(ptTime.getHours()).padStart(2, '0');
     const mm = String(ptTime.getMinutes()).padStart(2, '0');
