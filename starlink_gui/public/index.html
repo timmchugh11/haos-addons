@@ -1319,16 +1319,6 @@ async function loadDishyHistory() {
     const _fmtSpan  = s => { const m = Math.floor(s / 60), r = Math.round(s % 60); return m > 0 ? `${m}m ${r}s` : `${r}s`; };
     const _spanStr  = _spanSec !== null ? _fmtSpan(_spanSec) : `${_valid} pts`;
 
-    console.log('[History] ── time-span calc ────────────────────────────────');
-    console.log(`[History] Buffer size   : ${_bufSize} samples`);
-    console.log(`[History] Write head    : ${isNaN(_current) ? '(not in response)' : _current}`);
-    console.log(`[History] Valid samples : ${_valid}  (min(write-head, buffer))`);
-    if (_intervalSec !== null) {
-      console.log(`[History] Sample interval: ${_intervalSec.toFixed(2)} s/sample  (measured from Δcurrent / Δtime)`);
-      console.log(`[History] Span           : ${_valid} × ${_intervalSec.toFixed(2)} s = ${_spanSec} s ≈ ${_spanStr}`);
-    } else {
-      console.log('[History] Sample interval: (need ≥2 loads to measure — waiting for next refresh)');
-    }
     set('hs-timespan', _spanStr);
     // ─────────────────────────────────────────────────────────────────
 
