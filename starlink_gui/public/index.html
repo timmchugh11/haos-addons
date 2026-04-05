@@ -326,6 +326,7 @@ main{
 .chart-tip[hidden]{display:none}
 .chart-tip .k{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.08em}
 .chart-tip .v{margin-top:3px;font-weight:600}
+.chart-tip .t{margin-top:2px;font-size:10px;color:var(--muted)}
 canvas.chart{width:100%;height:100%;display:block}
 
 /* ── obstruction map ── */
@@ -1266,6 +1267,10 @@ function renderDiagnostics(d) {
 // ════════════════════════════════════════════════════════════════════
 
 const charts = {};
+let _histPrev        = null; // { current, ts } from last successful history load
+let _histIntervalSec = null; // measured seconds-per-sample
+let _histBufSize     = 0;    // total samples in current buffer
+let _histLoadedAt    = null; // Date.now() when last fetch completed (≈ time of newest sample)
 
 async function loadDishyHistory() {
   set('hist-updated', 'Loading…');
@@ -1291,27 +1296,39 @@ async function loadDishyHistory() {
     set('hs-samples',  String(dl.length));
 
     // ── Time span estimation ──────────────────────────────────────────
-    // Starlink history is a ring buffer sampled at 1 s/sample.
-    // data.current is the absolute write-head counter; modulo buffer
-    // length it wraps, so min(current, length) = valid filled samples.
-    const _bufSize = dl.length;
-    const _current = data.current !== undefined ? Number(data.current) : NaN;
-    const _valid   = !isNaN(_current) ? Math.min(_current, _bufSize) : _bufSize;
-    const _spanSec = _valid;                              // 1 sample = 1 s
-    const _spanMin = Math.floor(_spanSec / 60);
-    const _spanSub = _spanSec % 60;
-    const _spanStr = _spanMin > 0 ? `${_spanMin}m ${_spanSub}s` : `${_spanSec}s`;
+    // data.current is the dish's absolute ring-buffer write-head counter.
+    // By comparing consecutive values we can measure the real sample interval
+    // without relying on any undocumented API field.
+    const _bufSize  = dl.length;
+    const _now      = Date.now();
+    const _current  = data.current !== undefined ? Number(data.current) : NaN;
+    const _valid    = !isNaN(_current) ? Math.min(_current, _bufSize) : _bufSize;
+
+    let _intervalSec = _histIntervalSec;  // carry forward last known value
+    if (_histPrev && !isNaN(_current) && _current > _histPrev.current) {
+      const deltaSamples = _current - _histPrev.current;
+      const deltaMs      = _now - _histPrev.ts;
+      _intervalSec = deltaMs / 1000 / deltaSamples;   // real seconds per sample
+      _histIntervalSec = _intervalSec;                // persist for tooltip use
+    }
+    _histBufSize  = _bufSize;
+    _histLoadedAt = _now;
+    _histPrev = { current: _current, ts: _now };
+
+    const _spanSec  = _intervalSec !== null ? Math.round(_valid * _intervalSec) : null;
+    const _fmtSpan  = s => { const m = Math.floor(s / 60), r = Math.round(s % 60); return m > 0 ? `${m}m ${r}s` : `${r}s`; };
+    const _spanStr  = _spanSec !== null ? _fmtSpan(_spanSec) : `${_valid} pts`;
+
     console.log('[History] ── time-span calc ────────────────────────────────');
-    console.log(`[History] Buffer size  : ${_bufSize} samples`);
-    console.log(`[History] Write head   : ${isNaN(_current) ? '(not in response)' : _current}`);
-    console.log(`[History] Valid samples: ${_valid}  (min(write-head, buffer))`);
-    console.log(`[History] Span @ 1s/pt : ${_valid} × 1 s = ${_spanSec} s ≈ ${_spanStr}`);
-    console.log('[History] Raw interval fields →', {
-      current: data.current,
-      currentInterval: data.currentInterval,
-      sampleInterval: data.sampleInterval,
-      interval: data.interval,
-    });
+    console.log(`[History] Buffer size   : ${_bufSize} samples`);
+    console.log(`[History] Write head    : ${isNaN(_current) ? '(not in response)' : _current}`);
+    console.log(`[History] Valid samples : ${_valid}  (min(write-head, buffer))`);
+    if (_intervalSec !== null) {
+      console.log(`[History] Sample interval: ${_intervalSec.toFixed(2)} s/sample  (measured from Δcurrent / Δtime)`);
+      console.log(`[History] Span           : ${_valid} × ${_intervalSec.toFixed(2)} s = ${_spanSec} s ≈ ${_spanStr}`);
+    } else {
+      console.log('[History] Sample interval: (need ≥2 loads to measure — waiting for next refresh)');
+    }
     set('hs-timespan', _spanStr);
     // ─────────────────────────────────────────────────────────────────
 
@@ -1453,7 +1470,18 @@ function renderChart(id) {
   ctx.fill();
   ctx.stroke();
 
-  tip.innerHTML = `<div class="v">${point.value.toFixed(3)} ${unit}</div>`;
+  let _timeLabel = '';
+  if (_histIntervalSec !== null && _histBufSize > 0 && _histLoadedAt !== null) {
+    const secsAgo = Math.round((_histBufSize - 1 - point.index) * _histIntervalSec);
+    const ptTime  = new Date(_histLoadedAt - secsAgo * 1000);
+    const hh = String(ptTime.getHours()).padStart(2, '0');
+    const mm = String(ptTime.getMinutes()).padStart(2, '0');
+    const ss = String(ptTime.getSeconds()).padStart(2, '0');
+    const rel = secsAgo < 60 ? `${secsAgo}s ago`
+              : (() => { const m = Math.floor(secsAgo/60), s = secsAgo%60; return s > 0 ? `${m}m ${s}s ago` : `${m}m ago`; })();
+    _timeLabel = `${hh}:${mm}:${ss} (${rel})`;
+  }
+  tip.innerHTML = `<div class="v">${point.value.toFixed(3)} ${unit}</div>${_timeLabel ? `<div class="t">${_timeLabel}</div>` : ''}`;
   tip.hidden = false;
   const tipX = Math.min(Math.max(point.x, 52), w - 52);
   const tipY = Math.max(point.y - 10, 16);
