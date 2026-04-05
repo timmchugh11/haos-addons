@@ -1275,10 +1275,19 @@ async function loadDishyHistory() {
   set('hist-updated', 'Loading…');
   try {
     const data = await apiFetch('/dishy/history');
-    const dl   = (data.downlinkThroughputBps || []).map(v => +(v / 1e6).toFixed(3));
-    const ul   = (data.uplinkThroughputBps   || []).map(v => +(v / 1e6).toFixed(3));
-    const lat  = data.popPingLatencyMs        || [];
-    const loss = data.popPingDropRate         || [];
+
+    // Ring buffer: data.current is the write head (next-write index).
+    // Rotate arrays so index 0 = oldest sample, last index = newest.
+    const _rotate = arr => {
+      if (!arr || !arr.length) return arr || [];
+      const head = (Number(data.current) || 0) % arr.length;
+      return head === 0 ? arr : [...arr.slice(head), ...arr.slice(0, head)];
+    };
+
+    const dl   = _rotate(data.downlinkThroughputBps).map(v => +(v / 1e6).toFixed(3));
+    const ul   = _rotate(data.uplinkThroughputBps).map(v => +(v / 1e6).toFixed(3));
+    const lat  = _rotate(data.popPingLatencyMs);
+    const loss = _rotate(data.popPingDropRate);
 
     drawChart('chart-dl',   dl,                                  '#009DFF', 'Mbps');
     drawChart('chart-ul',   ul,                                  '#00D47E', 'Mbps');
