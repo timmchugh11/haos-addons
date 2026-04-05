@@ -23,6 +23,7 @@ app.use(cors());
 app.use(express.json());
 // Serve static assets (css, js, images etc.) but NOT index.html — we inject the base path ourselves
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.use('/vendor/three', express.static(path.join(__dirname, 'node_modules', 'three'), { index: false }));
 app.get('/starlink-logo-01.png', (_req, res) => {
   res.sendFile(path.join(__dirname, 'starlink-logo-01.png'));
 });
