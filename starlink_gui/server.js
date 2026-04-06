@@ -547,6 +547,14 @@ app.get('/obstruction', serveSimplePage(OBSTRUCTION_HTML));
 app.get('/alignment',   serveSimplePage(ALIGNMENT_HTML));
 app.get('/combined',    serveSimplePage(COMBINED_HTML));
 
+const CARD_PAGES = { obstruction: OBSTRUCTION_HTML, alignment: ALIGNMENT_HTML, combined: COMBINED_HTML };
+
+app.get('/', (req, res, next) => {
+    const page = CARD_PAGES[req.query.p];
+    if (page) return serveSimplePage(page)(req, res);
+    next();
+});
+
 app.get('/', serveIndex);
 app.get('/{*path}', serveIndex);
 
