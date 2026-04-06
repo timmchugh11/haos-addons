@@ -241,6 +241,15 @@ function buildCompassRing(THREE, grp) {
   }
 }
 
+function getObstructionColors() {
+  const defaults = { clear: '#00ffff', obstructed: '#ff4444' };
+  try {
+    const raw = localStorage.getItem('starlink_gui.obstruction_colors');
+    if (!raw) return defaults;
+    return { ...defaults, ...JSON.parse(raw) };
+  } catch (_) { return defaults; }
+}
+
 function buildCellMesh() {
   const THREE = view.THREE;
   if (!THREE || !view.obsGroup) return;
@@ -249,8 +258,9 @@ function buildCellMesh() {
   if (!view.cells.length) return;
   const geom  = new THREE.BoxGeometry(0.022, 0.001, 0.022);
   const opts  = { transparent: true, opacity: 0.5, depthWrite: false };
-  const clear  = new THREE.MeshBasicMaterial({ ...opts, color: new THREE.Color('#00ffff') });
-  const blocked = new THREE.MeshBasicMaterial({ ...opts, color: new THREE.Color('#ff4444') });
+  const cols = getObstructionColors();
+  const clear  = new THREE.MeshBasicMaterial({ ...opts, color: new THREE.Color(cols.clear) });
+  const blocked = new THREE.MeshBasicMaterial({ ...opts, color: new THREE.Color(cols.obstructed) });
   const dummy = new THREE.Object3D();
   for (const [subset, mat] of [[view.cells.filter(c => c.value >= 0.02), clear], [view.cells.filter(c => c.value < 0.02), blocked]]) {
     if (!subset.length) continue;

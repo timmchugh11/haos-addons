@@ -69,8 +69,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:-ap
     <!-- top-right: legend -->
     <div id="stats-tr" class="stat-group" style="display: none;">
       <div class="legend">
-        <span class="legend-dot" style="background:#00ffff"></span>Clear
-        <span class="legend-dot" style="background:#ff4444"></span>Obstructed
+        <span id="legend-dot-clear" class="legend-dot" style="background:#00ffff"></span>Clear
+        <span id="legend-dot-obstructed" class="legend-dot" style="background:#ff4444"></span>Obstructed
         <span class="legend-dot" style="background:#00D47E;opacity:0.6"></span>Desired
       </div>
     </div>
@@ -387,6 +387,15 @@ function buildCompassRing(THREE, grp) {
   }
 }
 
+function getObstructionColors() {
+  const defaults = { clear: '#00ffff', obstructed: '#ff4444' };
+  try {
+    const raw = localStorage.getItem('starlink_gui.obstruction_colors');
+    if (!raw) return defaults;
+    return { ...defaults, ...JSON.parse(raw) };
+  } catch (_) { return defaults; }
+}
+
 function buildCellMesh() {
   const THREE = view.THREE;
   if (!THREE || !view.obsGroup) return;
@@ -395,8 +404,13 @@ function buildCellMesh() {
   if (!view.cells.length) return;
   const geom    = new THREE.BoxGeometry(0.022, 0.001, 0.022);
   const opts    = { transparent: true, opacity: 0.5, depthWrite: false };
-  const clear   = new THREE.MeshBasicMaterial({ ...opts, color: new THREE.Color('#00ffff') });
-  const blocked = new THREE.MeshBasicMaterial({ ...opts, color: new THREE.Color('#ff4444') });
+  const cols = getObstructionColors();
+  const el1 = document.getElementById('legend-dot-clear');
+  const el2 = document.getElementById('legend-dot-obstructed');
+  if (el1) el1.style.background = cols.clear;
+  if (el2) el2.style.background = cols.obstructed;
+  const clear   = new THREE.MeshBasicMaterial({ ...opts, color: new THREE.Color(cols.clear) });
+  const blocked = new THREE.MeshBasicMaterial({ ...opts, color: new THREE.Color(cols.obstructed) });
   const dummy   = new THREE.Object3D();
   for (const [subset, mat] of [
     [view.cells.filter(c => c.value >= 0.02), clear],
