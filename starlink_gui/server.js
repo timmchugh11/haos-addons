@@ -112,6 +112,18 @@ app.get('/api/dishy/obstruction-map', (req, res) => {
     handle(res, () => dishy.fetch_obstruction_map().finally(() => dishy.close()));
 });
 
+app.get('/api/dishy/alignment', (req, res) => {
+    const dishy = getDishy(req);
+    handle(res, () => dishy['handle']({ getDiagnostics: {} })
+        .then(r => {
+            const stats = r?.dishGetDiagnostics?.alignmentStats;
+            if (!stats) throw new Error('alignmentStats not available in diagnostics response');
+            return stats;
+        })
+        .finally(() => dishy.close())
+    );
+});
+
 app.get('/api/dishy/dump', async (req, res) => {
     const specs = {
         dishGetStatus: async () => {

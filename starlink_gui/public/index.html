@@ -477,6 +477,70 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
 ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
 /* ── bypass mode ── */
 .bypass-active .router-item{display:none!important}
+
+/* ── alignment map ── */
+main:has(#page-dishy-alignment.active){
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+#page-dishy-alignment.active{
+  display:flex;
+  flex-direction:column;
+  flex:1;
+  min-height:0;
+}
+#align-box{
+  position:relative;
+  padding:0;
+  overflow:hidden;
+  flex:1;
+  min-height:0;
+}
+#align-canvas-wrap{
+  position:absolute;
+  inset:0;
+  display:block;
+}
+#align-canvas{
+  width:100%;
+  height:100%;
+  background:#000;
+  touch-action:none;
+  cursor:grab;
+}
+#align-canvas.is-dragging{cursor:grabbing}
+#align-overlay{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  padding:20px;
+}
+#align-overlay-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+#align-overlay-top .box-title{margin-bottom:0}
+#align-overlay-top button{pointer-events:auto}
+#align-overlay-bottom{display:flex;flex-direction:column;gap:10px}
+#align-controls{
+  display:flex;
+  align-items:center;
+  color:var(--muted);
+  font-size:12px;
+}
+#align-stats{display:flex;flex-wrap:wrap;align-items:center;gap:16px;color:var(--muted);font-size:12px}
+#align-stats span span{color:var(--text2);margin-left:3px;font-family:monospace}
+#align-overlay .cards{margin-bottom:0}
+#align-overlay .card{
+  background:rgba(10,20,32,0.72);
+  backdrop-filter:blur(6px);
+  border-color:rgba(255,255,255,0.1);
+}
 </style>
 </head>
 <body>
@@ -525,6 +589,10 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
   <a href="#dishy-obstruction" class="nav-link" data-page="dishy-obstruction">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
     Obstruction Map
+  </a>
+  <a href="#dishy-alignment" class="nav-link" data-page="dishy-alignment">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="2"/></svg>
+    Alignment
   </a>
   <a href="#dishy-location" class="nav-link" data-page="dishy-location">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -710,6 +778,45 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
             <span>Tracked <span id="obs-samples">—</span></span>
             <span id="obs-obstructed-wrap" style="display:none">Obstructed <span id="obs-obstructed">—</span></span>
             <span>Untracked <span id="obs-untracked">—</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ DISHY ALIGNMENT ════ -->
+  <section id="page-dishy-alignment" class="page">
+    <div class="page-title">Alignment</div>
+    <div class="page-sub">Boresight alignment — actual vs desired pointing direction</div>
+
+    <div class="refresh-row">
+      <button class="btn btn-primary btn-sm" onclick="loadAlignment()">Refresh</button>
+      <span class="last-update" id="align-updated">Never updated</span>
+    </div>
+    <div class="box" id="align-box">
+      <div id="align-canvas-wrap">
+        <canvas id="align-canvas" width="400" height="400"></canvas>
+      </div>
+      <div id="align-overlay">
+        <div id="align-overlay-top"></div>
+        <div id="align-overlay-bottom">
+          <div id="align-controls" style="display:none">
+            <div id="align-helper">Drag to rotate &amp; scroll to zoom</div>
+            <label style="pointer-events:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-left:auto">
+              Speed
+              <input id="align-speed" type="range" min="0" max="0.005" step="0.0001" value="0.0003"
+                style="width:80px;accent-color:#287fff"
+                oninput="const sign=alignmentView.baseYawVel<0?-1:1;alignmentView.baseYawVel=sign*+this.value;document.getElementById('align-speed-val').textContent=parseFloat(this.value).toFixed(4);saveAlignmentSpin()">
+              <span id="align-speed-val" style="font-family:monospace">0.0003</span>
+            </label>
+            <button id="align-dir" style="pointer-events:auto;margin-left:8px;font-size:11px;padding:2px 8px" class="btn btn-primary btn-sm"
+              onclick="alignmentView.baseYawVel*=-1;this.textContent=alignmentView.baseYawVel>=0?'CW':'CCW';saveAlignmentSpin()">CW</button>
+          </div>
+          <div id="align-stats">
+            <span>Actual Az <span id="align-actual-az">—</span>°</span>
+            <span>Actual El <span id="align-actual-el">—</span>°</span>
+            <span>Desired Az <span id="align-desired-az">—</span>°</span>
+            <span>Desired El <span id="align-desired-el">—</span>°</span>
           </div>
         </div>
       </div>
@@ -1150,6 +1257,7 @@ function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
   currentPage = page;
   document.getElementById('main').scrollTop = 0;
+  history.pushState({ page }, '', '#' + page);
   autoLoad(page);
 }
 
@@ -1160,6 +1268,7 @@ function autoLoad(page) {
     'dishy-diagnostics': loadDishyDiagnostics,
     'dishy-history': loadDishyHistory,
     'dishy-obstruction': loadObstruction,
+    'dishy-alignment':   loadAlignment,
     'dishy-location': loadLocation,
     'router-status': loadRouterStatus,
     'router-clients': loadRouterClients,
@@ -1602,7 +1711,7 @@ const obstructionView = {
   obsGroup: null,  // cells + dish — rotates with yaw AND pitch
   yawGroup: null,  // compass ring — rotates with yaw only
   cellMesh: null, cellMeshes: [], THREE: null,
-  dishLoadStarted: false,
+  dishLoadStarted: false, dishOrientGroup: null,
   cells: [],
   yaw: 0, pitch: 0.5, zoom: 1.27,
   yawVel: 0.0003, baseYawVel: 0.0003, spinRaf: null,
@@ -1616,7 +1725,18 @@ window.addEventListener('starlink-obstruction-3d-ready', () => { ensureScene(); 
 async function loadObstruction() {
   set('obs-updated', 'Loading…');
   try {
-    const data = await apiFetch('/dishy/obstruction-map');
+    const [obstrData, alignData] = await Promise.allSettled([
+      apiFetch('/dishy/obstruction-map'),
+      apiFetch('/dishy/alignment'),
+    ]);
+    const data = obstrData.status === 'fulfilled' ? obstrData.value : (() => { throw new Error(obstrData.reason?.message || 'obstruction-map failed'); })();
+    if (alignData.status === 'fulfilled') {
+      const aAz = alignData.value?.boresightAzimuthDeg;
+      const aEl = alignData.value?.boresightElevationDeg;
+      if (typeof aAz === 'number' && typeof aEl === 'number') {
+        applyObstructionDishOrientation(aAz, aEl);
+      }
+    }
     const snr  = data.snr || [];
     const rows = data.numRows || 1;
     const cols = data.numCols || Math.round(snr.length / rows);
@@ -1741,6 +1861,7 @@ function ensureScene() {
   const yawGroup = new THREE.Group();
   scene.add(yawGroup);
   buildCompassRing(THREE, yawGroup);
+  yawGroup.scale.setScalar(0.5);
 
   obstructionView.THREE    = THREE;
   obstructionView.renderer = renderer;
@@ -1752,6 +1873,9 @@ function ensureScene() {
   // Load dish model
   if (!obstructionView.dishLoadStarted) {
     obstructionView.dishLoadStarted = true;
+    const dishOrientGroup = new THREE.Group();
+    obsGroup.add(dishOrientGroup);
+    obstructionView.dishOrientGroup = dishOrientGroup;
     new GLTFLoader().load('./starlink_mini_dish.glb', (gltf) => {
       const model  = gltf.scene;
       const box    = new THREE.Box3().setFromObject(model);
@@ -1766,12 +1890,24 @@ function ensureScene() {
         child.frustumCulled = false;
         child.material = new THREE.MeshStandardMaterial({ color: 0xe0e8f8, metalness: 0.3, roughness: 0.55, side: THREE.DoubleSide });
       });
-      obsGroup.add(model);
+      dishOrientGroup.add(model);
       renderObstructionMap();
     });
   }
 
   if (obstructionView.cells.length) buildCellMesh();
+  renderObstructionMap();
+}
+
+function applyObstructionDishOrientation(az, el) {
+  const g     = obstructionView.dishOrientGroup;
+  const THREE = obstructionView.THREE;
+  if (!g || !THREE) return;
+  const azRad   = (az        * Math.PI) / 180;
+  const tiltRad = ((90 - el) * Math.PI) / 180;
+  const qTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tiltRad);
+  const qAz   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI - azRad);
+  g.quaternion.multiplyQuaternions(qAz, qTilt);
   renderObstructionMap();
 }
 
@@ -1911,6 +2047,301 @@ function renderObstructionMap() {
     if (dirBtn) dirBtn.textContent = dir;
   }
 }
+
+// ════════════════════════════════════════════════════════════════════
+// ALIGNMENT
+// ════════════════════════════════════════════════════════════════════
+
+const alignmentView = {
+  canvas: null, renderer: null, scene: null, camera: null,
+  obsGroup: null, yawGroup: null, THREE: null,
+  dishLoadStarted: false,
+  actualMarker: null, desiredMarker: null,
+  yaw: 0, pitch: 0.5, zoom: 0.65,
+  yawVel: 0, baseYawVel: 0.0003, spinRaf: null,
+  velHistory: [],
+  dragging: false, pointerId: null, lastX: 0, lastY: 0,
+  resizeBound: false,
+  dishOrientGroup: null, desiredOrientGroup: null, dishAz: 0, dishEl: 45,
+};
+
+
+// Convert azimuth (deg, 0=N CW) + elevation (deg, 0=horizon 90=zenith)
+// to a THREE.js world position on the unit sphere (same axis convention as obstruction map).
+function alignAzElToVec3(THREE, azDeg, elDeg) {
+  const az = (azDeg * Math.PI) / 180;
+  const el = (elDeg * Math.PI) / 180;
+  return new THREE.Vector3(
+    Math.sin(az) * Math.cos(el),
+    Math.sin(el),
+    -Math.cos(az) * Math.cos(el)
+  );
+}
+
+async function loadAlignment() {
+  set('align-updated', 'Loading…');
+  try {
+    const data = await apiFetch('/dishy/alignment');
+    const aAz = typeof data.boresightAzimuthDeg          === 'number' ? data.boresightAzimuthDeg          : null;
+    const aEl = typeof data.boresightElevationDeg        === 'number' ? data.boresightElevationDeg        : null;
+    const dAz = typeof data.desiredBoresightAzimuthDeg   === 'number' ? data.desiredBoresightAzimuthDeg   : null;
+    const dEl = typeof data.desiredBoresightElevationDeg === 'number' ? data.desiredBoresightElevationDeg : null;
+
+    set('align-actual-az',  aAz != null ? aAz.toFixed(1) : '—');
+    set('align-actual-el',  aEl != null ? aEl.toFixed(1) : '—');
+    set('align-desired-az', dAz != null ? dAz.toFixed(1) : '—');
+    set('align-desired-el', dEl != null ? dEl.toFixed(1) : '—');
+
+    if (aAz != null && aEl != null) {
+      alignmentView.dishAz = aAz;
+      alignmentView.dishEl = aEl;
+      alignmentView._pendingData = { aAz, aEl, dAz, dEl };
+      applyDishOrientation(aAz, aEl);
+      if (dAz != null && dEl != null) applyDesiredOrientation(dAz, dEl);
+    }
+    set('align-updated', 'Updated ' + now());
+  } catch (e) {
+    toast('Alignment error: ' + e.message, 'err');
+    set('align-updated', 'Error');
+  }
+}
+
+function applyDishOrientation(az, el) {
+  const g     = alignmentView.dishOrientGroup;
+  const THREE = alignmentView.THREE;
+  if (!g || !THREE) return;
+  // el = degrees above horizon (0=horizontal, 90=straight up)
+  // tilt from vertical = 90 - el
+  const azRad   = (az        * Math.PI) / 180;
+  const tiltRad = ((90 - el) * Math.PI) / 180;
+  // Step 1: tilt the dish — face tips from +Y toward +Z
+  const qTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tiltRad);
+  // Step 2: rotate the whole thing around Y so the tilt points in the correct
+  //   compass direction. In this scene N = -Z, E = +X, az is CW from N.
+  //   We need +Z (tilt direction after step 1) → (sin az, 0, -cos az).
+  //   That rotation around Y is (π - az).
+  const qAz = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI - azRad);
+  g.quaternion.multiplyQuaternions(qAz, qTilt);
+  renderAlignmentMap();
+}
+
+function applyDesiredOrientation(az, el) {
+  const g     = alignmentView.desiredOrientGroup;
+  const THREE = alignmentView.THREE;
+  if (!g || !THREE) return;
+  const azRad   = (az        * Math.PI) / 180;
+  const tiltRad = ((90 - el) * Math.PI) / 180;
+  const qTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tiltRad);
+  const qAz   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI - azRad);
+  g.quaternion.multiplyQuaternions(qAz, qTilt);
+  renderAlignmentMap();
+}
+
+
+
+function ensureAlignmentCanvas() {
+  if (alignmentView.canvas) return alignmentView.canvas;
+  const canvas = document.getElementById('align-canvas');
+  alignmentView.canvas = canvas;
+  canvas.addEventListener('pointerdown', (e) => {
+    alignmentView.dragging = true;
+    alignmentView.pointerId = e.pointerId;
+    alignmentView.lastX = e.clientX;
+    alignmentView.lastY = e.clientY;
+    alignmentView.velHistory = [];
+    canvas.classList.add('is-dragging');
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!alignmentView.dragging || e.pointerId !== alignmentView.pointerId) return;
+    const dx = (e.clientX - alignmentView.lastX) * 0.01;
+    alignmentView.yaw   += dx;
+    alignmentView.yawVel = dx;
+    alignmentView.pitch  = Math.max(-0.40, Math.min(1.0, alignmentView.pitch + (e.clientY - alignmentView.lastY) * 0.01));
+    alignmentView.lastX  = e.clientX;
+    alignmentView.lastY  = e.clientY;
+    alignmentView.velHistory.push(dx);
+    if (alignmentView.velHistory.length > 5) alignmentView.velHistory.shift();
+    renderAlignmentMap();
+  });
+  const endDrag = (e) => {
+    if (e && alignmentView.pointerId != null && e.pointerId !== alignmentView.pointerId) return;
+    alignmentView.dragging = false;
+    canvas.classList.remove('is-dragging');
+    if (canvas.hasPointerCapture(e?.pointerId)) canvas.releasePointerCapture(e.pointerId);
+    const h = alignmentView.velHistory;
+    const flick = h.length ? h.reduce((a, b) => a + b, 0) / h.length : 0;
+    alignmentView.yawVel = flick;
+    if (Math.abs(flick) > 0.0001) {
+      const speed = Math.abs(alignmentView.baseYawVel);
+      alignmentView.baseYawVel = flick > 0 ? speed : -speed;
+    }
+  };
+  canvas.addEventListener('pointerup',     endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointerleave',  (e) => { alignmentView.velHistory = []; endDrag(e); });
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 1.1 : 1 / 1.1;
+    alignmentView.zoom = Math.max(0.3, Math.min(4.0, alignmentView.zoom * delta));
+    renderAlignmentMap();
+  }, { passive: false });
+  if (!alignmentView.resizeBound) {
+    alignmentView.resizeBound = true;
+    window.addEventListener('resize', renderAlignmentMap);
+  }
+  return canvas;
+}
+
+function ensureAlignmentScene() {
+  ensureAlignmentCanvas();
+  if (alignmentView.renderer) return;
+  const modules = window.__starlinkObstruction3D;
+  if (!modules) return;
+
+  const { THREE, GLTFLoader } = modules;
+  const canvas = alignmentView.canvas;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setClearColor(0x000000, 1);
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(46, 1, 0.01, 100);
+  camera.position.set(0, 0.9, 2.1);
+  camera.lookAt(0, 0, 0);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+  const key  = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(2, 4, 3);  scene.add(key);
+  const fill = new THREE.DirectionalLight(0x7ab0ff, 0.9); fill.position.set(-2, -1, 2); scene.add(fill);
+
+  const obsGroup = new THREE.Group();
+  scene.add(obsGroup);
+
+  const yawGroup = new THREE.Group();
+  scene.add(yawGroup);
+  buildCompassRing(THREE, yawGroup);  // reuse same function from obstruction
+  yawGroup.scale.setScalar(0.5);     // half-size compass for alignment view
+
+  alignmentView.THREE    = THREE;
+  alignmentView.renderer = renderer;
+  alignmentView.scene    = scene;
+  alignmentView.camera   = camera;
+  alignmentView.obsGroup = obsGroup;
+  alignmentView.yawGroup = yawGroup;
+
+  // dishOrientGroup: actual pointing — receives az/el quaternion
+  const dishOrientGroup = new THREE.Group();
+  obsGroup.add(dishOrientGroup);
+  alignmentView.dishOrientGroup = dishOrientGroup;
+
+  // desiredOrientGroup: desired pointing — ghost copy, offset slightly up
+  const desiredOrientGroup = new THREE.Group();
+  desiredOrientGroup.position.y = 0.03;
+  obsGroup.add(desiredOrientGroup);
+  alignmentView.desiredOrientGroup = desiredOrientGroup;
+
+  if (!alignmentView.dishLoadStarted) {
+    alignmentView.dishLoadStarted = true;
+    new GLTFLoader().load('./starlink_mini_dish.glb', (gltf) => {
+      const model = gltf.scene;
+      const box   = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      const dims   = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(dims.x, dims.y, dims.z) || 1;
+      const s = 0.32 / maxDim;
+
+      // Actual dish — solid
+      model.scale.setScalar(s);
+      model.position.set(-center.x * s, -center.y * s + 0.04, -center.z * s);
+      model.traverse((child) => {
+        if (!child.isMesh) return;
+        child.frustumCulled = false;
+        child.material = new THREE.MeshStandardMaterial({ color: 0xe0e8f8, metalness: 0.3, roughness: 0.55, side: THREE.DoubleSide });
+      });
+      dishOrientGroup.add(model);
+
+      // Desired ghost — cloned, translucent green
+      const ghost = model.clone(true);
+      ghost.traverse((child) => {
+        if (!child.isMesh) return;
+        child.frustumCulled = false;
+        child.material = new THREE.MeshStandardMaterial({
+          color: 0x00D47E, metalness: 0.1, roughness: 0.7,
+          transparent: true, opacity: 0.35,
+          side: THREE.DoubleSide, depthWrite: false,
+        });
+      });
+      desiredOrientGroup.add(ghost);
+
+      renderAlignmentMap();
+    });
+  }
+
+  // If data already loaded, apply orientations now
+  if (alignmentView._pendingData) {
+    const { aAz, aEl, dAz, dEl } = alignmentView._pendingData;
+    applyDishOrientation(aAz, aEl);
+    if (dAz != null && dEl != null) applyDesiredOrientation(dAz, dEl);
+  }
+
+  startAlignmentSpin();
+
+  renderAlignmentMap();
+}
+
+function startAlignmentSpin() {
+  if (alignmentView.spinRaf) return;
+  const loop = () => {
+    if (!alignmentView.dragging) {
+      alignmentView.yawVel *= 0.92;
+      alignmentView.yaw += alignmentView.yawVel + alignmentView.baseYawVel;
+      if (alignmentView.yaw >  Math.PI) alignmentView.yaw -= Math.PI * 2;
+      else if (alignmentView.yaw < -Math.PI) alignmentView.yaw += Math.PI * 2;
+      renderAlignmentMap();
+    }
+    alignmentView.spinRaf = requestAnimationFrame(loop);
+  };
+  alignmentView.spinRaf = requestAnimationFrame(loop);
+}
+
+function resetAlignmentView() {
+  alignmentView.yaw   = 0;
+  alignmentView.pitch = 0.5;
+  alignmentView.zoom  = 0.65;
+  alignmentView.yawVel = alignmentView.baseYawVel;
+  renderAlignmentMap();
+}
+
+function renderAlignmentMap() {
+  ensureAlignmentCanvas();
+  if (!alignmentView.renderer) { ensureAlignmentScene(); return; }
+  const canvas   = alignmentView.canvas;
+  const renderer = alignmentView.renderer;
+  const dpr = window.devicePixelRatio || 1;
+  const wr  = canvas.parentElement.getBoundingClientRect();
+  const w   = Math.max(320, Math.floor(wr.width  || 600));
+  const h   = Math.max(200, Math.floor(wr.height || 520));
+  renderer.setPixelRatio(dpr);
+  renderer.setSize(w, h, false);
+  alignmentView.camera.aspect = w / h;
+  alignmentView.camera.updateProjectionMatrix();
+  const z = alignmentView.zoom;
+  alignmentView.camera.position.set(0, 0.9 * z, 2.1 * z);
+  alignmentView.camera.lookAt(0, 0, 0);
+  const THREE = alignmentView.THREE;
+  if (THREE) {
+    const qY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), alignmentView.yaw);
+    const qX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), alignmentView.pitch);
+    const q  = new THREE.Quaternion().multiplyQuaternions(qX, qY);
+    if (alignmentView.obsGroup) alignmentView.obsGroup.quaternion.copy(q);
+    if (alignmentView.yawGroup) alignmentView.yawGroup.quaternion.copy(q);
+  }
+  renderer.render(alignmentView.scene, alignmentView.camera);
+}
+
+window.addEventListener('starlink-obstruction-3d-ready', () => { ensureAlignmentScene(); });
 
 // ════════════════════════════════════════════════════════════════════
 // LOCATION
@@ -2510,7 +2941,17 @@ async function init() {
   document.body.classList.toggle('bypass-active', bypass);
 
   applyInterval(false);
-  refreshDashboard();
+
+  // Restore page from URL hash, fall back to dashboard
+  const hashPage = window.location.hash.replace('#', '').trim();
+  const validPage = hashPage && document.getElementById('page-' + hashPage) ? hashPage : 'dashboard';
+  navigate(validPage);
+
+  // Handle browser back/forward
+  window.addEventListener('popstate', (e) => {
+    const p = (e.state?.page) || window.location.hash.replace('#', '').trim() || 'dashboard';
+    navigate(p);
+  });
 }
 
 init();
