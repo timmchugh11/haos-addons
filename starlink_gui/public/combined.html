@@ -97,10 +97,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:transparent;font-fam
       <div class="stat-line dim">Az <span id="desired-az">—</span>° El <span id="desired-el">—</span>° <span style="color:rgba(0,212,126,0.7)">desired</span></div>
     </div>
 
-    <!-- bottom-center: stow + timestamp -->
+    <!-- bottom-center: stow -->
     <div id="stats-bc" class="stat-group">
       <div class="stat-line" id="s-stow-label">—</div>
-      <div class="stat-line dim" id="updated"></div>
     </div>
 
   </div>
@@ -235,9 +234,8 @@ async function loadData() {
       }).catch(() => { stowEl.textContent = ''; });
     }
 
-    setEl('updated', new Date().toLocaleTimeString());
   } catch (e) {
-    setEl('updated', 'Error: ' + e.message);
+    console.error('loadData error:', e);
   }
 }
 
