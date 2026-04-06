@@ -798,7 +798,10 @@ main:has(#page-dishy-alignment.active){
         <canvas id="align-canvas" width="400" height="400"></canvas>
       </div>
       <div id="align-overlay">
-        <div id="align-overlay-top"></div>
+        <div id="align-overlay-top">
+          <div class="box-title">Alignment View</div>
+          <button class="btn btn-primary btn-sm" onclick="resetAlignmentView()">Reset View</button>
+        </div>
         <div id="align-overlay-bottom">
           <div id="align-controls" style="display:none">
             <div id="align-helper">Drag to rotate &amp; scroll to zoom</div>
@@ -806,11 +809,11 @@ main:has(#page-dishy-alignment.active){
               Speed
               <input id="align-speed" type="range" min="0" max="0.005" step="0.0001" value="0.0003"
                 style="width:80px;accent-color:#287fff"
-                oninput="const sign=alignmentView.baseYawVel<0?-1:1;alignmentView.baseYawVel=sign*+this.value;document.getElementById('align-speed-val').textContent=parseFloat(this.value).toFixed(4);saveAlignmentSpin()">
+                oninput="const sign=alignmentView.baseYawVel<0?-1:1;alignmentView.baseYawVel=sign*+this.value;document.getElementById('align-speed-val').textContent=parseFloat(this.value).toFixed(4)">
               <span id="align-speed-val" style="font-family:monospace">0.0003</span>
             </label>
             <button id="align-dir" style="pointer-events:auto;margin-left:8px;font-size:11px;padding:2px 8px" class="btn btn-primary btn-sm"
-              onclick="alignmentView.baseYawVel*=-1;this.textContent=alignmentView.baseYawVel>=0?'CW':'CCW';saveAlignmentSpin()">CW</button>
+              onclick="alignmentView.baseYawVel*=-1;this.textContent=alignmentView.baseYawVel>=0?'CW':'CCW'">CW</button>
           </div>
           <div id="align-stats">
             <span>Actual Az <span id="align-actual-az">—</span>°</span>
@@ -2066,7 +2069,6 @@ const alignmentView = {
   canvas: null, renderer: null, scene: null, camera: null,
   obsGroup: null, yawGroup: null, THREE: null,
   dishLoadStarted: false,
-  actualMarker: null, desiredMarker: null,
   yaw: 0, pitch: 0.5, zoom: 0.65,
   yawVel: 0, baseYawVel: 0.0003, spinRaf: null,
   velHistory: [],
@@ -2075,18 +2077,6 @@ const alignmentView = {
   dishOrientGroup: null, desiredOrientGroup: null, dishAz: 0, dishEl: 45,
 };
 
-
-// Convert azimuth (deg, 0=N CW) + elevation (deg, 0=horizon 90=zenith)
-// to a THREE.js world position on the unit sphere (same axis convention as obstruction map).
-function alignAzElToVec3(THREE, azDeg, elDeg) {
-  const az = (azDeg * Math.PI) / 180;
-  const el = (elDeg * Math.PI) / 180;
-  return new THREE.Vector3(
-    Math.sin(az) * Math.cos(el),
-    Math.sin(el),
-    -Math.cos(az) * Math.cos(el)
-  );
-}
 
 async function loadAlignment() {
   set('align-updated', 'Loading…');
