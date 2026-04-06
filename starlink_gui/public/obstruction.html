@@ -6,9 +6,9 @@
 <title>Obstruction Map</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#e6e6e6}
+html,body{width:100%;height:100%;overflow:hidden;background:transparent;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#e6e6e6}
 #wrap{position:relative;width:100vw;height:100vh}
-#obs-canvas{width:100%;height:100%;display:block;background:#000;touch-action:none;cursor:grab}
+#obs-canvas{width:100%;height:100%;display:block;background:transparent;touch-action:none;cursor:grab}
 #obs-canvas.is-dragging{cursor:grabbing}
 #overlay{
   position:absolute;inset:0;pointer-events:none;
@@ -44,7 +44,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:-ap
 <script>
 // ── Config ───────────────────────────────────────────────────────────────────
 const BASE = (typeof window.__BASE__ === 'string') ? window.__BASE__ : '';
-const REFRESH_INTERVAL_MS = 30000;
+const REFRESH_INTERVAL_MS = 5000;
 
 // ── View state ───────────────────────────────────────────────────────────────
 const view = {
@@ -164,8 +164,8 @@ function initScene() {
   const { THREE, GLTFLoader } = mods;
   const canvas = view.canvas;
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setClearColor(0x000000, 1);
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(window.devicePixelRatio || 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 

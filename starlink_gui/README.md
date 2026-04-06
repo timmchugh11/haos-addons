@@ -86,7 +86,7 @@ Assistant dashboard **Webpage** (iframe) cards:
 | `/alignment` | 3D alignment view only — no chrome, fills the card |
 | `/combined` | Both in one scene — obstruction cells, solid dish (actual), ghost dish (desired), along with some other usefull stats |
 
-All pages auto-refresh every 30 seconds and support drag-to-rotate and
+All pages auto-refresh every 5 seconds and support drag-to-rotate and
 scroll-to-zoom. Example card configuration:
 
 ```yaml
@@ -181,4 +181,4 @@ local Starlink devices.
 
 ## Current Version
 
-The add-on version is `1.1.13`.
+The add-on version is `1.1.14`.
