@@ -1260,7 +1260,6 @@ function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
   currentPage = page;
   document.getElementById('main').scrollTop = 0;
-  history.pushState({ page }, '', '#' + page);
   autoLoad(page);
 }
 
@@ -2951,16 +2950,8 @@ async function init() {
   applyInterval(false);
   checkConnStatus();
 
-  // Restore page from URL hash, fall back to dashboard
-  const hashPage = window.location.hash.replace('#', '').trim();
-  const validPage = hashPage && document.getElementById('page-' + hashPage) ? hashPage : 'dashboard';
-  navigate(validPage);
-
-  // Handle browser back/forward
-  window.addEventListener('popstate', (e) => {
-    const p = (e.state?.page) || window.location.hash.replace('#', '').trim() || 'dashboard';
-    navigate(p);
-  });
+  // Start on dashboard
+  navigate('dashboard');
 }
 
 init();
