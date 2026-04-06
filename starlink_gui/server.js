@@ -16,8 +16,10 @@ const DEFAULT_DISH_PORT   = parseInt(process.env.DISH_PORT   || '9200', 10);
 const DEFAULT_ROUTER_HOST = process.env.ROUTER_HOST || '192.168.1.1';
 const DEFAULT_ROUTER_PORT = parseInt(process.env.ROUTER_PORT || '9000', 10);
 
-// Read index.html once at startup for ingress-path injection
-const INDEX_HTML = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+// Read HTML files once at startup for ingress-path injection
+const INDEX_HTML        = fs.readFileSync(path.join(__dirname, 'public', 'index.html'),        'utf8');
+const OBSTRUCTION_HTML  = fs.readFileSync(path.join(__dirname, 'public', 'obstruction.html'),  'utf8');
+const ALIGNMENT_HTML    = fs.readFileSync(path.join(__dirname, 'public', 'alignment.html'),    'utf8');
 
 app.use(cors());
 app.use(express.json());
@@ -527,6 +529,21 @@ function serveIndex(req, res) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
 }
+
+function serveSimplePage(html) {
+    return (req, res) => {
+        const base = req.headers['x-ingress-path'] || '';
+        const out  = html.replace(
+            '</head>',
+            `<script>window.__BASE__=${JSON.stringify(base)};</script></head>`
+        );
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(out);
+    };
+}
+
+app.get('/obstruction', serveSimplePage(OBSTRUCTION_HTML));
+app.get('/alignment',   serveSimplePage(ALIGNMENT_HTML));
 
 app.get('/', serveIndex);
 app.get('/{*path}', serveIndex);

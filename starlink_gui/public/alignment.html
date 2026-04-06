@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Alignment</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#e6e6e6}
+#wrap{position:relative;width:100vw;height:100vh}
+#align-canvas{width:100%;height:100%;display:block;background:#000;touch-action:none;cursor:grab}
+#align-canvas.is-dragging{cursor:grabbing}
+#overlay{
+  position:absolute;inset:0;pointer-events:none;
+  display:flex;flex-direction:column;justify-content:space-between;
+  padding:14px;
+}
+#overlay-top{display:flex;justify-content:space-between;align-items:center}
+#overlay-bottom{display:flex;flex-direction:column;gap:6px}
+#stats{font-size:11px;color:rgba(255,255,255,0.5);display:flex;flex-wrap:wrap;gap:10px}
+#stats span span{color:rgba(255,255,255,0.75);margin-left:3px;font-family:monospace}
+#updated{font-size:10px;color:rgba(255,255,255,0.3);font-family:monospace}
+#title{font-size:12px;font-weight:600;letter-spacing:0.06em;color:rgba(255,255,255,0.5);text-transform:uppercase}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="align-canvas" width="400" height="400"></canvas>
+  <div id="overlay">
+    <div id="overlay-top">
+      <span id="title">Alignment</span>
+    </div>
+    <div id="overlay-bottom">
+      <div id="stats">
+        <span>Actual Az <span id="actual-az">—</span>°</span>
+        <span>Actual El <span id="actual-el">—</span>°</span>
+        <span>Desired Az <span id="desired-az">—</span>°</span>
+        <span>Desired El <span id="desired-el">—</span>°</span>
+      </div>
+      <span id="updated"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ───────────────────────────────────────────────────────────────────
+const BASE = (typeof window.__BASE__ === 'string') ? window.__BASE__ : '';
+const REFRESH_INTERVAL_MS = 30000;
+
+// ── View state ───────────────────────────────────────────────────────────────
+const view = {
+  canvas: null, renderer: null, scene: null, camera: null,
+  obsGroup: null, yawGroup: null, THREE: null,
+  dishLoadStarted: false, dishOrientGroup: null, desiredOrientGroup: null,
+  yaw: 0, pitch: 0.5, zoom: 0.65,
+  yawVel: 0, baseYawVel: 0.0003, spinRaf: null,
+  velHistory: [],
+  dragging: false, pointerId: null, lastX: 0, lastY: 0,
+  _pendingData: null,
+};
+
+// ── API ───────────────────────────────────────────────────────────────────────
+async function apiFetch(path) {
+  const r = await fetch(BASE + '/api' + path);
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'API error');
+  return j.data;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setEl(id, val) { const e = document.getElementById(id); if (e) e.textContent = val; }
+
+// ── Data load ─────────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const data = await apiFetch('/dishy/alignment');
+    const aAz = typeof data.boresightAzimuthDeg          === 'number' ? data.boresightAzimuthDeg          : null;
+    const aEl = typeof data.boresightElevationDeg        === 'number' ? data.boresightElevationDeg        : null;
+    const dAz = typeof data.desiredBoresightAzimuthDeg   === 'number' ? data.desiredBoresightAzimuthDeg   : null;
+    const dEl = typeof data.desiredBoresightElevationDeg === 'number' ? data.desiredBoresightElevationDeg : null;
+    setEl('actual-az',  aAz != null ? aAz.toFixed(1) : '—');
+    setEl('actual-el',  aEl != null ? aEl.toFixed(1) : '—');
+    setEl('desired-az', dAz != null ? dAz.toFixed(1) : '—');
+    setEl('desired-el', dEl != null ? dEl.toFixed(1) : '—');
+    if (aAz != null && aEl != null) {
+      view._pendingData = { aAz, aEl, dAz, dEl };
+      applyDishOrientation(aAz, aEl);
+      if (dAz != null && dEl != null) applyDesiredOrientation(dAz, dEl);
+    }
+    setEl('updated', new Date().toLocaleTimeString());
+  } catch (e) {
+    setEl('updated', 'Error: ' + e.message);
+  }
+}
+
+// ── Three.js scene ────────────────────────────────────────────────────────────
+window.addEventListener('starlink-obstruction-3d-ready', initScene);
+
+function initCanvas() {
+  if (view.canvas) return;
+  const canvas = document.getElementById('align-canvas');
+  view.canvas = canvas;
+  canvas.addEventListener('pointerdown', e => {
+    view.dragging = true; view.pointerId = e.pointerId;
+    view.lastX = e.clientX; view.lastY = e.clientY; view.velHistory = [];
+    canvas.classList.add('is-dragging'); canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!view.dragging || e.pointerId !== view.pointerId) return;
+    const dx = (e.clientX - view.lastX) * 0.01;
+    view.yaw   += dx;
+    view.yawVel = dx;
+    view.pitch  = Math.max(-0.40, Math.min(1.0, view.pitch + (e.clientY - view.lastY) * 0.01));
+    view.lastX  = e.clientX; view.lastY = e.clientY;
+    view.velHistory.push(dx); if (view.velHistory.length > 5) view.velHistory.shift();
+    renderMap();
+  });
+  const endDrag = e => {
+    if (e && view.pointerId != null && e.pointerId !== view.pointerId) return;
+    view.dragging = false; canvas.classList.remove('is-dragging');
+    if (canvas.hasPointerCapture(e?.pointerId)) canvas.releasePointerCapture(e.pointerId);
+    const h = view.velHistory;
+    const flick = h.length ? h.reduce((a, b) => a + b, 0) / h.length : 0;
+    view.yawVel = flick;
+    if (Math.abs(flick) > 0.0001) {
+      const spd = Math.abs(view.baseYawVel);
+      view.baseYawVel = flick > 0 ? spd : -spd;
+    }
+  };
+  canvas.addEventListener('pointerup',     endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointerleave',  e => { view.velHistory = []; endDrag(e); });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    view.zoom = Math.max(0.3, Math.min(4.0, view.zoom * (e.deltaY > 0 ? 1.1 : 1/1.1)));
+    renderMap();
+  }, { passive: false });
+  window.addEventListener('resize', renderMap);
+}
+
+function initScene() {
+  initCanvas();
+  if (view.renderer) return;
+  const mods = window.__starlinkObstruction3D;
+  if (!mods) return;
+  const { THREE, GLTFLoader } = mods;
+  const canvas = view.canvas;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setClearColor(0x000000, 1);
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(46, 1, 0.01, 100);
+  camera.position.set(0, 0.9, 2.1); camera.lookAt(0, 0, 0);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+  const key  = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(2, 4, 3);   scene.add(key);
+  const fill = new THREE.DirectionalLight(0x7ab0ff, 0.9); fill.position.set(-2, -1, 2); scene.add(fill);
+
+  const obsGroup = new THREE.Group(); scene.add(obsGroup);
+  const yawGroup = new THREE.Group(); scene.add(yawGroup);
+  buildCompassRing(THREE, yawGroup);
+  yawGroup.scale.setScalar(0.5);
+
+  view.THREE = THREE; view.renderer = renderer; view.scene = scene;
+  view.camera = camera; view.obsGroup = obsGroup; view.yawGroup = yawGroup;
+
+  const dishOrientGroup    = new THREE.Group(); obsGroup.add(dishOrientGroup);
+  const desiredOrientGroup = new THREE.Group(); desiredOrientGroup.position.y = 0.03; obsGroup.add(desiredOrientGroup);
+  view.dishOrientGroup    = dishOrientGroup;
+  view.desiredOrientGroup = desiredOrientGroup;
+
+  if (!view.dishLoadStarted) {
+    view.dishLoadStarted = true;
+    new GLTFLoader().load(BASE + '/starlink_mini_dish.glb', gltf => {
+      const model = gltf.scene;
+      const box   = new THREE.Box3().setFromObject(model);
+      const ctr   = box.getCenter(new THREE.Vector3());
+      const dims  = box.getSize(new THREE.Vector3());
+      const s     = 0.32 / (Math.max(dims.x, dims.y, dims.z) || 1);
+      model.scale.setScalar(s);
+      model.position.set(-ctr.x * s, -ctr.y * s + 0.04, -ctr.z * s);
+      model.traverse(child => {
+        if (!child.isMesh) return;
+        child.frustumCulled = false;
+        child.material = new THREE.MeshStandardMaterial({ color: 0xe0e8f8, metalness: 0.3, roughness: 0.55, side: THREE.DoubleSide });
+      });
+      dishOrientGroup.add(model);
+      // Ghost copy for desired orientation
+      const ghost = model.clone(true);
+      ghost.traverse(child => {
+        if (!child.isMesh) return;
+        child.frustumCulled = false;
+        child.material = new THREE.MeshStandardMaterial({
+          color: 0x00D47E, metalness: 0.1, roughness: 0.7,
+          transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false,
+        });
+      });
+      desiredOrientGroup.add(ghost);
+      renderMap();
+    });
+  }
+
+  if (view._pendingData) {
+    const { aAz, aEl, dAz, dEl } = view._pendingData;
+    applyDishOrientation(aAz, aEl);
+    if (dAz != null && dEl != null) applyDesiredOrientation(dAz, dEl);
+  }
+
+  startSpin();
+  renderMap();
+}
+
+function buildCompassRing(THREE, grp) {
+  const R = 0.708, y = 0.01;
+  const pts = Array.from({ length: 129 }, (_, i) => {
+    const a = (i / 128) * Math.PI * 2;
+    return new THREE.Vector3(Math.cos(a) * R, y, Math.sin(a) * R);
+  });
+  grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 })));
+  for (let i = 0; i < 72; i++) {
+    const a = (i / 72) * Math.PI * 2, major = i % 6 === 0;
+    const r1 = R - (major ? 0.07 : 0.03);
+    grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(Math.cos(a) * r1, y, Math.sin(a) * r1),
+      new THREE.Vector3(Math.cos(a) * R,  y, Math.sin(a) * R),
+    ]), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: major ? 0.75 : 0.3 })));
+  }
+  for (const [text, lx, lz] of [['N', 0, -0.828], ['E', 0.828, 0], ['S', 0, 0.828], ['W', -0.828, 0]]) {
+    const cv = document.createElement('canvas'); cv.width = 128; cv.height = 128;
+    const c2 = cv.getContext('2d');
+    c2.fillStyle = 'rgba(255,255,255,0.92)';
+    c2.font = 'bold 88px "Segoe UI",sans-serif';
+    c2.textAlign = 'center'; c2.textBaseline = 'middle';
+    c2.fillText(text, 64, 68);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true }));
+    sprite.position.set(lx, y + 0.108, lz);
+    sprite.scale.set(0.156, 0.156, 1);
+    grp.add(sprite);
+  }
+}
+
+function applyDishOrientation(az, el) {
+  const g = view.dishOrientGroup, THREE = view.THREE;
+  if (!g || !THREE) return;
+  const azRad   = az       * Math.PI / 180;
+  const tiltRad = (90 - el) * Math.PI / 180;
+  const qTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tiltRad);
+  const qAz   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI - azRad);
+  g.quaternion.multiplyQuaternions(qAz, qTilt);
+  renderMap();
+}
+
+function applyDesiredOrientation(az, el) {
+  const g = view.desiredOrientGroup, THREE = view.THREE;
+  if (!g || !THREE) return;
+  const azRad   = az       * Math.PI / 180;
+  const tiltRad = (90 - el) * Math.PI / 180;
+  const qTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tiltRad);
+  const qAz   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI - azRad);
+  g.quaternion.multiplyQuaternions(qAz, qTilt);
+  renderMap();
+}
+
+function startSpin() {
+  if (view.spinRaf) return;
+  const loop = () => {
+    if (!view.dragging) {
+      view.yawVel *= 0.92;
+      view.yaw += view.yawVel + view.baseYawVel;
+      if (view.yaw >  Math.PI) view.yaw -= Math.PI * 2;
+      else if (view.yaw < -Math.PI) view.yaw += Math.PI * 2;
+      renderMap();
+    }
+    view.spinRaf = requestAnimationFrame(loop);
+  };
+  view.spinRaf = requestAnimationFrame(loop);
+}
+
+function resetView() {
+  view.yaw = 0; view.pitch = 0.5; view.zoom = 0.65;
+  view.yawVel = view.baseYawVel;
+  renderMap();
+}
+
+function renderMap() {
+  if (!view.renderer) { initScene(); return; }
+  const canvas = view.canvas, renderer = view.renderer;
+  const dpr = window.devicePixelRatio || 1;
+  const wr  = canvas.parentElement.getBoundingClientRect();
+  const w   = Math.max(320, Math.floor(wr.width  || 600));
+  const h   = Math.max(200, Math.floor(wr.height || 520));
+  renderer.setPixelRatio(dpr); renderer.setSize(w, h, false);
+  view.camera.aspect = w / h; view.camera.updateProjectionMatrix();
+  const z = view.zoom;
+  view.camera.position.set(0, 0.9 * z, 2.1 * z); view.camera.lookAt(0, 0, 0);
+  const THREE = view.THREE;
+  if (THREE) {
+    const qY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), view.yaw);
+    const qX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), view.pitch);
+    const q  = new THREE.Quaternion().multiplyQuaternions(qX, qY);
+    if (view.obsGroup) view.obsGroup.quaternion.copy(q);
+    if (view.yawGroup) view.yawGroup.quaternion.copy(q);
+  }
+  renderer.render(view.scene, view.camera);
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+loadData();
+setInterval(loadData, REFRESH_INTERVAL_MS);
+</script>
+<script type="module" src="./obstruction-3d.mjs"></script>
+</body>
+</html>

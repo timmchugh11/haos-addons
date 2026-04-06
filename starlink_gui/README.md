@@ -13,8 +13,9 @@ open directly from the HA sidebar without publishing a separate public endpoint.
   - status
   - diagnostics
   - history and signal charts
-  - 3D interactive sky obstruction map 
+  - 3D interactive sky obstruction map
   - 3D interactive alignment view (actual vs desired boresight)
+  - Standalone obstruction and alignment pages for embedding in HA dashboard cards
   - location
   - basic controls (`reboot`, `stow`, `unstow`)
 - Router pages for:
@@ -73,6 +74,28 @@ you can leave it internal and use ingress only.
   bypassed and the router gRPC endpoint is unavailable.
 - Router pages are based on the fields your Starlink firmware actually returns;
   some fields may be sparse depending on hardware and firmware version
+
+## HA Dashboard Card Pages
+
+Two minimal full-viewport pages are available for embedding directly in Home
+Assistant dashboard **Webpage** (iframe) cards:
+
+| URL path | Description |
+|---|---|
+| `/obstruction` | 3D obstruction map only — no chrome, fills the card |
+| `/alignment` | 3D alignment view only — no chrome, fills the card |
+
+Both pages auto-refresh every 30 seconds and support drag-to-rotate and
+scroll-to-zoom. Example card configuration:
+
+```yaml
+type: iframe
+url: http://<ha-host>:3000/obstruction
+aspect_ratio: 75%
+```
+
+When accessed through HA ingress, the URL will follow your ingress path
+automatically.
 
 ## Sky Obstruction Map
 
@@ -145,4 +168,4 @@ local Starlink devices.
 
 ## Current Version
 
-The add-on version is `1.1.8`.
+The add-on version is `1.1.9`.
