@@ -13,7 +13,8 @@ open directly from the HA sidebar without publishing a separate public endpoint.
   - status
   - diagnostics
   - history and signal charts
-  - 3D interactive sky obstruction map
+  - 3D interactive sky obstruction map 
+  - 3D interactive alignment view (actual vs desired boresight)
   - location
   - basic controls (`reboot`, `stow`, `unstow`)
 - Router pages for:
@@ -109,6 +110,7 @@ The backend exposes internal JSON endpoints used by the frontend, including:
   - `/api/dishy/history`
   - `/api/dishy/location`
   - `/api/dishy/obstruction-map`
+  - `/api/dishy/alignment`
   - `/api/dishy/reboot`
   - `/api/dishy/stow`
   - `/api/dishy/unstow`
@@ -143,4 +145,4 @@ local Starlink devices.
 
 ## Current Version
 
-The add-on version is `1.1.6`.
+The add-on version is `1.1.7`.
