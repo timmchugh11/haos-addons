@@ -20,6 +20,7 @@ const DEFAULT_ROUTER_PORT = parseInt(process.env.ROUTER_PORT || '9000', 10);
 const INDEX_HTML        = fs.readFileSync(path.join(__dirname, 'public', 'index.html'),        'utf8');
 const OBSTRUCTION_HTML  = fs.readFileSync(path.join(__dirname, 'public', 'obstruction.html'),  'utf8');
 const ALIGNMENT_HTML    = fs.readFileSync(path.join(__dirname, 'public', 'alignment.html'),    'utf8');
+const COMBINED_HTML     = fs.readFileSync(path.join(__dirname, 'public', 'combined.html'),     'utf8');
 
 app.use(cors());
 app.use(express.json());
@@ -544,6 +545,7 @@ function serveSimplePage(html) {
 
 app.get('/obstruction', serveSimplePage(OBSTRUCTION_HTML));
 app.get('/alignment',   serveSimplePage(ALIGNMENT_HTML));
+app.get('/combined',    serveSimplePage(COMBINED_HTML));
 
 app.get('/', serveIndex);
 app.get('/{*path}', serveIndex);

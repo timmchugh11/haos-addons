@@ -84,6 +84,7 @@ Assistant dashboard **Webpage** (iframe) cards:
 |---|---|
 | `/obstruction` | 3D obstruction map only — no chrome, fills the card |
 | `/alignment` | 3D alignment view only — no chrome, fills the card |
+| `/combined` | Both in one scene — obstruction cells, solid dish (actual), ghost dish (desired) |
 
 Both pages auto-refresh every 30 seconds and support drag-to-rotate and
 scroll-to-zoom. Example card configuration:
@@ -168,4 +169,4 @@ local Starlink devices.
 
 ## Current Version
 
-The add-on version is `1.1.9`.
+The add-on version is `1.1.10`.
