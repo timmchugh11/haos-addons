@@ -77,38 +77,7 @@ you can leave it internal and use ingress only.
 
 ## HA Dashboard Card Pages
 
-Three minimal full-viewport pages are available for embedding directly in Home
-Assistant dashboard **Webpage** (iframe) cards:
-
-| URL path | Description |
-|---|---|
-| `/obstruction` | 3D obstruction map only — no chrome, fills the card |
-| `/alignment` | 3D alignment view only — no chrome, fills the card |
-| `/combined` | Both in one scene — obstruction cells, solid dish (actual), ghost dish (desired), along with some other usefull stats |
-
-All pages auto-refresh every 5 seconds and support drag-to-rotate and
-scroll-to-zoom. Example card configuration:
-
-```yaml
-type: iframe
-url: http://<ha-host>:3000/combined
-aspect_ratio: 75%
-```
-
-> **Note:** HA ingress does not forward subpaths, so these card pages must be
-> accessed via a **direct port URL** (e.g. `http://<ha-ip>:3000/combined`)
-> rather than through the ingress link. This also means the card pages bypass HA
-> authentication — only expose the port on a trusted local network.
-
-### Obstruction Colours in Card Pages
-
-The card pages read the obstruction cell colours from the same browser
-`localStorage` key used by the main UI (`starlink_gui.obstruction_colors`).
-To change the colours:
-
-1. Open the main UI via the add-on's direct port URL (e.g. `http://<ha-ip>:3000/#settings).
-2. Go to **Settings → Obstruction Map Colours** and pick your colours.
-3. Reload the card page — it will use the updated colours automatically.
+TBD
 
 ## Sky Obstruction Map
 
