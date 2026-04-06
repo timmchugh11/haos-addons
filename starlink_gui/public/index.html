@@ -1319,6 +1319,16 @@ function toast(msg, type = 'info', dur = 4000) {
 // DASHBOARD
 // ════════════════════════════════════════════════════════════════════
 
+async function checkConnStatus() {
+  updateConnStatus('idle', 'Connecting…');
+  try {
+    await apiFetch('/dishy/status');
+    updateConnStatus('ok', 'Connected');
+  } catch (_) {
+    updateConnStatus('err', 'Error');
+  }
+}
+
 async function refreshDashboard() {
   updateConnStatus('idle', 'Fetching…');
   try {
@@ -2914,6 +2924,14 @@ async function init() {
     sortTableByHeader(th);
   });
 
+  // Intercept sidebar nav-link clicks so navigate() runs instead of browser hash change
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a.nav-link[data-page]');
+    if (!link) return;
+    event.preventDefault();
+    navigate(link.dataset.page);
+  });
+
   // Load server-side defaults (from HA add-on options / env vars)
   try {
     const base = window.__BASE__ || '';
@@ -2941,6 +2959,7 @@ async function init() {
   document.body.classList.toggle('bypass-active', bypass);
 
   applyInterval(false);
+  checkConnStatus();
 
   // Restore page from URL hash, fall back to dashboard
   const hashPage = window.location.hash.replace('#', '').trim();
