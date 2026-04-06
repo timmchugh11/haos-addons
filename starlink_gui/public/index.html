@@ -2478,7 +2478,7 @@ async function loadRouterStatus() {
     const uptime = data.deviceState?.uptimeS != null ? fmtClockDuration(data.deviceState.uptimeS) : '—';
     set('rst-wan',    data.ipv4WanAddress   ?? '—');
     set('rst-lat',    data.pingLatencyMs    != null ? data.pingLatencyMs.toFixed(1) : '—');
-    set('rst-drop',   data.pingDropRate     != null ? (data.pingDropRate * 100).toFixed(2) : '—');
+    set('rst-drop',   ((data.pingDropRate ?? 0) * 100).toFixed(2));
     set('rst-state',  uptime);
     set('rst-serial', data.serialNumber ?? data.deviceInfo?.id ?? '—');
     set('rst-sku',    data.sku ?? data.deviceInfo?.hardwareVersion ?? '—');

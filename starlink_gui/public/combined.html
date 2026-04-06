@@ -10,49 +10,91 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:-ap
 #wrap{position:relative;width:100vw;height:100vh}
 #canvas{width:100%;height:100%;display:block;background:#000;touch-action:none;cursor:grab}
 #canvas.is-dragging{cursor:grabbing}
+
+/* ── overlay grid: 3×3 corners + edges ── */
 #overlay{
   position:absolute;inset:0;pointer-events:none;
-  display:flex;flex-direction:column;justify-content:space-between;
-  padding:14px;
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  grid-template-rows:1fr 1fr 1fr;
+  padding:18px;
+  gap:0;
 }
-#overlay-top{display:flex;justify-content:space-between;align-items:center}
-#overlay-bottom{display:flex;flex-direction:column;gap:5px}
-#title{font-size:12px;font-weight:600;letter-spacing:0.06em;color:rgba(255,255,255,0.5);text-transform:uppercase}
-#obs-stats{font-size:11px;color:rgba(255,255,255,0.5);display:flex;gap:12px}
-#obs-stats span span{color:rgba(255,255,255,0.75);margin-left:3px;font-family:monospace}
-#align-stats{font-size:11px;color:rgba(255,255,255,0.5);display:flex;flex-wrap:wrap;gap:10px}
-#align-stats span span{color:rgba(255,255,255,0.75);margin-left:3px;font-family:monospace}
-#updated{font-size:10px;color:rgba(255,255,255,0.3);font-family:monospace}
-.legend{display:flex;align-items:center;gap:10px;font-size:10px;color:rgba(255,255,255,0.4)}
-.legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+
+/* stat group shared styles */
+.stat-group{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.stat-line{
+  font-size:14px;
+  font-weight:500;
+  color:rgba(255,255,255,0.88);
+  line-height:1.35;
+  text-shadow:0 1px 6px rgba(0,0,0,0.9);
+  white-space:nowrap;
+}
+.stat-line.dim{color:rgba(255,255,255,0.45);font-size:11px;font-weight:400}
+.stat-line .val{font-weight:700}
+.stat-line .unit{font-size:11px;color:rgba(255,255,255,0.5);margin-left:2px}
+.pill-ok  {color:#00D47E}
+.pill-warn{color:#FF9500}
+.pill-err {color:#FF3B30}
+
+/* corner / edge positions */
+#stats-tl{grid-column:1;grid-row:1;align-self:start;justify-self:start}
+#stats-tr{grid-column:3;grid-row:1;align-self:start;justify-self:end;text-align:right}
+#stats-br{grid-column:3;grid-row:3;align-self:end;justify-self:end;text-align:right}
+#stats-bl{grid-column:1;grid-row:3;align-self:end;justify-self:start}
+#stats-bc{grid-column:2;grid-row:3;align-self:end;justify-self:center;text-align:center}
+
+/* legend dots */
+.legend{display:flex;align-items:center;gap:8px;font-size:10px;color:rgba(255,255,255,0.35)}
+.legend-dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0}
 </style>
 </head>
 <body>
 <div id="wrap">
   <canvas id="canvas" width="400" height="400"></canvas>
   <div id="overlay">
-    <div id="overlay-top">
-      <span id="title">Obstruction &amp; Alignment</span>
+
+    <!-- top-left: throughput + ping -->
+    <div id="stats-tl" class="stat-group">
+      <div class="stat-line"><span class="val" id="s-dl">—</span><span class="unit">Mbits/s Down</span></div>
+      <div class="stat-line"><span class="val" id="s-ul">—</span><span class="unit">Mbits/s Up</span></div>
+      <div class="stat-line"><span class="val" id="s-ping">—</span><span class="unit">ms Ping</span></div>
+    </div>
+
+    <!-- top-right: legend -->
+    <div id="stats-tr" class="stat-group">
       <div class="legend">
         <span class="legend-dot" style="background:#00ffff"></span>Clear
         <span class="legend-dot" style="background:#ff4444"></span>Obstructed
         <span class="legend-dot" style="background:#00D47E;opacity:0.6"></span>Desired
       </div>
     </div>
-    <div id="overlay-bottom">
-      <div id="obs-stats">
-        <span>Tracked <span id="st-samples">—</span></span>
-        <span id="obstructed-wrap" style="display:none">Obstructed <span id="st-obstructed">—</span></span>
-        <span>Untracked <span id="st-untracked">—</span></span>
-      </div>
-      <div id="align-stats">
-        <span>Actual Az <span id="actual-az">—</span>°</span>
-        <span>Actual El <span id="actual-el">—</span>°</span>
-        <span>Desired Az <span id="desired-az">—</span>°</span>
-        <span>Desired El <span id="desired-el">—</span>°</span>
-      </div>
-      <span id="updated"></span>
+
+    <!-- bottom-right: drop / obstruction / roaming -->
+    <div id="stats-br" class="stat-group">
+      <div class="stat-line"><span class="val" id="s-drop">—</span><span class="unit">% Dropped</span></div>
+      <div class="stat-line" id="s-obst-label">—</div>
+      <div class="stat-line" id="s-roam-label">—</div>
     </div>
+
+    <!-- bottom-left: obstruction mesh + alignment detail -->
+    <div id="stats-bl" class="stat-group">
+      <div class="stat-line dim">Sky: <span id="st-samples">—</span> tracked<span id="obstructed-wrap" style="display:none">, <span id="st-obstructed">—</span> blocked</span></div>
+      <div class="stat-line dim">Az <span id="actual-az">—</span>° El <span id="actual-el">—</span>° <span style="color:rgba(255,255,255,0.3)">actual</span></div>
+      <div class="stat-line dim">Az <span id="desired-az">—</span>° El <span id="desired-el">—</span>° <span style="color:rgba(0,212,126,0.7)">desired</span></div>
+    </div>
+
+    <!-- bottom-center: stow + timestamp -->
+    <div id="stats-bc" class="stat-group">
+      <div class="stat-line" id="s-stow-label">—</div>
+      <div class="stat-line dim" id="updated"></div>
+    </div>
+
   </div>
 </div>
 
@@ -89,9 +131,10 @@ function setEl(id, val) { const e = document.getElementById(id); if (e) e.textCo
 // ── Data load ─────────────────────────────────────────────────────────────────
 async function loadData() {
   try {
-    const [obstrRes, alignRes] = await Promise.allSettled([
+    const [obstrRes, alignRes, statusRes] = await Promise.allSettled([
       apiFetch('/dishy/obstruction-map'),
       apiFetch('/dishy/alignment'),
+      apiFetch('/dishy/status'),
     ]);
 
     // ── Obstruction cells ──
@@ -136,6 +179,52 @@ async function loadData() {
         applyDishOrientation(aAz, aEl);
         if (dAz != null && dEl != null) applyDesiredOrientation(dAz, dEl);
       }
+    }
+
+    // ── Status ──
+    if (statusRes.status === 'fulfilled') {
+      const s   = statusRes.value;
+      const dl  = s.downlinkThroughputBps != null ? (s.downlinkThroughputBps / 1e6).toFixed(2) : '—';
+      const ul  = s.uplinkThroughputBps   != null ? (s.uplinkThroughputBps   / 1e6).toFixed(2) : '—';
+      const ping = s.popPingLatencyMs     != null ? Math.round(s.popPingLatencyMs)              : '—';
+      const drop = ((s.popPingDropRate ?? 0) * 100).toFixed(1);
+      setEl('s-dl',   dl);
+      setEl('s-ul',   ul);
+      setEl('s-ping', ping !== '—' ? ping : '—');
+      setEl('s-drop', drop);
+
+      // Obstruction flag
+      const alerts = s.alerts || {};
+      const hasObstruct = alerts.obstructed === true || alerts.roofObstruction === true || alerts.fresnelZoneObstruction === true;
+      const obstEl = document.getElementById('s-obst-label');
+      if (obstEl) {
+        obstEl.className = 'stat-line ' + (hasObstruct ? 'pill-warn' : '');
+        obstEl.textContent = hasObstruct ? 'Obstructed' : 'No Obstructions';
+      }
+
+      // Roaming flag
+      const roaming = s.roaming ?? alerts.roaming ?? false;
+      const roamEl = document.getElementById('s-roam-label');
+      if (roamEl) {
+        roamEl.className = 'stat-line ' + (roaming ? 'pill-warn' : '');
+        roamEl.textContent = roaming ? 'Roaming' : 'Not Roaming';
+      }
+    }
+
+    // ── Stow (from diagnostics via status fallback) ──
+    // fetch_status doesn't expose stow; try alerts.dishUnhealthy as proxy, but
+    // the stow flag lives in diagnostics — we piggy-back on obstruction data which
+    // sometimes carries deviceState.  Use a best-effort read from status.deviceState.
+    const stowEl = document.getElementById('s-stow-label');
+    if (stowEl) {
+      // stowed comes from diagnostics, but status sometimes has alerts.motorsStuck
+      // as a hint. We'll show Unknown until we have a diagnostics fetch.
+      // For now fetch diagnostics in a non-blocking way.
+      apiFetch('/dishy/diagnostics').then(d => {
+        const stowed = d.stowed;
+        stowEl.className = 'stat-line ' + (stowed ? 'pill-warn' : '');
+        stowEl.textContent = stowed === true ? 'Stowed' : stowed === false ? 'Not Stowed' : '';
+      }).catch(() => { stowEl.textContent = ''; });
     }
 
     setEl('updated', new Date().toLocaleTimeString());
