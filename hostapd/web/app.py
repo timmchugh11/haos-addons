@@ -4,12 +4,14 @@
 import json
 import os
 import subprocess
+import time
 
 from flask import Flask, jsonify, request, make_response
 
 app = Flask(__name__, static_folder="/web", static_url_path="")
 
 CONFIG_FILE = "/data/hostapd_config.json"
+HOSTAPD_LOG_FILE = "/tmp/hostapd.log"
 
 DEFAULT_CONFIG = {
     "country_code": "US",
@@ -248,6 +250,17 @@ def _op_class_for_6ghz(channel):
     return 131
 
 
+def _tail_file(path, max_lines=20):
+    if not os.path.exists(path):
+        return ""
+    try:
+        with open(path, "r", errors="replace") as f:
+            lines = f.readlines()
+        return "".join(lines[-max_lines:]).strip()
+    except Exception:
+        return ""
+
+
 def get_station_dump(iface):
     """Return list of stations from `iw dev <iface> station dump`."""
     stations = []
@@ -390,6 +403,13 @@ def _kill(name):
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
+    if name == "hostapd":
+        logf = _procs.pop("hostapd_log", None)
+        if logf:
+            try:
+                logf.close()
+            except Exception:
+                pass
 
 
 def stop_ap():
@@ -463,6 +483,9 @@ def apply_config(cfg):
             f.write(f"hw_mode={hw_mode}\n")
             f.write(f"channel={channel}\n")
             f.write(f"country_code={country}\n")
+            f.write("ieee80211d=1\n")
+            f.write("auth_algs=1\n")
+            f.write("wmm_enabled=1\n")
             if band == "2g":
                 f.write("ieee80211n=1\n")
             elif band == "5g":
@@ -474,7 +497,10 @@ def apply_config(cfg):
                     return {"ok": False, "message": "6 GHz channel must be a valid 20 MHz channel (1, 5, 9 ... 233)"}
                 f.write(f"op_class={op_class}\n")
                 f.write("ieee80211ax=1\n")
+                f.write("he_oper_chwidth=0\n")
+                f.write(f"he_oper_centr_freq_seg0_idx={channel}\n")
                 f.write("ieee80211w=2\n")
+                f.write("beacon_prot=1\n")
                 f.write("wpa=2\n")
                 f.write("wpa_key_mgmt=SAE\n")
                 f.write("rsn_pairwise=CCMP\n")
@@ -488,7 +514,22 @@ def apply_config(cfg):
         hostapd_confs.append(conf_path)
 
     if hostapd_confs:
-        _procs["hostapd"] = subprocess.Popen(["hostapd"] + hostapd_confs)
+        with open(HOSTAPD_LOG_FILE, "w") as logf:
+            logf.write("")
+        logf = open(HOSTAPD_LOG_FILE, "a", buffering=1)
+        _procs["hostapd_log"] = logf
+        _procs["hostapd"] = subprocess.Popen(
+            ["hostapd", "-dd"] + hostapd_confs,
+            stdout=logf,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        time.sleep(2)
+        if _procs["hostapd"].poll() is not None:
+            log_tail = _tail_file(HOSTAPD_LOG_FILE)
+            stop_ap()
+            detail = f" Hostapd log: {log_tail}" if log_tail else ""
+            return {"ok": False, "message": f"hostapd failed to start.{detail}"}
         return {"ok": True, "message": f"AP started ({len(hostapd_confs)} radio(s)) — bridged to {uplink}"}
 
     return {"ok": False, "message": "No radios enabled — nothing to start"}
