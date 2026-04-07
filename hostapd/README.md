@@ -6,8 +6,9 @@ WiFi access point managed via a built-in web UI. Uses `hostapd` for AP mode and 
 either routed/NAT mode or experimental bridge mode. 5 GHz radios can optionally enable
 Wi-Fi 6 / 802.11ax when the adapter, driver, and hostapd build support it.
 Supports independent 2.4 GHz and 5 GHz radios. 6 GHz detection remains in the backend
-and logs, but 6 GHz AP configuration is currently hidden in the UI while support is
-being revisited.
+and logs, and can now be exposed through an explicit experimental UI toggle when the
+adapter reports enough 6 GHz AP capability to justify testing. 6 GHz should still be
+treated as experimental only.
 
 ---
 
@@ -41,14 +42,18 @@ Accessible via HA ingress (sidebar) or directly at `http://<ha-ip>:8080`.
 | **Shared Settings** | Password, country code, and network mode. |
 | **2.4 GHz Radio** | Toggle, interface selector, SSID, channel (1–13), WPA3 toggle. |
 | **5 GHz Radio** | Toggle, interface selector, SSID, channel (36/40/44/48…), channel width, AX toggle, WPA3 toggle. |
+| **6 GHz Radio (Experimental)** | Hidden by default. Only shown when `Enable Experimental 6 GHz UI` is on and the adapter reports Band 4 + HE AP + SAE + START_AP capability. Limited to detected 20 MHz channels with WPA3-SAE. |
 | **DHCP** | Private subnet, gateway, lease range, and lease duration for NAT mode. |
+| **Debug** | Shows diagnostics, generated hostapd config snippets, recent hostapd logs, and a command runner inside the add-on container. |
 
 The interface dropdown shows each detected wireless interface with an inline warning if
 AP mode is not supported, and displays USB device info and USB bus speed on selection.
 
-**6 GHz status:** the add-on still detects and logs 6 GHz-capable adapters, but the
-6 GHz radio controls are currently hidden because 6 GHz AP broadcasting is not working
-reliably yet.
+**6 GHz status:** the add-on still treats 6 GHz as experimental. The normal workflow
+keeps it hidden. A dedicated experimental toggle can reveal the 6 GHz radio section,
+but only when the detected adapter reports Band 4 presence, HE AP support, SAE support,
+and `START_AP` capability. Even then, 6 GHz AP startup may still fail depending on
+kernel, firmware, hostapd build, and regulatory state.
 
 **5 GHz Wi-Fi 6 status:** when enabled in the UI, the add-on writes `ieee80211ax=1`
 plus conservative HE operating settings that match the selected 20/40/80 MHz width.
@@ -72,6 +77,14 @@ For non-6 GHz radios, enabling **Use WPA3** puts the radio into WPA2/WPA3 transi
 mode (`WPA-PSK` + `SAE`) with optional PMF for compatibility. 6 GHz remains SAE-only
 with required PMF and should still be treated as experimental.
 
+For the first 6 GHz implementation, the add-on intentionally constrains startup to:
+
+- `20 MHz` only
+- detected enabled 6 GHz channels only
+- WPA3-SAE only
+- required PMF
+- AX/HE enabled
+
 ---
 
 ## Adapter compatibility
@@ -89,7 +102,8 @@ or
 ```
 
 6 GHz capability is still reported in startup logs so compatible adapters can be
-identified quickly, but 6 GHz AP mode is currently disabled in the web UI.
+identified quickly. The UI can expose 6 GHz for experimental testing only when the
+adapter appears to meet the minimum capability threshold described above.
 
 ### Recommended chipsets
 

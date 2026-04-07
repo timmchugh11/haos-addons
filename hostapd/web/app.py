@@ -4,6 +4,7 @@
 import json
 import os
 import ipaddress
+import re
 import subprocess
 import time
 
@@ -27,6 +28,7 @@ NAT_RULES = [
 DEFAULT_CONFIG = {
     "country_code": "US",
     "network_mode": "nat",
+    "experimental_6ghz_enabled": False,
     "password": "changeme123",
     "dhcp": {
         "bridge_cidr": "192.168.50.1/24",
@@ -45,6 +47,8 @@ DEFAULT_CONFIG = {
 
 # Tracks running subprocesses keyed by name
 _procs = {}
+_last_generated_configs = {}
+_last_hostapd_error = ""
 
 HW_MODE = {"2g": "g", "5g": "a", "6g": "a"}
 BAND_LABELS = {"2g": "2.4GHz", "5g": "5GHz", "6g": "6GHz"}
@@ -62,6 +66,7 @@ def normalize_config(cfg):
     normalized = {
         "country_code": str(cfg.get("country_code", DEFAULT_CONFIG["country_code"])).upper(),
         "network_mode": str(cfg.get("network_mode", DEFAULT_CONFIG["network_mode"])).strip().lower(),
+        "experimental_6ghz_enabled": bool(cfg.get("experimental_6ghz_enabled", DEFAULT_CONFIG["experimental_6ghz_enabled"])),
         "password": cfg.get("password", DEFAULT_CONFIG["password"]),
         "dhcp": json.loads(json.dumps(DEFAULT_CONFIG["dhcp"])),
         "radios": [],
@@ -193,11 +198,135 @@ def _bands_from_phy_block(lines):
     return bands
 
 
+def _extract_band4_channels(lines):
+    enabled = []
+    disabled = []
+    in_band4 = False
+    in_freqs = False
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("Band 4:"):
+            in_band4 = True
+            in_freqs = False
+            continue
+        if in_band4 and re.match(r"Band \d+:", stripped):
+            break
+        if not in_band4:
+            continue
+        if stripped.startswith("Frequencies:"):
+            in_freqs = True
+            continue
+        if in_freqs and stripped.startswith("*"):
+            match = re.search(r"\[(\d+)\]", stripped)
+            if not match:
+                continue
+            channel = int(match.group(1))
+            if "(disabled)" in stripped or "(no IR)" in stripped:
+                disabled.append(channel)
+            else:
+                enabled.append(channel)
+            continue
+        if in_freqs and stripped and not stripped.startswith("*"):
+            in_freqs = False
+
+    return enabled, disabled
+
+
+def _band4_has_he_ap(lines):
+    in_band4 = False
+    in_he = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("Band 4:"):
+            in_band4 = True
+            in_he = False
+            continue
+        if in_band4 and re.match(r"Band \d+:", stripped):
+            break
+        if not in_band4:
+            continue
+        if stripped.startswith("HE Iftypes:"):
+            in_he = True
+            continue
+        if in_he:
+            if stripped.startswith("*"):
+                continue
+            if stripped.endswith(":"):
+                if stripped[:-1] == "AP":
+                    return True
+                continue
+            if stripped:
+                in_he = False
+    return False
+
+
+def _supported_commands(lines):
+    commands = set()
+    in_commands = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("Supported commands:"):
+            in_commands = True
+            continue
+        if in_commands:
+            if stripped.startswith("*"):
+                commands.add(stripped.lstrip("* ").strip())
+                continue
+            if stripped:
+                in_commands = False
+    return commands
+
+
+def _max_ap_go_interfaces(lines):
+    for line in lines:
+        if "AP" not in line and "P2P-GO" not in line:
+            continue
+        match = re.search(r"#\{\s*([^}]*)\}\s*<=\s*(\d+)", line)
+        if not match:
+            continue
+        roles = {item.strip() for item in match.group(1).split(",")}
+        if "AP" in roles or "P2P-GO" in roles:
+            return int(match.group(2))
+    return None
+
+
+def _interface_combo_summary(lines):
+    return {
+        "max_ap_go": _max_ap_go_interfaces(lines),
+    }
+
+
+def _psc_channels(channels):
+    return [channel for channel in channels if (channel - 5) % 16 == 0]
+
+
+def _friendly_hostapd_error(log_tail):
+    if not log_tail:
+        return ""
+    log_lower = log_tail.lower()
+    if "primary frequency not allowed" in log_lower or "frequency not allowed" in log_lower:
+        return "The selected 6 GHz primary channel is not currently allowed by the driver or regulatory domain."
+    if "hardware does not support configured mode" in log_lower:
+        return "The adapter or driver rejected the requested radio mode."
+    if "failed to set beacon parameters" in log_lower:
+        return "The driver accepted the config but failed while programming beacon parameters."
+    return ""
+
+
 def get_interface_info(iface):
     info = {
         "ap_supported": False,
         "bands": [],
         "supports_6ghz": False,
+        "enabled_6ghz_channels": [],
+        "disabled_6ghz_channels": [],
+        "psc_6ghz_channels": [],
+        "he_ap_6ghz": False,
+        "start_ap_supported": False,
+        "sae_supported": False,
+        "capability_summary_6ghz": {},
+        "interface_combination": {},
         "usb_info": None,
         "usb_speed": None,
     }
@@ -205,6 +334,7 @@ def get_interface_info(iface):
     if not phy:
         info["error"] = "Interface not found"
         return info
+    info["phy"] = phy
 
     # AP mode + band support
     try:
@@ -232,6 +362,31 @@ def get_interface_info(iface):
                         in_modes = False
         info["bands"] = _bands_from_phy_block(phy_lines)
         info["supports_6ghz"] = "6GHz" in info["bands"]
+        enabled_6g, disabled_6g = _extract_band4_channels(phy_lines)
+        info["enabled_6ghz_channels"] = enabled_6g
+        info["disabled_6ghz_channels"] = disabled_6g
+        info["psc_6ghz_channels"] = _psc_channels(enabled_6g)
+        info["he_ap_6ghz"] = _band4_has_he_ap(phy_lines)
+        commands = _supported_commands(phy_lines)
+        info["start_ap_supported"] = "start_ap" in commands
+        info["sae_supported"] = any("sae" in line.lower() and "authenticate" in line.lower() for line in phy_lines)
+        info["interface_combination"] = _interface_combo_summary(phy_lines)
+        info["capability_summary_6ghz"] = {
+            "band4_present": bool(enabled_6g or disabled_6g),
+            "he_ap_present": info["he_ap_6ghz"],
+            "sae_supported": info["sae_supported"],
+            "start_ap_supported": info["start_ap_supported"],
+            "enabled_channels": enabled_6g,
+            "psc_channels": info["psc_6ghz_channels"],
+            "max_ap_go": info["interface_combination"].get("max_ap_go"),
+            "experimental_ready": bool(
+                info["supports_6ghz"]
+                and info["he_ap_6ghz"]
+                and info["sae_supported"]
+                and info["start_ap_supported"]
+                and enabled_6g
+            ),
+        }
     except Exception as e:
         info["error"] = str(e)
 
@@ -282,6 +437,20 @@ def _validate_radio_selection(radio):
         return f"{iface}: AP mode is not supported"
     if BAND_LABELS.get(band) not in info.get("bands", []):
         return f"{iface}: {band_label} is not supported by this adapter"
+    if band == "6g":
+        if not radio.get("ax_enabled"):
+            return "6 GHz requires Wi-Fi 6 / 802.11ax to remain enabled"
+        if not radio.get("wpa3"):
+            return "6 GHz requires WPA3-SAE and protected management frames"
+        if not info.get("he_ap_6ghz"):
+            return f"{iface}: 6 GHz HE AP capability was not detected"
+        if not info.get("start_ap_supported"):
+            return f"{iface}: start_ap support was not detected"
+        if not info.get("sae_supported"):
+            return f"{iface}: SAE support was not detected"
+        enabled_6g = set(info.get("enabled_6ghz_channels", []))
+        if enabled_6g and int(channel) not in enabled_6g:
+            return "Selected 6 GHz channel is not currently enabled by the driver/regulatory domain"
 
     return None
 
@@ -433,6 +602,7 @@ def _he_oper(channel, width):
 
 
 def get_debug_snapshot():
+    global _last_generated_configs, _last_hostapd_error
     cfg = load_config()
     radio_ifaces = [radio.get("interface") for radio in cfg.get("radios", []) if radio.get("interface")]
     commands = {
@@ -452,6 +622,9 @@ def get_debug_snapshot():
         "uplink": _uplink_interface(),
         "bridge": _bridge_name(),
         "radio_ifaces": radio_ifaces,
+        "generated_configs": _last_generated_configs,
+        "last_hostapd_error": _last_hostapd_error,
+        "interface_capabilities": {iface: get_interface_info(iface) for iface in radio_ifaces},
         "commands": {},
     }
     for name, cmd in commands.items():
@@ -687,6 +860,7 @@ def _kill(name):
 
 
 def stop_ap():
+    global _last_hostapd_error
     _kill("dnsmasq")
     _kill("hostapd")
     _set_tcp_mss_clamp(False)
@@ -709,10 +883,14 @@ def stop_ap():
 
 
 def apply_config(cfg):
+    global _last_generated_configs, _last_hostapd_error
     cfg = normalize_config(cfg)
     stop_ap()
+    _last_hostapd_error = ""
+    _last_generated_configs = {}
     country = cfg.get("country_code", "US")
     network_mode = cfg.get("network_mode", "nat")
+    experimental_6ghz_enabled = bool(cfg.get("experimental_6ghz_enabled"))
     password = cfg.get("password", "changeme123")
     dhcp_cfg = None
     if network_mode == "nat":
@@ -721,11 +899,19 @@ def apply_config(cfg):
             return {"ok": False, "message": dhcp_err}
     hostapd_confs = []
     enabled_radios = [radio for radio in cfg.get("radios", []) if radio.get("enabled")]
+    enabled_6g = [radio for radio in enabled_radios if radio.get("band") == "6g"]
 
     if len(password) < 8:
         return {"ok": False, "message": "WiFi password must be at least 8 characters"}
+    if enabled_6g:
+        if not experimental_6ghz_enabled:
+            return {"ok": False, "message": "6 GHz radios require Experimental 6 GHz mode to be enabled in the UI"}
+        if len(country.strip()) != 2:
+            return {"ok": False, "message": "6 GHz requires a valid 2-letter country code"}
 
     seen_ifaces = set()
+    phy_counts = {}
+    phy_limits = {}
     for radio in enabled_radios:
         err = _validate_radio_selection(radio)
         if err:
@@ -734,6 +920,17 @@ def apply_config(cfg):
         if iface in seen_ifaces:
             return {"ok": False, "message": f"{iface}: cannot be assigned to multiple radios"}
         seen_ifaces.add(iface)
+        info = get_interface_info(iface)
+        phy = info.get("phy")
+        if phy:
+            phy_counts[phy] = phy_counts.get(phy, 0) + 1
+            max_ap_go = (info.get("interface_combination") or {}).get("max_ap_go")
+            if max_ap_go is not None:
+                phy_limits[phy] = max_ap_go
+    for phy, count in phy_counts.items():
+        limit = phy_limits.get(phy)
+        if limit is not None and count > limit:
+            return {"ok": False, "message": f"{phy}: adapter interface combination allows only {limit} AP/GO interface(s) at a time"}
 
     uplink = _uplink_interface()
     if not uplink:
@@ -824,6 +1021,7 @@ def apply_config(cfg):
                     return {"ok": False, "message": "6 GHz channel must be a valid 20 MHz channel (1, 5, 9 ... 233)"}
                 f.write(f"op_class={op_class}\n")
                 f.write("ieee80211ax=1\n")
+                f.write("ieee80211h=1\n")
                 f.write("he_oper_chwidth=0\n")
                 f.write(f"he_oper_centr_freq_seg0_idx={channel}\n")
                 f.write("ieee80211w=2\n")
@@ -843,6 +1041,11 @@ def apply_config(cfg):
                 else:
                     f.write("wpa_key_mgmt=WPA-PSK\n")
                 f.write(f"wpa_passphrase={password}\n")
+        try:
+            with open(conf_path, "r") as f:
+                _last_generated_configs[band] = f.read()
+        except Exception:
+            _last_generated_configs[band] = f"(failed to read {conf_path})"
         hostapd_confs.append(conf_path)
 
     if hostapd_confs:
@@ -861,8 +1064,12 @@ def apply_config(cfg):
         time.sleep(2)
         if _procs["hostapd"].poll() is not None:
             log_tail = _tail_file(HOSTAPD_LOG_FILE)
+            _last_hostapd_error = log_tail
             stop_ap()
-            detail = f" Hostapd log: {log_tail}" if log_tail else ""
+            hint = _friendly_hostapd_error(log_tail)
+            detail = f" {hint}" if hint else ""
+            if log_tail:
+                detail += f" Hostapd log: {log_tail}"
             return {"ok": False, "message": f"hostapd failed to start.{detail}"}
         mode_label = "routed via" if network_mode == "nat" else "bridged to"
         return {"ok": True, "message": f"AP started ({len(hostapd_confs)} radio(s)) — {mode_label} {uplink}"}

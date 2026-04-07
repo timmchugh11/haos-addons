@@ -210,7 +210,13 @@
           <input type="text" id="country_code" maxlength="2" placeholder="US">
         </div>
       </div>
+      <div class="form-row">
+        <div class="field">
+          <label class="toggle-row"><span class="toggle"><input type="checkbox" id="experimental_6ghz_enabled" onchange="updateExperimental6gUI()"><span class="slider"></span></span><span class="toggle-label">Enable Experimental 6 GHz UI</span></label>
+        </div>
+      </div>
       <div id="network-mode-hint" class="hint"></div>
+      <div id="experimental-6g-hint" class="hint" style="margin-top:8px"></div>
     </div>
   </div>
 
@@ -258,6 +264,32 @@
       </div>
       <div class="hint">Wider channels can improve negotiated link rates, but they require compatible channels, adapters, and cleaner spectrum. Wi-Fi 6 / 802.11ax and WPA3 are optional per-radio features on 5 GHz.</div>
       <div class="iface-info" id="info_5g"></div>
+    </div>
+  </div>
+
+  <div class="box" id="box_6g" style="display:none">
+    <div class="box-header">
+      <div class="box-title">6 GHz Radio (Experimental)</div>
+      <label class="toggle"><input type="checkbox" id="en_6g" onchange="toggleBand('6g')"><span class="slider"></span></label>
+    </div>
+    <div class="box-body" id="fields_6g" style="opacity:.4;pointer-events:none">
+      <div class="form-row">
+        <div class="field"><label>Interface</label><select id="iface_6g" onchange="loadIfaceInfo('6g'); sync6gChannels()"><option value="">-- select --</option></select></div>
+        <div class="field"><label>SSID</label><input type="text" id="ssid_6g" placeholder="HomeAssistant-AP-6G"></div>
+        <div class="field"><label>Channel</label><select id="ch_6g"></select></div>
+        <div class="field"><label>Channel Width</label><select id="width_6g"><option value="20">20 MHz</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label class="toggle-row"><span class="toggle"><input type="checkbox" id="ax_6g" checked disabled><span class="slider"></span></span><span class="toggle-label">Wi-Fi 6 / 802.11ax required</span></label>
+        </div>
+        <div class="field">
+          <label class="toggle-row"><span class="toggle"><input type="checkbox" id="wpa3_6g" checked disabled><span class="slider"></span></span><span class="toggle-label">WPA3-SAE required</span></label>
+        </div>
+      </div>
+      <div class="hint">6 GHz AP mode is experimental on this adapter and may fail depending on kernel, firmware, hostapd build, and regulatory state. Initial support is limited to 20 MHz channels detected as enabled by the driver. PSC channels are preferred for first tests.</div>
+      <div class="hint" id="hint_6g_limit" style="margin-top:8px"></div>
+      <div class="iface-info" id="info_6g"></div>
     </div>
   </div>
 
@@ -356,7 +388,7 @@
 let _interfaces = {};
 let _currentPage = 'overview';
 let _termStream = null;
-const BANDS = ['2g', '5g'];
+const ALL_BANDS = ['2g', '5g', '6g'];
 const BAND_LABELS = {'2g': '2.4 GHz', '5g': '5 GHz', '6g': '6 GHz'};
 const BAND_CAPS = {'2g': '2.4GHz', '5g': '5GHz', '6g': '6GHz'};
 
@@ -413,6 +445,32 @@ function updateNetworkModeUI() {
     dhcpNav.style.display = '';
     dhcpPage.style.display = '';
   }
+}
+
+function experimental6gAvailable() {
+  return Object.values(_interfaces || {}).some(info => info?.capability_summary_6ghz?.experimental_ready);
+}
+
+function updateExperimental6gUI() {
+  const enabled = !!document.getElementById('experimental_6ghz_enabled')?.checked;
+  const available = experimental6gAvailable();
+  const box = document.getElementById('box_6g');
+  const hint = document.getElementById('experimental-6g-hint');
+  const limitHint = document.getElementById('hint_6g_limit');
+  box.style.display = enabled && available ? '' : 'none';
+  if (!enabled) {
+    hint.innerHTML = '6 GHz remains hidden by default. Enable the experimental toggle only if you want to test backend-detected 6 GHz support on a compatible adapter.';
+  } else if (!available) {
+    hint.innerHTML = '6 GHz experimental mode is unavailable because Band 4 AP capability, HE AP support, or SAE support was not detected on the currently visible adapters.';
+  } else {
+    hint.innerHTML = '6 GHz AP mode is experimental on this adapter and may fail depending on kernel, firmware, hostapd build, and regulatory state.';
+  }
+  const iface = document.getElementById('iface_6g')?.value;
+  const inf = _interfaces[iface];
+  const maxApGo = inf?.interface_combination?.max_ap_go;
+  limitHint.textContent = maxApGo === 1
+    ? 'This adapter supports only one AP/GO interface at a time. Enabling 6 GHz may replace another AP role on this radio.'
+    : '';
 }
 
 // ── Overview ────────────────────────────────────────────────────────────────
@@ -521,7 +579,7 @@ async function loadClients() {
 // ── Interfaces ───────────────────────────────────────────────────────────────
 async function loadInterfaces() {
   _interfaces = await api('GET', '/api/interfaces');
-  BANDS.forEach(band => {
+  ALL_BANDS.forEach(band => {
     const sel = document.getElementById(`iface_${band}`);
     const cur = sel.value;
     sel.innerHTML = '<option value="">-- select --</option>';
@@ -535,6 +593,8 @@ async function loadInterfaces() {
       sel.appendChild(opt);
     });
   });
+  updateExperimental6gUI();
+  sync6gChannels();
 }
 
 function renderIfaceInfo(band, iface) {
@@ -550,15 +610,54 @@ function renderIfaceInfo(band, iface) {
     : `<span class="badge badge-warn">${bandLabel(band)} not detected</span>`;
   const usb = inf.usb_info  ? `<span>USB: ${escHtml(inf.usb_info)}</span>` : '';
   const spd = inf.usb_speed ? `<span>Speed: ${inf.usb_speed}</span>` : '';
-  el.innerHTML = `${apBadge} ${bandSupport} <span>Bands: ${bands}</span>${usb}${spd}`;
+  let extra = '';
+  if (band === '6g') {
+    const cap = inf.capability_summary_6ghz || {};
+    const enabledChannels = (cap.enabled_channels || []).join(', ') || '—';
+    const pscChannels = (cap.psc_channels || []).join(', ') || '—';
+    extra = ` <span>HE AP: ${cap.he_ap_present ? 'yes' : 'no'}</span><span>SAE: ${cap.sae_supported ? 'yes' : 'no'}</span><span>START_AP: ${cap.start_ap_supported ? 'yes' : 'no'}</span><span>6 GHz channels: ${enabledChannels}</span><span>PSC: ${pscChannels}</span>`;
+  }
+  el.innerHTML = `${apBadge} ${bandSupport} <span>Bands: ${bands}</span>${usb}${spd}${extra}`;
 }
 
 function loadIfaceInfo(band) { renderIfaceInfo(band, document.getElementById(`iface_${band}`).value); }
+
+function sync6gChannels() {
+  const sel = document.getElementById('ch_6g');
+  if (!sel) return;
+  const current = sel.value || '5';
+  const iface = document.getElementById('iface_6g')?.value;
+  const info = _interfaces[iface] || {};
+  const enabled = info.enabled_6ghz_channels || [];
+  const psc = new Set(info.psc_6ghz_channels || []);
+  const ordered = [...enabled].sort((a, b) => {
+    const ap = psc.has(a) ? 0 : 1;
+    const bp = psc.has(b) ? 0 : 1;
+    return ap - bp || a - b;
+  });
+  sel.innerHTML = '';
+  if (!ordered.length) {
+    const opt = document.createElement('option');
+    opt.value = '5';
+    opt.textContent = '5';
+    sel.appendChild(opt);
+    sel.value = '5';
+    return;
+  }
+  ordered.forEach(channel => {
+    const opt = document.createElement('option');
+    opt.value = String(channel);
+    opt.textContent = psc.has(channel) ? `${channel} (PSC)` : String(channel);
+    sel.appendChild(opt);
+  });
+  sel.value = ordered.map(String).includes(current) ? current : String(ordered[0]);
+}
 
 // ── Config ───────────────────────────────────────────────────────────────────
 async function loadConfig() {
   const cfg = await api('GET', '/api/config');
   document.getElementById('network_mode').value = cfg.network_mode || 'nat';
+  document.getElementById('experimental_6ghz_enabled').checked = !!cfg.experimental_6ghz_enabled;
   document.getElementById('password').value     = cfg.password     || '';
   document.getElementById('country_code').value = cfg.country_code || 'US';
   document.getElementById('dhcp_bridge_cidr').value = cfg.dhcp?.bridge_cidr || '';
@@ -567,19 +666,29 @@ async function loadConfig() {
   document.getElementById('dhcp_range_end').value = cfg.dhcp?.range_end || '';
   document.getElementById('dhcp_netmask').value = cfg.dhcp?.netmask || '';
   document.getElementById('dhcp_lease_time').value = cfg.dhcp?.lease_time || '';
-  BANDS.forEach(band => {
+  ALL_BANDS.forEach(band => {
     const r = (cfg.radios || []).find(x => x.band === band) || { band };
     document.getElementById(`en_${r.band}`).checked  = !!r.enabled;
     document.getElementById(`iface_${r.band}`).value = r.interface || '';
     document.getElementById(`ssid_${r.band}`).value  = r.ssid      || '';
-    document.getElementById(`ch_${r.band}`).value    = r.channel   || (r.band === '2g' ? 6 : r.band === '5g' ? 36 : 5);
-    document.getElementById(`width_${r.band}`).value = r.channel_width || '20';
-    if (document.getElementById(`ax_${r.band}`)) document.getElementById(`ax_${r.band}`).checked = !!r.ax_enabled;
-    document.getElementById(`wpa3_${r.band}`).checked = !!r.wpa3;
+    if (r.band === '6g') {
+      sync6gChannels();
+      document.getElementById(`ch_${r.band}`).value = String(r.channel || 5);
+      document.getElementById(`ax_${r.band}`).checked = true;
+      document.getElementById(`wpa3_${r.band}`).checked = true;
+    } else {
+      document.getElementById(`ch_${r.band}`).value = r.channel || (r.band === '2g' ? 6 : 36);
+      document.getElementById(`width_${r.band}`).value = r.channel_width || '20';
+    }
+    if (r.band === '6g') document.getElementById(`width_${r.band}`).value = r.channel_width || '20';
+    if (document.getElementById(`ax_${r.band}`)) document.getElementById(`ax_${r.band}`).checked = r.band === '6g' ? true : !!r.ax_enabled;
+    document.getElementById(`wpa3_${r.band}`).checked = r.band === '6g' ? true : !!r.wpa3;
     toggleBand(r.band);
     renderIfaceInfo(r.band, r.interface);
   });
   updateNetworkModeUI();
+  updateExperimental6gUI();
+  sync6gChannels();
 }
 
 async function saveConfig() {
@@ -590,6 +699,7 @@ async function saveConfig() {
 function buildConfig() {
   return {
     network_mode: document.getElementById('network_mode').value,
+    experimental_6ghz_enabled: document.getElementById('experimental_6ghz_enabled').checked,
     password:     document.getElementById('password').value,
     country_code: document.getElementById('country_code').value.toUpperCase(),
     dhcp: {
@@ -600,15 +710,15 @@ function buildConfig() {
       netmask: document.getElementById('dhcp_netmask').value.trim(),
       lease_time: document.getElementById('dhcp_lease_time').value.trim(),
     },
-    radios: BANDS.map(band => ({
+    radios: ALL_BANDS.map(band => ({
       band,
       enabled:   document.getElementById(`en_${band}`).checked,
       interface: document.getElementById(`iface_${band}`).value,
       ssid:      document.getElementById(`ssid_${band}`).value,
       channel:   parseInt(document.getElementById(`ch_${band}`).value, 10),
       channel_width: document.getElementById(`width_${band}`).value,
-      ax_enabled: document.getElementById(`ax_${band}`)?.checked || false,
-      wpa3: document.getElementById(`wpa3_${band}`).checked,
+      ax_enabled: band === '6g' ? true : (document.getElementById(`ax_${band}`)?.checked || false),
+      wpa3: band === '6g' ? true : document.getElementById(`wpa3_${band}`).checked,
     })),
   };
 }
@@ -646,13 +756,22 @@ async function loadDebug() {
       <div>Uplink</div><div>${escHtml(data.uplink || '—')}</div>
       <div>Bridge</div><div>${escHtml(data.bridge || '—')}</div>
       <div>Radio Ifaces</div><div>${escHtml((data.radio_ifaces || []).join(', ') || '—')}</div>
+      <div>Last Hostapd Error</div><div>${escHtml(data.last_hostapd_error || '—')}</div>
     `;
+    const configPanels = Object.entries(data.generated_configs || {}).map(([band, conf]) => `
+      <div class="box" style="margin-bottom:12px">
+        <div class="box-header"><div class="box-title">generated_${escHtml(band)}</div></div>
+        <div class="box-body">
+          <textarea class="term" readonly>${conf || ''}</textarea>
+        </div>
+      </div>
+    `).join('');
     const entries = Object.entries(data.commands || {});
     if (!entries.length) {
-      panels.innerHTML = '<span class="no-data">No diagnostics available</span>';
+      panels.innerHTML = configPanels || '<span class="no-data">No diagnostics available</span>';
       return;
     }
-    panels.innerHTML = entries.map(([name, res]) => `
+    panels.innerHTML = configPanels + entries.map(([name, res]) => `
       <div class="box" style="margin-bottom:12px">
         <div class="box-header"><div class="box-title">${escHtml(name)}</div></div>
         <div class="box-body">
