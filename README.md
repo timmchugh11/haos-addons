@@ -38,7 +38,7 @@ Includes a bypass mode to hide all router pages when the Starlink router is not 
 
 ### Hostapd AP
 
-[![version](https://img.shields.io/badge/version-0.10.6-blue.svg)](hostapd/config.yaml)
+[![version](https://img.shields.io/badge/version-0.10.7-blue.svg)](hostapd/config.yaml)
 
 Warning: This is a personal project and is not production-hardened. It can and will break the host network configuration while testing or applying AP/bridge changes.
 

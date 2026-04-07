@@ -271,6 +271,34 @@ def _set_tcp_mss_clamp(enabled):
         subprocess.run(cmd, capture_output=True)
 
 
+def _set_promisc(iface, enabled):
+    if not iface:
+        return
+    mode = "on" if enabled else "off"
+    subprocess.run(["ip", "link", "set", "dev", iface, "promisc", mode], capture_output=True)
+
+
+def _set_bridge_compat(bridge, uplink, wifi_ifaces, enabled):
+    if enabled:
+        _set_promisc(bridge, True)
+        _set_promisc(uplink, True)
+        for iface in wifi_ifaces:
+            _set_promisc(iface, True)
+
+        snooping_path = f"/sys/class/net/{bridge}/bridge/multicast_snooping"
+        if os.path.exists(snooping_path):
+            try:
+                with open(snooping_path, "w") as f:
+                    f.write("0")
+            except Exception:
+                pass
+    else:
+        _set_promisc(bridge, False)
+        _set_promisc(uplink, False)
+        for iface in wifi_ifaces:
+            _set_promisc(iface, False)
+
+
 def get_station_dump(iface):
     """Return list of stations from `iw dev <iface> station dump`."""
     stations = []
@@ -425,9 +453,12 @@ def _kill(name):
 def stop_ap():
     _kill("hostapd")
     _set_tcp_mss_clamp(False)
+    cfg = load_config()
+    radio_ifaces = [radio.get("interface") for radio in cfg.get("radios", []) if radio.get("interface")]
     bridge_state = _procs.pop("bridge", None)
     if bridge_state:
         uplink, gateway = bridge_state if isinstance(bridge_state, tuple) else (bridge_state, None)
+        _set_bridge_compat(_bridge_name(), uplink, radio_ifaces, False)
         _teardown_bridge(_bridge_name(), uplink, gateway)
 
     # Backward-compatible cleanup for older in-memory state that tracked one bridge per band.
@@ -467,6 +498,7 @@ def apply_config(cfg):
     bridge = _bridge_name()
     gateway = _setup_bridge(bridge, uplink)
     _procs["bridge"] = (uplink, gateway)
+    _set_bridge_compat(bridge, uplink, [radio["interface"] for radio in enabled_radios], True)
     _set_tcp_mss_clamp(True)
 
     for radio in enabled_radios:
