@@ -49,6 +49,7 @@ _procs = {}
 HW_MODE = {"2g": "g", "5g": "a", "6g": "a"}
 BAND_LABELS = {"2g": "2.4GHz", "5g": "5GHz", "6g": "6GHz"}
 RADIO_WIDTHS = {"2g": {"20"}, "5g": {"20", "40", "80"}, "6g": {"20"}}
+UI_EXPOSED_BANDS = {"2g", "5g"}
 
 
 def _default_radio_map():
@@ -99,6 +100,11 @@ def normalize_config(cfg):
         normalized["radios"].append(merged)
 
     return normalized
+
+
+# 6 GHz remains in the backend config and hostapd generation paths on purpose so
+# older saved configs still load and experimental support can be revisited later.
+# The normal UI currently exposes only 2.4 GHz and 5 GHz radios.
 
 
 # ---------------------------------------------------------------------------

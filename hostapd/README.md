@@ -39,7 +39,7 @@ Accessible via HA ingress (sidebar) or directly at `http://<ha-ip>:8080`.
 |---|---|
 | **Status** | Live indicator (updates every 5 s). Apply & Start / Stop AP buttons. |
 | **Shared Settings** | Password, country code, and network mode. |
-| **2.4 GHz Radio** | Toggle, interface selector, SSID, channel (1–13), WPA3 toggle, conservative AX toggle. |
+| **2.4 GHz Radio** | Toggle, interface selector, SSID, channel (1–13), WPA3 toggle. |
 | **5 GHz Radio** | Toggle, interface selector, SSID, channel (36/40/44/48…), channel width, AX toggle, WPA3 toggle. |
 | **DHCP** | Private subnet, gateway, lease range, and lease duration for NAT mode. |
 
@@ -54,6 +54,10 @@ reliably yet.
 plus conservative HE operating settings that match the selected 20/40/80 MHz width.
 If the adapter or hostapd build rejects those settings, startup will fail and the
 hostapd log will show the reason.
+
+**2.4 GHz status:** the current UI does not expose a 2.4 GHz AX toggle. On 2.4 GHz,
+the add-on currently exposes WPA3 transition mode but otherwise keeps the radio on the
+existing non-AX path.
 
 ---
 
