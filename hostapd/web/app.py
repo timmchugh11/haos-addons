@@ -247,13 +247,18 @@ def _band4_has_he_ap(lines):
         if not in_band4:
             continue
         if stripped.startswith("HE Iftypes:"):
+            inline = stripped.split(":", 1)[1].strip().lower()
+            if inline:
+                tokens = {token.strip() for token in re.split(r"[,\s]+", inline) if token.strip()}
+                if "ap" in tokens:
+                    return True
             in_he = True
             continue
         if in_he:
             if stripped.startswith("*"):
                 continue
             if stripped.endswith(":"):
-                if stripped[:-1] == "AP":
+                if stripped[:-1].strip().lower() == "ap":
                     return True
                 continue
             if stripped:
@@ -271,7 +276,9 @@ def _supported_commands(lines):
             continue
         if in_commands:
             if stripped.startswith("*"):
-                commands.add(stripped.lstrip("* ").strip())
+                raw = stripped.lstrip("* ").strip().lower()
+                normalized = re.sub(r"^[^a-z]+", "", raw)
+                commands.add(normalized)
                 continue
             if stripped:
                 in_commands = False
@@ -368,9 +375,20 @@ def get_interface_info(iface):
         info["psc_6ghz_channels"] = _psc_channels(enabled_6g)
         info["he_ap_6ghz"] = _band4_has_he_ap(phy_lines)
         commands = _supported_commands(phy_lines)
-        info["start_ap_supported"] = "start_ap" in commands
+        info["start_ap_supported"] = bool({"start_ap", "lstart_ap"} & commands)
         info["sae_supported"] = any("sae" in line.lower() and "authenticate" in line.lower() for line in phy_lines)
         info["interface_combination"] = _interface_combo_summary(phy_lines)
+        failed_checks = []
+        if not (enabled_6g or disabled_6g):
+            failed_checks.append("band4_missing")
+        if not info["he_ap_6ghz"]:
+            failed_checks.append("he_ap_missing")
+        if not info["sae_supported"]:
+            failed_checks.append("sae_missing")
+        if not info["start_ap_supported"]:
+            failed_checks.append("start_ap_missing")
+        if not enabled_6g:
+            failed_checks.append("no_enabled_6ghz_channels")
         info["capability_summary_6ghz"] = {
             "band4_present": bool(enabled_6g or disabled_6g),
             "he_ap_present": info["he_ap_6ghz"],
@@ -379,13 +397,8 @@ def get_interface_info(iface):
             "enabled_channels": enabled_6g,
             "psc_channels": info["psc_6ghz_channels"],
             "max_ap_go": info["interface_combination"].get("max_ap_go"),
-            "experimental_ready": bool(
-                info["supports_6ghz"]
-                and info["he_ap_6ghz"]
-                and info["sae_supported"]
-                and info["start_ap_supported"]
-                and enabled_6g
-            ),
+            "failed_checks": failed_checks,
+            "experimental_ready": not failed_checks and info["supports_6ghz"],
         }
     except Exception as e:
         info["error"] = str(e)

@@ -451,17 +451,36 @@ function experimental6gAvailable() {
   return Object.values(_interfaces || {}).some(info => info?.capability_summary_6ghz?.experimental_ready);
 }
 
+function format6gFailedChecks(failedChecks) {
+  const labels = {
+    band4_missing: 'Band 4 / 6 GHz channels were not detected',
+    he_ap_missing: 'HE AP support was not detected',
+    sae_missing: 'SAE support was not detected',
+    start_ap_missing: 'START_AP support was not detected',
+    no_enabled_6ghz_channels: 'No enabled 6 GHz channels are currently available',
+  };
+  return (failedChecks || []).map(key => labels[key] || key);
+}
+
 function updateExperimental6gUI() {
   const enabled = !!document.getElementById('experimental_6ghz_enabled')?.checked;
   const available = experimental6gAvailable();
   const box = document.getElementById('box_6g');
   const hint = document.getElementById('experimental-6g-hint');
   const limitHint = document.getElementById('hint_6g_limit');
+  const candidateFailures = Object.entries(_interfaces || {})
+    .map(([iface, info]) => ({ iface, failed: info?.capability_summary_6ghz?.failed_checks || [] }))
+    .filter(entry => entry.failed.length);
   box.style.display = enabled && available ? '' : 'none';
   if (!enabled) {
     hint.innerHTML = '6 GHz remains hidden by default. Enable the experimental toggle only if you want to test backend-detected 6 GHz support on a compatible adapter.';
   } else if (!available) {
-    hint.innerHTML = '6 GHz experimental mode is unavailable because Band 4 AP capability, HE AP support, or SAE support was not detected on the currently visible adapters.';
+    if (candidateFailures.length) {
+      hint.innerHTML = '6 GHz experimental mode is unavailable on the currently visible adapters. Failed checks: ' +
+        candidateFailures.map(entry => `${escHtml(entry.iface)}: ${escHtml(format6gFailedChecks(entry.failed).join(', '))}`).join(' | ');
+    } else {
+      hint.innerHTML = '6 GHz experimental mode is unavailable because the full capability gate was not met.';
+    }
   } else {
     hint.innerHTML = '6 GHz AP mode is experimental on this adapter and may fail depending on kernel, firmware, hostapd build, and regulatory state.';
   }
