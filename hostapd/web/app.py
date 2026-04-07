@@ -12,9 +12,15 @@ app = Flask(__name__, static_folder="/web", static_url_path="")
 
 CONFIG_FILE = "/data/hostapd_config.json"
 HOSTAPD_LOG_FILE = "/tmp/hostapd.log"
+IPV6_BRIDGE_RULES = [
+    ["ip6tables", "-I", "INPUT", "-i", "br-ap", "-j", "DROP"],
+    ["ip6tables", "-I", "FORWARD", "-i", "br-ap", "-j", "DROP"],
+    ["ip6tables", "-I", "FORWARD", "-o", "br-ap", "-j", "DROP"],
+]
 
 DEFAULT_CONFIG = {
     "country_code": "US",
+    "disable_client_ipv6": True,
     "password": "changeme123",
     "radios": [
         {"band": "2g", "enabled": True,  "interface": "wlan0", "ssid": "HomeAssistant-AP",    "channel": 6},
@@ -39,6 +45,7 @@ def normalize_config(cfg):
     cfg = cfg or {}
     normalized = {
         "country_code": str(cfg.get("country_code", DEFAULT_CONFIG["country_code"])).upper(),
+        "disable_client_ipv6": bool(cfg.get("disable_client_ipv6", DEFAULT_CONFIG["disable_client_ipv6"])),
         "password": cfg.get("password", DEFAULT_CONFIG["password"]),
         "radios": [],
     }
@@ -261,6 +268,25 @@ def _tail_file(path, max_lines=20):
         return ""
 
 
+def _write_proc_value(path, value):
+    try:
+        with open(path, "w") as f:
+            f.write(str(value))
+        return True
+    except Exception:
+        return False
+
+
+def _set_bridge_ipv6_filtering(enabled):
+    sysctl_path = "/proc/sys/net/bridge/bridge-nf-call-ip6tables"
+    if os.path.exists(sysctl_path):
+        _write_proc_value(sysctl_path, "1" if enabled else "0")
+
+    rules = IPV6_BRIDGE_RULES if enabled else [[rule[0], "-D"] + rule[2:] for rule in IPV6_BRIDGE_RULES]
+    for cmd in rules:
+        subprocess.run(cmd, capture_output=True)
+
+
 def get_station_dump(iface):
     """Return list of stations from `iw dev <iface> station dump`."""
     stations = []
@@ -414,6 +440,7 @@ def _kill(name):
 
 def stop_ap():
     _kill("hostapd")
+    _set_bridge_ipv6_filtering(False)
     bridge_state = _procs.pop("bridge", None)
     if bridge_state:
         uplink, gateway = bridge_state if isinstance(bridge_state, tuple) else (bridge_state, None)
@@ -431,6 +458,7 @@ def apply_config(cfg):
     cfg = normalize_config(cfg)
     stop_ap()
     country = cfg.get("country_code", "US")
+    disable_client_ipv6 = cfg.get("disable_client_ipv6", True)
     password = cfg.get("password", "changeme123")
     hostapd_confs = []
     enabled_radios = [radio for radio in cfg.get("radios", []) if radio.get("enabled")]
@@ -456,6 +484,7 @@ def apply_config(cfg):
     bridge = _bridge_name()
     gateway = _setup_bridge(bridge, uplink)
     _procs["bridge"] = (uplink, gateway)
+    _set_bridge_ipv6_filtering(disable_client_ipv6)
 
     for radio in enabled_radios:
         band = radio["band"]

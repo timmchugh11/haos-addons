@@ -188,6 +188,13 @@
           <input type="text" id="country_code" maxlength="2" placeholder="US">
         </div>
       </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="disable_client_ipv6"><span class="slider"></span></label>
+        <div>
+          <div class="toggle-label">Disable Client IPv6</div>
+          <div class="hint">Blocks IPv6 for AP clients on the bridge so clients fall back to IPv4/DNS from DHCP.</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -417,6 +424,7 @@ async function loadConfig() {
   const cfg = await api('GET', '/api/config');
   document.getElementById('password').value     = cfg.password     || '';
   document.getElementById('country_code').value = cfg.country_code || 'US';
+  document.getElementById('disable_client_ipv6').checked = cfg.disable_client_ipv6 !== false;
   BANDS.forEach(band => {
     const r = (cfg.radios || []).find(x => x.band === band) || { band };
     document.getElementById(`en_${r.band}`).checked  = !!r.enabled;
@@ -437,6 +445,7 @@ function buildConfig() {
   return {
     password:     document.getElementById('password').value,
     country_code: document.getElementById('country_code').value.toUpperCase(),
+    disable_client_ipv6: document.getElementById('disable_client_ipv6').checked,
     radios: BANDS.map(band => ({
       band,
       enabled:   document.getElementById(`en_${band}`).checked,
