@@ -12,11 +12,6 @@ app = Flask(__name__, static_folder="/web", static_url_path="")
 
 CONFIG_FILE = "/data/hostapd_config.json"
 HOSTAPD_LOG_FILE = "/tmp/hostapd.log"
-IPV6_BRIDGE_RULES = [
-    ["ip6tables", "-I", "INPUT", "-i", "br-ap", "-j", "DROP"],
-    ["ip6tables", "-I", "FORWARD", "-i", "br-ap", "-j", "DROP"],
-    ["ip6tables", "-I", "FORWARD", "-o", "br-ap", "-j", "DROP"],
-]
 
 DEFAULT_CONFIG = {
     "country_code": "US",
@@ -277,14 +272,22 @@ def _write_proc_value(path, value):
         return False
 
 
-def _set_bridge_ipv6_filtering(enabled):
-    sysctl_path = "/proc/sys/net/bridge/bridge-nf-call-ip6tables"
-    if os.path.exists(sysctl_path):
-        _write_proc_value(sysctl_path, "1" if enabled else "0")
+def _set_iface_ipv6_disabled(iface, disabled):
+    if not iface:
+        return
+    base = f"/proc/sys/net/ipv6/conf/{iface}"
+    if not os.path.isdir(base):
+        return
+    _write_proc_value(os.path.join(base, "disable_ipv6"), "1" if disabled else "0")
+    if disabled:
+        _write_proc_value(os.path.join(base, "accept_ra"), "0")
+        _write_proc_value(os.path.join(base, "autoconf"), "0")
 
-    rules = IPV6_BRIDGE_RULES if enabled else [[rule[0], "-D"] + rule[2:] for rule in IPV6_BRIDGE_RULES]
-    for cmd in rules:
-        subprocess.run(cmd, capture_output=True)
+
+def _set_client_ipv6_disabled(disabled, ifaces=None):
+    _set_iface_ipv6_disabled(_bridge_name(), disabled)
+    for iface in ifaces or []:
+        _set_iface_ipv6_disabled(iface, disabled)
 
 
 def get_station_dump(iface):
@@ -440,7 +443,9 @@ def _kill(name):
 
 def stop_ap():
     _kill("hostapd")
-    _set_bridge_ipv6_filtering(False)
+    cfg = load_config()
+    radio_ifaces = [radio.get("interface") for radio in cfg.get("radios", []) if radio.get("interface")]
+    _set_client_ipv6_disabled(False, radio_ifaces)
     bridge_state = _procs.pop("bridge", None)
     if bridge_state:
         uplink, gateway = bridge_state if isinstance(bridge_state, tuple) else (bridge_state, None)
@@ -484,7 +489,7 @@ def apply_config(cfg):
     bridge = _bridge_name()
     gateway = _setup_bridge(bridge, uplink)
     _procs["bridge"] = (uplink, gateway)
-    _set_bridge_ipv6_filtering(disable_client_ipv6)
+    _set_client_ipv6_disabled(disable_client_ipv6, [radio["interface"] for radio in enabled_radios])
 
     for radio in enabled_radios:
         band = radio["band"]
