@@ -1,9 +1,9 @@
 name: Hostapd AP
-version: "0.9.5"
+version: "0.10.0"
 slug: hostapd
 description: >-
   WiFi access point managed via a built-in web UI.
-  Supports separate 2.4 GHz and 5 GHz radios. Requires adapters with AP mode support.
+  Supports separate 2.4 GHz, 5 GHz, and 6 GHz radios. Requires adapters with AP mode support.
 url: https://github.com/timmchugh11/haos-addons
 arch:
   - amd64

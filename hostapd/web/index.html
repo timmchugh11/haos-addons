@@ -89,6 +89,7 @@
   .toggle-label{font-weight:600;font-size:14px}
   .iface-info{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.8}
   .iface-info span{display:inline-block;margin-right:12px}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
   .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
   .badge-green{background:rgba(34,197,94,.15);color:var(--success)}
   .badge-red{background:rgba(239,68,68,.15);color:var(--danger)}
@@ -220,6 +221,22 @@
     </div>
   </div>
 
+  <div class="box">
+    <div class="box-header">
+      <div class="box-title">6 GHz Radio</div>
+      <label class="toggle"><input type="checkbox" id="en_6g" onchange="toggleBand('6g')"><span class="slider"></span></label>
+    </div>
+    <div class="box-body" id="fields_6g" style="opacity:.4;pointer-events:none">
+      <div class="form-row">
+        <div class="field"><label>Interface</label><select id="iface_6g" onchange="loadIfaceInfo('6g')"><option value="">-- select --</option></select></div>
+        <div class="field"><label>SSID</label><input type="text" id="ssid_6g" placeholder="HomeAssistant-AP-6G"></div>
+        <div class="field"><label>Channel (1/5/9/13…233)</label><input type="number" id="ch_6g" min="1" max="233" step="4" value="5"></div>
+      </div>
+      <div class="iface-info" id="info_6g"></div>
+      <div class="hint">6 GHz is configured as WPA3-SAE only and expects a valid 20 MHz 6 GHz channel.</div>
+    </div>
+  </div>
+
   <div class="actions">
     <button class="btn btn-primary" onclick="saveConfig()">Save Config</button>
     <button class="btn btn-ghost" onclick="loadAll()">Discard Changes</button>
@@ -234,6 +251,9 @@
 <script>
 let _interfaces = {};
 let _currentPage = 'overview';
+const BANDS = ['2g', '5g', '6g'];
+const BAND_LABELS = {'2g': '2.4 GHz', '5g': '5 GHz', '6g': '6 GHz'};
+const BAND_CAPS = {'2g': '2.4GHz', '5g': '5GHz', '6g': '6GHz'};
 
 async function api(method, path, body) {
   const base = window.__BASE__ || '';
@@ -264,6 +284,10 @@ function navigate(page) {
   if (page === 'clients') loadClients();
 }
 
+function bandLabel(band) {
+  return BAND_LABELS[band] || String(band || '?');
+}
+
 // ── Overview ────────────────────────────────────────────────────────────────
 async function refreshOverview() {
   try {
@@ -281,7 +305,6 @@ async function refreshOverview() {
     }
     let total = 0;
     list.innerHTML = s.radios.map(r => {
-      const bandLabel = r.band === '2g' ? '2.4 GHz' : '5 GHz';
       const st = s.ap_running
         ? '<span class="badge badge-green">Active</span>'
         : '<span class="badge badge-red">Stopped</span>';
@@ -289,7 +312,7 @@ async function refreshOverview() {
       return `<div class="radio-box">
         <div class="radio-box-header">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
-          <strong>${bandLabel}</strong> ${st}
+          <strong>${bandLabel(r.band)}</strong> ${st}
         </div>
         <div class="radio-box-body">
           <div class="rs"><div class="rs-label">SSID</div><div class="rs-value">${escHtml(r.ssid||'—')}</div></div>
@@ -352,7 +375,7 @@ async function loadClients() {
       </tr></thead>
       <tbody>${clients.map(c => `<tr>
         <td style="font-family:monospace;font-size:12px">${escHtml(c.mac)}</td>
-        <td><span class="badge badge-blue">${c.band==='2g'?'2.4 GHz':c.band==='5g'?'5 GHz':escHtml(c.band||'?')}</span></td>
+        <td><span class="badge badge-blue">${escHtml(bandLabel(c.band))}</span></td>
         <td>${escHtml(c.ssid||'—')}</td>
         <td>${fmtSignal(c.signal)}</td>
         <td>${fmtRate(c.tx_bitrate)}</td>
@@ -371,14 +394,16 @@ async function loadClients() {
 // ── Interfaces ───────────────────────────────────────────────────────────────
 async function loadInterfaces() {
   _interfaces = await api('GET', '/api/interfaces');
-  ['2g', '5g'].forEach(band => {
+  BANDS.forEach(band => {
     const sel = document.getElementById(`iface_${band}`);
     const cur = sel.value;
     sel.innerHTML = '<option value="">-- select --</option>';
     Object.entries(_interfaces).forEach(([iface, info]) => {
+      const supportsBand = info.ap_supported && (info.bands || []).includes(BAND_CAPS[band]);
+      if (!supportsBand && iface !== cur) return;
       const opt = document.createElement('option');
       opt.value = iface;
-      opt.textContent = iface + (info.ap_supported ? '' : ' ⚠ no AP mode');
+      opt.textContent = iface + (supportsBand ? '' : ` ⚠ no ${bandLabel(band)} AP support`);
       if (iface === cur) opt.selected = true;
       sel.appendChild(opt);
     });
@@ -393,9 +418,12 @@ function renderIfaceInfo(band, iface) {
     ? '<span class="badge badge-green">AP supported</span>'
     : '<span class="badge badge-red">AP NOT supported</span>';
   const bands = inf.bands.length ? inf.bands.join(' / ') : '?';
+  const bandSupport = (inf.bands || []).includes(BAND_CAPS[band])
+    ? `<span class="badge badge-blue">${bandLabel(band)} supported</span>`
+    : `<span class="badge badge-warn">${bandLabel(band)} not detected</span>`;
   const usb = inf.usb_info  ? `<span>USB: ${escHtml(inf.usb_info)}</span>` : '';
   const spd = inf.usb_speed ? `<span>Speed: ${inf.usb_speed}</span>` : '';
-  el.innerHTML = `${apBadge} <span>Bands: ${bands}</span>${usb}${spd}`;
+  el.innerHTML = `${apBadge} ${bandSupport} <span>Bands: ${bands}</span>${usb}${spd}`;
 }
 
 function loadIfaceInfo(band) { renderIfaceInfo(band, document.getElementById(`iface_${band}`).value); }
@@ -409,7 +437,7 @@ async function loadConfig() {
     document.getElementById(`en_${r.band}`).checked  = !!r.enabled;
     document.getElementById(`iface_${r.band}`).value = r.interface || '';
     document.getElementById(`ssid_${r.band}`).value  = r.ssid      || '';
-    document.getElementById(`ch_${r.band}`).value    = r.channel   || (r.band === '2g' ? 6 : 36);
+    document.getElementById(`ch_${r.band}`).value    = r.channel   || (r.band === '2g' ? 6 : r.band === '5g' ? 36 : 5);
     toggleBand(r.band);
     renderIfaceInfo(r.band, r.interface);
   });
@@ -424,7 +452,7 @@ function buildConfig() {
   return {
     password:     document.getElementById('password').value,
     country_code: document.getElementById('country_code').value.toUpperCase(),
-    radios: ['2g', '5g'].map(band => ({
+    radios: BANDS.map(band => ({
       band,
       enabled:   document.getElementById(`en_${band}`).checked,
       interface: document.getElementById(`iface_${band}`).value,

@@ -17,13 +17,52 @@ DEFAULT_CONFIG = {
     "radios": [
         {"band": "2g", "enabled": True,  "interface": "wlan0", "ssid": "HomeAssistant-AP",    "channel": 6},
         {"band": "5g", "enabled": False, "interface": "wlan1", "ssid": "HomeAssistant-AP-5G", "channel": 36},
+        {"band": "6g", "enabled": False, "interface": "wlan2", "ssid": "HomeAssistant-AP-6G", "channel": 5},
     ],
 }
 
 # Tracks running subprocesses keyed by name
 _procs = {}
 
-HW_MODE = {"2g": "g", "5g": "a"}
+HW_MODE = {"2g": "g", "5g": "a", "6g": "a"}
+BAND_LABELS = {"2g": "2.4GHz", "5g": "5GHz", "6g": "6GHz"}
+
+
+def _default_radio_map():
+    return {radio["band"]: json.loads(json.dumps(radio)) for radio in DEFAULT_CONFIG["radios"]}
+
+
+def normalize_config(cfg):
+    """Fill in missing fields and migrate older configs forward."""
+    cfg = cfg or {}
+    normalized = {
+        "country_code": str(cfg.get("country_code", DEFAULT_CONFIG["country_code"])).upper(),
+        "password": cfg.get("password", DEFAULT_CONFIG["password"]),
+        "radios": [],
+    }
+
+    defaults = _default_radio_map()
+    saved = {}
+    for radio in cfg.get("radios", []):
+        band = radio.get("band")
+        if band:
+            saved[band] = radio
+
+    for band, default_radio in defaults.items():
+        merged = json.loads(json.dumps(default_radio))
+        merged.update(saved.get(band, {}))
+        if merged.get("channel") in (None, ""):
+            merged["channel"] = default_radio["channel"]
+        try:
+            merged["channel"] = int(merged["channel"])
+        except (TypeError, ValueError):
+            merged["channel"] = default_radio["channel"]
+        merged["enabled"] = bool(merged.get("enabled"))
+        merged["interface"] = str(merged.get("interface", ""))
+        merged["ssid"] = str(merged.get("ssid", ""))
+        normalized["radios"].append(merged)
+
+    return normalized
 
 
 # ---------------------------------------------------------------------------
@@ -33,14 +72,14 @@ HW_MODE = {"2g": "g", "5g": "a"}
 def load_config():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE) as f:
-            return json.load(f)
-    return json.loads(json.dumps(DEFAULT_CONFIG))  # deep copy
+            return normalize_config(json.load(f))
+    return normalize_config(DEFAULT_CONFIG)
 
 
 def save_config(cfg):
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
     with open(CONFIG_FILE, "w") as f:
-        json.dump(cfg, f, indent=2)
+        json.dump(normalize_config(cfg), f, indent=2)
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +212,40 @@ def get_interface_info(iface):
             pass
 
     return info
+
+
+def _validate_radio_selection(radio):
+    band = radio.get("band")
+    iface = radio.get("interface", "")
+    ssid = radio.get("ssid", "").strip()
+    channel = radio.get("channel")
+    band_label = BAND_LABELS.get(band, band or "unknown")
+
+    if not iface:
+        return f"{band_label}: interface is required"
+    if not ssid:
+        return f"{band_label}: SSID is required"
+    if len(ssid) > 32:
+        return f"{band_label}: SSID must be 32 characters or fewer"
+    if channel is None:
+        return f"{band_label}: channel is required"
+    if band == "6g" and _op_class_for_6ghz(int(channel)) is None:
+        return "6 GHz channel must be a valid 20 MHz channel (1, 5, 9 ... 233)"
+
+    info = get_interface_info(iface)
+    if not info.get("ap_supported"):
+        return f"{iface}: AP mode is not supported"
+    if BAND_LABELS.get(band) not in info.get("bands", []):
+        return f"{iface}: {band_label} is not supported by this adapter"
+
+    return None
+
+
+def _op_class_for_6ghz(channel):
+    # 20 MHz 6 GHz operation class
+    if channel < 1 or channel > 233 or (channel - 1) % 4 != 0:
+        return None
+    return 131
 
 
 def get_station_dump(iface):
@@ -331,19 +404,32 @@ def stop_ap():
 
 
 def apply_config(cfg):
+    cfg = normalize_config(cfg)
     stop_ap()
     country = cfg.get("country_code", "US")
     password = cfg.get("password", "changeme123")
     hostapd_confs = []
+    enabled_radios = [radio for radio in cfg.get("radios", []) if radio.get("enabled")]
+
+    if len(password) < 8:
+        return {"ok": False, "message": "WiFi password must be at least 8 characters"}
+
+    seen_ifaces = set()
+    for radio in enabled_radios:
+        err = _validate_radio_selection(radio)
+        if err:
+            return {"ok": False, "message": err}
+        iface = radio["interface"]
+        if iface in seen_ifaces:
+            return {"ok": False, "message": f"{iface}: cannot be assigned to multiple radios"}
+        seen_ifaces.add(iface)
 
     uplink = _uplink_interface()
     if not uplink:
         return {"ok": False, "message": "Could not determine host uplink interface"}
     print(f"==> Uplink interface: {uplink}")
 
-    for radio in cfg.get("radios", []):
-        if not radio.get("enabled"):
-            continue
+    for radio in enabled_radios:
         band = radio["band"]
         iface = radio["interface"]
         ssid = radio["ssid"]
@@ -374,13 +460,28 @@ def apply_config(cfg):
             f.write(f"hw_mode={hw_mode}\n")
             f.write(f"channel={channel}\n")
             f.write(f"country_code={country}\n")
-            f.write(f"ieee80211n=1\n")
-            if hw_mode == "a":
+            if band == "2g":
+                f.write("ieee80211n=1\n")
+            elif band == "5g":
+                f.write("ieee80211n=1\n")
                 f.write("ieee80211ac=1\n")
-            f.write(f"wpa=2\n")
-            f.write(f"wpa_key_mgmt=WPA-PSK\n")
-            f.write(f"rsn_pairwise=CCMP\n")
-            f.write(f"wpa_passphrase={password}\n")
+            elif band == "6g":
+                op_class = _op_class_for_6ghz(channel)
+                if op_class is None:
+                    return {"ok": False, "message": "6 GHz channel must be a valid 20 MHz channel (1, 5, 9 ... 233)"}
+                f.write(f"op_class={op_class}\n")
+                f.write("ieee80211ax=1\n")
+                f.write("ieee80211w=2\n")
+                f.write("wpa=2\n")
+                f.write("wpa_key_mgmt=SAE\n")
+                f.write("rsn_pairwise=CCMP\n")
+                f.write("sae_pwe=1\n")
+                f.write(f"wpa_passphrase={password}\n")
+            if band != "6g":
+                f.write("wpa=2\n")
+                f.write("wpa_key_mgmt=WPA-PSK\n")
+                f.write("rsn_pairwise=CCMP\n")
+                f.write(f"wpa_passphrase={password}\n")
         hostapd_confs.append(conf_path)
 
     if hostapd_confs:
