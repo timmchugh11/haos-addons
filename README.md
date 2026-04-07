@@ -38,12 +38,12 @@ Includes a bypass mode to hide all router pages when the Starlink router is not 
 
 ### Hostapd AP
 
-[![version](https://img.shields.io/badge/version-0.11.0-blue.svg)](hostapd/config.yaml)
+[![version](https://img.shields.io/badge/version-0.11.1-blue.svg)](hostapd/config.yaml)
 
-Warning: This is a personal project and is not production-hardened. It can and will break the host network configuration while testing or applying AP/NAT changes.
+Warning: This is a personal project and is not production-hardened. It can and will break the host network configuration while testing or applying AP/NAT/bridge changes.
 
-WiFi access point managed via a built-in web UI. Places WiFi clients on a dedicated
-private subnet and routes/NATs them out via the host uplink.
+WiFi access point managed via a built-in web UI. Supports routed/NAT mode and an
+experimental bridge mode, with NAT as the recommended default.
 Supports independent 2.4 GHz and 5 GHz radios. 6 GHz capability is detected in logs,
 but 6 GHz AP controls are currently hidden while support is being revisited. Requires a WiFi adapter with AP mode support.
 

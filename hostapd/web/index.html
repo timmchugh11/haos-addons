@@ -195,6 +195,13 @@
     <div class="box-body">
       <div class="form-row">
         <div class="field">
+          <label>Network Mode</label>
+          <select id="network_mode" onchange="updateNetworkModeUI()">
+            <option value="nat">NAT (Recommended)</option>
+            <option value="bridge">Bridge (Experimental)</option>
+          </select>
+        </div>
+        <div class="field">
           <label>WiFi Password</label>
           <input type="password" id="password" placeholder="min 8 characters">
         </div>
@@ -203,6 +210,7 @@
           <input type="text" id="country_code" maxlength="2" placeholder="US">
         </div>
       </div>
+      <div id="network-mode-hint" class="hint"></div>
     </div>
   </div>
 
@@ -358,6 +366,10 @@ function escHtml(str) {
 // ── Navigation ──────────────────────────────────────────────────────────────
 function navigate(page) {
   _currentPage = page;
+  if (page === 'dhcp' && document.getElementById('network_mode').value === 'bridge') {
+    page = 'configure';
+    _currentPage = 'configure';
+  }
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
   document.querySelector('main').scrollTop = 0;
@@ -367,6 +379,23 @@ function navigate(page) {
 
 function bandLabel(band) {
   return BAND_LABELS[band] || String(band || '?');
+}
+
+function updateNetworkModeUI() {
+  const mode = document.getElementById('network_mode').value;
+  const hint = document.getElementById('network-mode-hint');
+  const dhcpNav = document.querySelector('nav button[data-page="dhcp"]');
+  const dhcpPage = document.getElementById('page-dhcp');
+  if (mode === 'bridge') {
+    hint.innerHTML = 'Bridge mode is experimental. It keeps clients on the upstream LAN and is better for same-LAN use cases, but it may fail to pass DHCP/client traffic and can break host networking.';
+    dhcpNav.style.display = 'none';
+    if (_currentPage === 'dhcp') navigate('configure');
+    dhcpPage.style.display = 'none';
+  } else {
+    hint.innerHTML = 'NAT mode is the recommended default. Clients are placed on a private subnet managed by the add-on and routed out through the detected uplink.';
+    dhcpNav.style.display = '';
+    dhcpPage.style.display = '';
+  }
 }
 
 // ── Overview ────────────────────────────────────────────────────────────────
@@ -512,6 +541,7 @@ function loadIfaceInfo(band) { renderIfaceInfo(band, document.getElementById(`if
 // ── Config ───────────────────────────────────────────────────────────────────
 async function loadConfig() {
   const cfg = await api('GET', '/api/config');
+  document.getElementById('network_mode').value = cfg.network_mode || 'nat';
   document.getElementById('password').value     = cfg.password     || '';
   document.getElementById('country_code').value = cfg.country_code || 'US';
   document.getElementById('dhcp_bridge_cidr').value = cfg.dhcp?.bridge_cidr || '';
@@ -529,6 +559,7 @@ async function loadConfig() {
     toggleBand(r.band);
     renderIfaceInfo(r.band, r.interface);
   });
+  updateNetworkModeUI();
 }
 
 async function saveConfig() {
@@ -538,6 +569,7 @@ async function saveConfig() {
 
 function buildConfig() {
   return {
+    network_mode: document.getElementById('network_mode').value,
     password:     document.getElementById('password').value,
     country_code: document.getElementById('country_code').value.toUpperCase(),
     dhcp: {

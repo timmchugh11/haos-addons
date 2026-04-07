@@ -26,6 +26,7 @@ NAT_RULES = [
 
 DEFAULT_CONFIG = {
     "country_code": "US",
+    "network_mode": "nat",
     "password": "changeme123",
     "dhcp": {
         "bridge_cidr": "192.168.50.1/24",
@@ -58,10 +59,13 @@ def normalize_config(cfg):
     cfg = cfg or {}
     normalized = {
         "country_code": str(cfg.get("country_code", DEFAULT_CONFIG["country_code"])).upper(),
+        "network_mode": str(cfg.get("network_mode", DEFAULT_CONFIG["network_mode"])).strip().lower(),
         "password": cfg.get("password", DEFAULT_CONFIG["password"]),
         "dhcp": json.loads(json.dumps(DEFAULT_CONFIG["dhcp"])),
         "radios": [],
     }
+    if normalized["network_mode"] not in ("nat", "bridge"):
+        normalized["network_mode"] = DEFAULT_CONFIG["network_mode"]
 
     normalized["dhcp"].update(cfg.get("dhcp", {}))
     for key, default_value in DEFAULT_CONFIG["dhcp"].items():
@@ -459,11 +463,60 @@ def _setup_ap_bridge(bridge, bridge_cidr):
         subprocess.run(cmd, capture_output=True)
 
 
+def _setup_bridge_mode(bridge, uplink):
+    """Create a bridge, move host uplink onto it, and preserve host connectivity."""
+    ip_prefix = None
+    try:
+        out = subprocess.check_output(["ip", "-o", "-4", "addr", "show", uplink], text=True)
+        for line in out.splitlines():
+            parts = line.split()
+            if "inet" in parts:
+                ip_prefix = parts[parts.index("inet") + 1]
+                break
+    except Exception:
+        pass
+
+    gateway = _get_default_gateway()
+    cmds = [
+        ["ip", "link", "add", "name", bridge, "type", "bridge"],
+        ["ip", "link", "set", uplink, "master", bridge],
+        ["ip", "link", "set", bridge, "up"],
+    ]
+    if ip_prefix:
+        cmds += [
+            ["ip", "addr", "flush", "dev", uplink],
+            ["ip", "addr", "add", ip_prefix, "dev", bridge],
+        ]
+    if gateway:
+        cmds += [
+            ["ip", "route", "del", "default"],
+            ["ip", "route", "add", "default", "via", gateway, "dev", bridge],
+        ]
+    for cmd in cmds:
+        subprocess.run(cmd, capture_output=True)
+    return {"uplink": uplink, "gateway": gateway, "ip_prefix": ip_prefix, "mode": "bridge"}
+
+
 def _teardown_ap_bridge(bridge):
     cmds = [
         ["ip", "link", "set", bridge, "down"],
         ["ip", "link", "del", bridge],
     ]
+    for cmd in cmds:
+        subprocess.run(cmd, capture_output=True)
+
+
+def _teardown_bridge_mode(bridge, uplink, gateway=None, ip_prefix=None):
+    if gateway:
+        subprocess.run(["ip", "route", "del", "default"], capture_output=True)
+        subprocess.run(["ip", "route", "add", "default", "via", gateway, "dev", uplink], capture_output=True)
+    cmds = [
+        ["ip", "link", "set", uplink, "nomaster"],
+        ["ip", "link", "set", bridge, "down"],
+        ["ip", "link", "del", bridge],
+    ]
+    if ip_prefix:
+        cmds.append(["ip", "addr", "add", ip_prefix, "dev", uplink])
     for cmd in cmds:
         subprocess.run(cmd, capture_output=True)
 
@@ -575,25 +628,32 @@ def stop_ap():
     cfg = load_config()
     radio_ifaces = [radio.get("interface") for radio in cfg.get("radios", []) if radio.get("interface")]
     bridge_state = _procs.pop("bridge", None) or {}
+    mode = bridge_state.get("mode", "nat")
     uplink = bridge_state.get("uplink")
     subnet_cidr = bridge_state.get("subnet_cidr")
-    if uplink:
+    if mode == "nat" and uplink:
         _set_nat_rules(uplink, subnet_cidr or "192.168.50.0/24", False)
-    prev_ip_forward = bridge_state.get("ip_forward_prev")
-    if prev_ip_forward in ("0", "1"):
-        _write_proc_value("/proc/sys/net/ipv4/ip_forward", prev_ip_forward)
-    _set_bridge_compat(_bridge_name(), radio_ifaces, False)
-    _teardown_ap_bridge(_bridge_name())
+        prev_ip_forward = bridge_state.get("ip_forward_prev")
+        if prev_ip_forward in ("0", "1"):
+            _write_proc_value("/proc/sys/net/ipv4/ip_forward", prev_ip_forward)
+        _set_bridge_compat(_bridge_name(), radio_ifaces, False)
+        _teardown_ap_bridge(_bridge_name())
+    elif mode == "bridge" and uplink:
+        _set_bridge_compat(_bridge_name(), radio_ifaces, False)
+        _teardown_bridge_mode(_bridge_name(), uplink, bridge_state.get("gateway"), bridge_state.get("ip_prefix"))
 
 
 def apply_config(cfg):
     cfg = normalize_config(cfg)
     stop_ap()
     country = cfg.get("country_code", "US")
+    network_mode = cfg.get("network_mode", "nat")
     password = cfg.get("password", "changeme123")
-    dhcp_cfg, dhcp_err = _validate_dhcp_config(cfg.get("dhcp", {}))
-    if dhcp_err:
-        return {"ok": False, "message": dhcp_err}
+    dhcp_cfg = None
+    if network_mode == "nat":
+        dhcp_cfg, dhcp_err = _validate_dhcp_config(cfg.get("dhcp", {}))
+        if dhcp_err:
+            return {"ok": False, "message": dhcp_err}
     hostapd_confs = []
     enabled_radios = [radio for radio in cfg.get("radios", []) if radio.get("enabled")]
 
@@ -616,10 +676,18 @@ def apply_config(cfg):
     print(f"==> Uplink interface: {uplink}")
 
     bridge = _bridge_name()
-    _setup_ap_bridge(bridge, dhcp_cfg["bridge_cidr"])
-    prev_ip_forward = _set_ip_forward(True)
-    _set_nat_rules(uplink, dhcp_cfg["subnet_cidr"], True)
-    _procs["bridge"] = {"uplink": uplink, "ip_forward_prev": prev_ip_forward, "subnet_cidr": dhcp_cfg["subnet_cidr"]}
+    if network_mode == "nat":
+        _setup_ap_bridge(bridge, dhcp_cfg["bridge_cidr"])
+        prev_ip_forward = _set_ip_forward(True)
+        _set_nat_rules(uplink, dhcp_cfg["subnet_cidr"], True)
+        _procs["bridge"] = {
+            "mode": "nat",
+            "uplink": uplink,
+            "ip_forward_prev": prev_ip_forward,
+            "subnet_cidr": dhcp_cfg["subnet_cidr"],
+        }
+    else:
+        _procs["bridge"] = _setup_bridge_mode(bridge, uplink)
     _set_bridge_compat(bridge, [radio["interface"] for radio in enabled_radios], True)
     _set_tcp_mss_clamp(True)
 
@@ -681,7 +749,8 @@ def apply_config(cfg):
         hostapd_confs.append(conf_path)
 
     if hostapd_confs:
-        _start_dnsmasq(dhcp_cfg)
+        if network_mode == "nat":
+            _start_dnsmasq(dhcp_cfg)
         with open(HOSTAPD_LOG_FILE, "w") as logf:
             logf.write("")
         logf = open(HOSTAPD_LOG_FILE, "a", buffering=1)
@@ -698,7 +767,8 @@ def apply_config(cfg):
             stop_ap()
             detail = f" Hostapd log: {log_tail}" if log_tail else ""
             return {"ok": False, "message": f"hostapd failed to start.{detail}"}
-        return {"ok": True, "message": f"AP started ({len(hostapd_confs)} radio(s)) — routed via {uplink}"}
+        mode_label = "routed via" if network_mode == "nat" else "bridged to"
+        return {"ok": True, "message": f"AP started ({len(hostapd_confs)} radio(s)) — {mode_label} {uplink}"}
 
     return {"ok": False, "message": "No radios enabled — nothing to start"}
 
