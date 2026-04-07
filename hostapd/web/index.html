@@ -221,22 +221,6 @@
     </div>
   </div>
 
-  <div class="box">
-    <div class="box-header">
-      <div class="box-title">6 GHz Radio</div>
-      <label class="toggle"><input type="checkbox" id="en_6g" onchange="toggleBand('6g')"><span class="slider"></span></label>
-    </div>
-    <div class="box-body" id="fields_6g" style="opacity:.4;pointer-events:none">
-      <div class="form-row">
-        <div class="field"><label>Interface</label><select id="iface_6g" onchange="loadIfaceInfo('6g')"><option value="">-- select --</option></select></div>
-        <div class="field"><label>SSID</label><input type="text" id="ssid_6g" placeholder="HomeAssistant-AP-6G"></div>
-        <div class="field"><label>Channel (1/5/9/13…233)</label><input type="number" id="ch_6g" min="1" max="233" step="4" value="5"></div>
-      </div>
-      <div class="iface-info" id="info_6g"></div>
-      <div class="hint">6 GHz is configured as WPA3-SAE only and expects a valid 20 MHz 6 GHz channel.</div>
-    </div>
-  </div>
-
   <div class="actions">
     <button class="btn btn-primary" onclick="saveConfig()">Save Config</button>
     <button class="btn btn-ghost" onclick="loadAll()">Discard Changes</button>
@@ -251,7 +235,7 @@
 <script>
 let _interfaces = {};
 let _currentPage = 'overview';
-const BANDS = ['2g', '5g', '6g'];
+const BANDS = ['2g', '5g'];
 const BAND_LABELS = {'2g': '2.4 GHz', '5g': '5 GHz', '6g': '6 GHz'};
 const BAND_CAPS = {'2g': '2.4GHz', '5g': '5GHz', '6g': '6GHz'};
 
@@ -433,7 +417,8 @@ async function loadConfig() {
   const cfg = await api('GET', '/api/config');
   document.getElementById('password').value     = cfg.password     || '';
   document.getElementById('country_code').value = cfg.country_code || 'US';
-  cfg.radios.forEach(r => {
+  BANDS.forEach(band => {
+    const r = (cfg.radios || []).find(x => x.band === band) || { band };
     document.getElementById(`en_${r.band}`).checked  = !!r.enabled;
     document.getElementById(`iface_${r.band}`).value = r.interface || '';
     document.getElementById(`ssid_${r.band}`).value  = r.ssid      || '';

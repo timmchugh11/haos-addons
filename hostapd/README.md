@@ -2,7 +2,9 @@
 
 WiFi access point managed via a built-in web UI. Uses `hostapd` for AP mode and bridges
 WiFi clients directly onto your existing network — no separate DHCP server, no NAT.
-Supports independent 2.4 GHz, 5 GHz, and 6 GHz radios.
+Supports independent 2.4 GHz and 5 GHz radios. 6 GHz detection remains in the backend
+and logs, but 6 GHz AP configuration is currently hidden in the UI while support is
+being revisited.
 
 ---
 
@@ -36,10 +38,13 @@ Accessible via HA ingress (sidebar) or directly at `http://<ha-ip>:8080`.
 | **Shared Settings** | Password (shared across both radios) and country code. |
 | **2.4 GHz Radio** | Toggle, interface selector, SSID, channel (1–13). |
 | **5 GHz Radio** | Toggle, interface selector, SSID, channel (36/40/44/48…). |
-| **6 GHz Radio** | Toggle, interface selector, SSID, channel (1/5/9/13…233), WPA3-SAE only. |
 
 The interface dropdown shows each detected wireless interface with an inline warning if
 AP mode is not supported, and displays USB device info and USB bus speed on selection.
+
+**6 GHz status:** the add-on still detects and logs 6 GHz-capable adapters, but the
+6 GHz radio controls are currently hidden because 6 GHz AP broadcasting is not working
+reliably yet.
 
 ---
 
@@ -69,8 +74,8 @@ or
     wlan1  AP:yes  6GHz:yes  bands=2.4GHz/5GHz/6GHz
 ```
 
-For 6 GHz AP mode, the add-on writes a WPA3-SAE configuration and expects the adapter
-and driver to expose valid 6 GHz channels.
+6 GHz capability is still reported in startup logs so compatible adapters can be
+identified quickly, but 6 GHz AP mode is currently disabled in the web UI.
 
 ### Recommended chipsets
 
