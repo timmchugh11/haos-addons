@@ -1,9 +1,9 @@
 # Hostapd AP
 
-> Warning: This is a personal project and is not production-hardened. It can and will break the host's network configuration while testing or applying AP/bridge changes. Do not use it unless you are comfortable recovering the host from a lost network connection.
+> Warning: This is a personal project and is not production-hardened. It can and will break the host's network configuration while testing or applying AP/NAT changes. Do not use it unless you are comfortable recovering the host from a lost network connection.
 
-WiFi access point managed via a built-in web UI. Uses `hostapd` for AP mode and bridges
-WiFi clients directly onto your existing network — no separate DHCP server, no NAT.
+WiFi access point managed via a built-in web UI. Uses `hostapd` for AP mode and places
+WiFi clients onto a dedicated private subnet, routing/NATing them out via the host uplink.
 Supports independent 2.4 GHz and 5 GHz radios. 6 GHz detection remains in the backend
 and logs, but 6 GHz AP configuration is currently hidden in the UI while support is
 being revisited.
@@ -52,13 +52,13 @@ reliably yet.
 
 ## Networking
 
-WiFi clients are **bridged directly to your existing network**. The add-on automatically
-detects your host's uplink interface, creates a Linux bridge (`br-ap`), and attaches
-both the uplink and enabled WiFi interfaces to it.
+WiFi clients are placed on a dedicated AP subnet behind the add-on. The add-on creates
+an internal bridge (`br-ap`) for the AP radios, runs `dnsmasq` for DHCP/DNS, and NATs
+client traffic out through the detected host uplink.
 
-- WiFi clients get their IP, gateway, and DNS from **your existing router's DHCP server**
-- No separate subnet, no NAT, no dnsmasq required
-- Clients appear on the same LAN as every other device
+- WiFi clients get an address from the add-on on a private subnet
+- Traffic is routed/NATed to the host uplink
+- Clients do not appear on the same LAN segment as wired devices
 
 ---
 

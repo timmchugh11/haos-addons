@@ -137,6 +137,10 @@
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     Configure
   </button>
+  <button data-page="dhcp" onclick="navigate('dhcp')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18"/><path d="M6 3v8"/><path d="M18 3v8"/><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 15h.01"/><path d="M12 15h.01"/><path d="M16 15h.01"/></svg>
+    DHCP
+  </button>
   <button data-page="debug" onclick="navigate('debug')">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6"/><path d="M9 7V4h6v3"/><path d="M5 10h14"/><path d="M7 20h10"/><rect x="4" y="7" width="16" height="10" rx="2"/></svg>
     Debug
@@ -229,6 +233,42 @@
         <div class="field"><label>Channel (36/40/44/48…)</label><input type="number" id="ch_5g" min="36" max="165" value="36"></div>
       </div>
       <div class="iface-info" id="info_5g"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" onclick="saveConfig()">Save Config</button>
+    <button class="btn btn-ghost" onclick="loadAll()">Discard Changes</button>
+  </div>
+</section>
+
+<!-- ══ DHCP ══ -->
+<section id="page-dhcp" class="page">
+  <div class="page-title">DHCP</div>
+  <div class="page-sub">Configure the private AP subnet and dnsmasq lease range used in routed/NAT mode</div>
+
+  <div class="box">
+    <div class="box-header"><div class="box-title">Subnet Settings</div></div>
+    <div class="box-body">
+      <div class="form-row">
+        <div class="field"><label>Bridge CIDR</label><input type="text" id="dhcp_bridge_cidr" placeholder="192.168.50.1/24"></div>
+        <div class="field"><label>Gateway IP</label><input type="text" id="dhcp_gateway" placeholder="192.168.50.1"></div>
+      </div>
+      <div class="hint">`Gateway IP` should match the IP portion of `Bridge CIDR`.</div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="box-header"><div class="box-title">Lease Range</div></div>
+    <div class="box-body">
+      <div class="form-row">
+        <div class="field"><label>Range Start</label><input type="text" id="dhcp_range_start" placeholder="192.168.50.50"></div>
+        <div class="field"><label>Range End</label><input type="text" id="dhcp_range_end" placeholder="192.168.50.199"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Netmask</label><input type="text" id="dhcp_netmask" placeholder="255.255.255.0"></div>
+        <div class="field"><label>Lease Time</label><input type="text" id="dhcp_lease_time" placeholder="12h"></div>
+      </div>
     </div>
   </div>
 
@@ -474,6 +514,12 @@ async function loadConfig() {
   const cfg = await api('GET', '/api/config');
   document.getElementById('password').value     = cfg.password     || '';
   document.getElementById('country_code').value = cfg.country_code || 'US';
+  document.getElementById('dhcp_bridge_cidr').value = cfg.dhcp?.bridge_cidr || '';
+  document.getElementById('dhcp_gateway').value = cfg.dhcp?.gateway || '';
+  document.getElementById('dhcp_range_start').value = cfg.dhcp?.range_start || '';
+  document.getElementById('dhcp_range_end').value = cfg.dhcp?.range_end || '';
+  document.getElementById('dhcp_netmask').value = cfg.dhcp?.netmask || '';
+  document.getElementById('dhcp_lease_time').value = cfg.dhcp?.lease_time || '';
   BANDS.forEach(band => {
     const r = (cfg.radios || []).find(x => x.band === band) || { band };
     document.getElementById(`en_${r.band}`).checked  = !!r.enabled;
@@ -494,6 +540,14 @@ function buildConfig() {
   return {
     password:     document.getElementById('password').value,
     country_code: document.getElementById('country_code').value.toUpperCase(),
+    dhcp: {
+      bridge_cidr: document.getElementById('dhcp_bridge_cidr').value.trim(),
+      gateway: document.getElementById('dhcp_gateway').value.trim(),
+      range_start: document.getElementById('dhcp_range_start').value.trim(),
+      range_end: document.getElementById('dhcp_range_end').value.trim(),
+      netmask: document.getElementById('dhcp_netmask').value.trim(),
+      lease_time: document.getElementById('dhcp_lease_time').value.trim(),
+    },
     radios: BANDS.map(band => ({
       band,
       enabled:   document.getElementById(`en_${band}`).checked,
