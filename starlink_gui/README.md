@@ -77,7 +77,23 @@ you can leave it internal and use ingress only.
 
 ## HA Dashboard Card Pages
 
-TBD
+This add-on also has a companion Lovelace card project:
+[homeassitant-starlink-card](https://github.com/timmchugh11/homeassitant-starlink-card).
+
+That card embeds the Starlink GUI add-on inside a Home Assistant dashboard card
+using an iframe. It can automatically resolve the add-on ingress URL through
+the Home Assistant Supervisor API, and also supports a manual ingress path
+override if auto-detection is not available.
+
+The companion card supports:
+
+- embedding the Starlink GUI directly in Lovelace
+- automatic add-on detection from installed Supervisor add-ons
+- manual ingress override
+- configurable aspect ratios, including percent values and `16:9` style ratios, basically the height
+- a simple visual editor in Home Assistant
+
+This add-on is required for that card to work.
 
 ## Sky Obstruction Map
 
