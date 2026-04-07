@@ -1,5 +1,7 @@
 # Hostapd AP
 
+> Warning: This is a personal project and is not production-hardened. It can and will break the host's network configuration while testing or applying AP/bridge changes. Do not use it unless you are comfortable recovering the host from a lost network connection.
+
 WiFi access point managed via a built-in web UI. Uses `hostapd` for AP mode and bridges
 WiFi clients directly onto your existing network — no separate DHCP server, no NAT.
 Supports independent 2.4 GHz and 5 GHz radios. 6 GHz detection remains in the backend

@@ -40,6 +40,8 @@ Includes a bypass mode to hide all router pages when the Starlink router is not 
 
 [![version](https://img.shields.io/badge/version-0.10.6-blue.svg)](hostapd/config.yaml)
 
+Warning: This is a personal project and is not production-hardened. It can and will break the host network configuration while testing or applying AP/bridge changes.
+
 WiFi access point managed via a built-in web UI. Bridges WiFi clients directly onto your
 existing network — clients get DHCP from your router with no separate subnet or NAT.
 Supports independent 2.4 GHz and 5 GHz radios. 6 GHz capability is detected in logs,
