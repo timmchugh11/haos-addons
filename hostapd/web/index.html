@@ -98,6 +98,12 @@
   .sig-good{color:var(--success)}
   .sig-ok{color:var(--warn)}
   .sig-bad{color:var(--danger)}
+  .stack{display:flex;flex-direction:column;gap:16px}
+  .term{width:100%;min-height:220px;background:#0d1117;border:1px solid var(--border2);border-radius:6px;color:#d1d5db;padding:12px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical}
+  .cmd-grid{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .cmd-grid input{flex:1;min-width:260px}
+  .kv{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;font-size:13px}
+  .kv div:nth-child(odd){color:var(--text2)}
   #toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 18px;font-size:13px;box-shadow:0 4px 20px rgba(0,0,0,.5);transform:translateY(80px);opacity:0;transition:all .25s;z-index:999;max-width:320px}
   #toast.show{transform:translateY(0);opacity:1}
   .no-data{color:var(--muted);font-size:13px;padding:24px 18px;text-align:center;display:block}
@@ -129,6 +135,10 @@
   <button data-page="configure" onclick="navigate('configure')">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     Configure
+  </button>
+  <button data-page="debug" onclick="navigate('debug')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6"/><path d="M9 7V4h6v3"/><path d="M5 10h14"/><path d="M7 20h10"/><rect x="4" y="7" width="16" height="10" rx="2"/></svg>
+    Debug
   </button>
 </nav>
 
@@ -227,6 +237,46 @@
   </div>
 </section>
 
+<!-- ══ DEBUG ══ -->
+<section id="page-debug" class="page">
+  <div class="page-title">Debug</div>
+  <div class="page-sub">Live bridge state, host diagnostics, and a command runner for CLI debugging</div>
+  <div class="actions">
+    <button class="btn btn-ghost btn-sm" onclick="loadDebug()">
+      <svg width="12" height="12" style="vertical-align:-1px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Refresh Debug
+    </button>
+  </div>
+
+  <div class="stack">
+    <div class="box">
+      <div class="box-header"><div class="box-title">Summary</div></div>
+      <div class="box-body">
+        <div id="debug-summary" class="kv"><span class="no-data">Loading…</span></div>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="box-header"><div class="box-title">Terminal</div></div>
+      <div class="box-body">
+        <div class="cmd-grid" style="margin-bottom:12px">
+          <input type="text" id="term-cmd" placeholder="bridge link">
+          <button class="btn btn-primary" onclick="runTerminal()">Run</button>
+        </div>
+        <div class="hint" style="margin-top:0;margin-bottom:10px">Runs commands inside the add-on container with `sh -lc`.</div>
+        <textarea id="term-out" class="term" readonly></textarea>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="box-header"><div class="box-title">Diagnostics</div></div>
+      <div class="box-body">
+        <div id="debug-panels"><span class="no-data">Click Refresh Debug to load diagnostics</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 </main>
 </div><!-- /app -->
 
@@ -266,6 +316,7 @@ function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
   document.querySelector('main').scrollTop = 0;
   if (page === 'clients') loadClients();
+  if (page === 'debug') loadDebug();
 }
 
 function bandLabel(band) {
@@ -461,6 +512,59 @@ async function stopAP() {
   refreshOverview();
 }
 
+// ── Debug ───────────────────────────────────────────────────────────────────
+function fmtExec(res) {
+  const code = res.code === null || res.code === undefined ? '?' : res.code;
+  const out = [res.stdout || '', res.stderr ? `stderr:\n${res.stderr}` : ''].filter(Boolean).join('\n');
+  return `$ ${res.command}\n[exit ${code}]${out ? `\n${out}` : ''}`.trim();
+}
+
+async function loadDebug() {
+  const summary = document.getElementById('debug-summary');
+  const panels = document.getElementById('debug-panels');
+  summary.innerHTML = '<span class="no-data">Loading…</span>';
+  panels.innerHTML = '<span class="no-data">Loading…</span>';
+  try {
+    const data = await api('GET', '/api/debug');
+    summary.innerHTML = `
+      <div>AP Running</div><div>${data.ap_running ? 'yes' : 'no'}</div>
+      <div>Uplink</div><div>${escHtml(data.uplink || '—')}</div>
+      <div>Bridge</div><div>${escHtml(data.bridge || '—')}</div>
+      <div>Radio Ifaces</div><div>${escHtml((data.radio_ifaces || []).join(', ') || '—')}</div>
+    `;
+    const entries = Object.entries(data.commands || {});
+    if (!entries.length) {
+      panels.innerHTML = '<span class="no-data">No diagnostics available</span>';
+      return;
+    }
+    panels.innerHTML = entries.map(([name, res]) => `
+      <div class="box" style="margin-bottom:12px">
+        <div class="box-header"><div class="box-title">${escHtml(name)}</div></div>
+        <div class="box-body">
+          <textarea class="term" readonly>${fmtExec(res)}</textarea>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    summary.innerHTML = `<span class="no-data">Error: ${escHtml(e.message)}</span>`;
+    panels.innerHTML = '';
+  }
+}
+
+async function runTerminal() {
+  const input = document.getElementById('term-cmd');
+  const out = document.getElementById('term-out');
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  out.value = `$ ${cmd}\nRunning...`;
+  try {
+    const res = await api('POST', '/api/exec', { command: cmd });
+    out.value = fmtExec(res);
+  } catch (e) {
+    out.value = `Error: ${e.message}`;
+  }
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function toggleBand(band) {
   const enabled = document.getElementById(`en_${band}`).checked;
@@ -478,6 +582,12 @@ async function loadAll() {
 loadAll();
 refreshOverview();
 setInterval(refreshOverview, 10000);
+document.getElementById('term-cmd').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    runTerminal();
+  }
+});
 </script>
 </body>
 </html>

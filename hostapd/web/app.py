@@ -265,6 +265,53 @@ def _tail_file(path, max_lines=20):
         return ""
 
 
+def _run_command(cmd, timeout=10):
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return {
+            "ok": proc.returncode == 0,
+            "code": proc.returncode,
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+        }
+    except subprocess.TimeoutExpired as e:
+        return {
+            "ok": False,
+            "code": None,
+            "stdout": e.stdout or "",
+            "stderr": (e.stderr or "") + "\nTimed out",
+        }
+    except Exception as e:
+        return {"ok": False, "code": None, "stdout": "", "stderr": str(e)}
+
+
+def get_debug_snapshot():
+    cfg = load_config()
+    radio_ifaces = [radio.get("interface") for radio in cfg.get("radios", []) if radio.get("interface")]
+    commands = {
+        "ip_addr_br_ap": ["ip", "addr", "show", _bridge_name()],
+        "ip_route": ["ip", "route"],
+        "bridge_link": ["bridge", "link"],
+        "bridge_fdb": ["bridge", "fdb", "show"],
+        "iptables_mangle": ["iptables", "-t", "mangle", "-S"],
+        "hostapd_log": ["sh", "-lc", f"test -f {HOSTAPD_LOG_FILE} && tail -n 80 {HOSTAPD_LOG_FILE} || true"],
+    }
+    for iface in radio_ifaces:
+        commands[f"ip_addr_{iface}"] = ["ip", "addr", "show", iface]
+        commands[f"iw_{iface}"] = ["iw", "dev", iface, "info"]
+
+    snapshot = {
+        "ap_running": bool(_procs.get("hostapd") and _procs["hostapd"].poll() is None),
+        "uplink": _uplink_interface(),
+        "bridge": _bridge_name(),
+        "radio_ifaces": radio_ifaces,
+        "commands": {},
+    }
+    for name, cmd in commands.items():
+        snapshot["commands"][name] = {"command": " ".join(cmd), **_run_command(cmd)}
+    return snapshot
+
+
 def _set_tcp_mss_clamp(enabled):
     rules = TCP_MSS_CLAMP_RULES if enabled else [[rule[0], "-t", "mangle", "-D"] + rule[4:] for rule in TCP_MSS_CLAMP_RULES]
     for cmd in rules:
@@ -657,6 +704,24 @@ def api_clients():
             sta["band"] = radio.get("band", "?")
             sta["ssid"] = radio.get("ssid", "?")
             result.append(sta)
+    return jsonify(result)
+
+
+@app.route("/api/debug", methods=["GET"])
+def api_debug():
+    return jsonify(get_debug_snapshot())
+
+
+@app.route("/api/exec", methods=["POST"])
+def api_exec():
+    payload = request.get_json(force=True) or {}
+    cmd = str(payload.get("command", "")).strip()
+    if not cmd:
+        return jsonify({"ok": False, "code": None, "stdout": "", "stderr": "Command is required"})
+    if len(cmd) > 1000:
+        return jsonify({"ok": False, "code": None, "stdout": "", "stderr": "Command is too long"})
+    result = _run_command(["sh", "-lc", cmd], timeout=20)
+    result["command"] = cmd
     return jsonify(result)
 
 
