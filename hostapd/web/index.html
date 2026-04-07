@@ -141,10 +141,6 @@
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18"/><path d="M6 3v8"/><path d="M18 3v8"/><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 15h.01"/><path d="M12 15h.01"/><path d="M16 15h.01"/></svg>
     DHCP
   </button>
-  <button data-page="debug" onclick="navigate('debug')">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6"/><path d="M9 7V4h6v3"/><path d="M5 10h14"/><path d="M7 20h10"/><rect x="4" y="7" width="16" height="10" rx="2"/></svg>
-    Debug
-  </button>
 </nav>
 
 <main>
@@ -497,10 +493,14 @@ async function refreshOverview() {
   try {
     const s = await api('GET', '/api/status');
     const badge = document.getElementById('ap-badge');
+    const clientsTab = document.querySelector('nav button[data-page="clients"]');
     if (s.ap_running) {
       badge.className = 'conn-badge running'; badge.textContent = 'Running';
+      clientsTab.style.display = '';
     } else {
       badge.className = 'conn-badge stopped'; badge.textContent = 'Stopped';
+      clientsTab.style.display = 'none';
+      if (_currentPage === 'clients') navigate('overview');
     }
     const list = document.getElementById('radio-list');
     if (!s.radios || s.radios.length === 0) {
@@ -565,6 +565,25 @@ function fmtBytes(raw) {
   return `${(b/1073741824).toFixed(2)} GB`;
 }
 
+function fmtList(items) {
+  return items && items.length ? escHtml(items.join(', ')) : '—';
+}
+
+function fmtExpected(raw) {
+  if (!raw) return '—';
+  const m = raw.match(/[\d.]+\s*Mbps/i);
+  return m ? m[0] : escHtml(raw);
+}
+
+function fmtFlags(client) {
+  const flags = [];
+  if (String(client.authorized || '').toLowerCase() === 'yes') flags.push('auth');
+  if (String(client.authenticated || '').toLowerCase() === 'yes') flags.push('802.1X');
+  if (String(client.associated || '').toLowerCase() === 'yes') flags.push('assoc');
+  if (String(client.mfp || '').toLowerCase() === 'yes') flags.push('mfp');
+  return flags.length ? escHtml(flags.join(', ')) : '—';
+}
+
 async function loadClients() {
   const wrap = document.getElementById('clients-wrap');
   wrap.innerHTML = '<span class="no-data">Loading…</span>';
@@ -573,19 +592,24 @@ async function loadClients() {
     if (!clients.length) { wrap.innerHTML = '<span class="no-data">No clients connected</span>'; return; }
     wrap.innerHTML = `<table>
       <thead><tr>
-        <th>MAC Address</th><th>Band</th><th>SSID</th>
-        <th>Signal</th><th>TX Rate</th><th>RX Rate</th>
-        <th>TX</th><th>RX</th><th>Connected</th><th>Inactive</th>
+        <th>MAC Address</th><th>Hostname</th><th>IP</th><th>Band</th><th>SSID</th>
+        <th>Signal</th><th>Signal Avg</th><th>TX Rate</th><th>RX Rate</th>
+        <th>Expected</th><th>TX</th><th>RX</th><th>Flags</th><th>Connected</th><th>Inactive</th>
       </tr></thead>
       <tbody>${clients.map(c => `<tr>
         <td style="font-family:monospace;font-size:12px">${escHtml(c.mac)}</td>
+        <td>${escHtml(c.hostname || '—')}</td>
+        <td>${fmtList(c.ip_addresses)}</td>
         <td><span class="badge badge-blue">${escHtml(bandLabel(c.band))}</span></td>
         <td>${escHtml(c.ssid||'—')}</td>
         <td>${fmtSignal(c.signal)}</td>
+        <td>${fmtSignal(c.signal_avg)}</td>
         <td>${fmtRate(c.tx_bitrate)}</td>
         <td>${fmtRate(c.rx_bitrate)}</td>
+        <td>${fmtExpected(c.expected_throughput)}</td>
         <td>${fmtBytes(c.tx_bytes)}</td>
         <td>${fmtBytes(c.rx_bytes)}</td>
+        <td>${fmtFlags(c)}</td>
         <td>${fmtTime(c.connected_time)}</td>
         <td style="color:var(--muted)">${escHtml(c.inactive_time||'—')}</td>
       </tr>`).join('')}</tbody>

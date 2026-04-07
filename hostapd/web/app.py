@@ -15,6 +15,7 @@ app = Flask(__name__, static_folder="/web", static_url_path="")
 CONFIG_FILE = "/data/hostapd_config.json"
 HOSTAPD_LOG_FILE = "/tmp/hostapd.log"
 DNSMASQ_CONF_FILE = "/tmp/dnsmasq-br-ap.conf"
+DNSMASQ_LEASE_FILE = "/tmp/dnsmasq.leases"
 TCP_MSS_CLAMP_RULES = [
     ["iptables", "-t", "mangle", "-I", "FORWARD", "-i", "br-ap", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu"],
     ["iptables", "-t", "mangle", "-I", "FORWARD", "-o", "br-ap", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu"],
@@ -778,6 +779,7 @@ def _write_dnsmasq_config(dhcp_cfg):
         f.write("interface=br-ap\n")
         f.write("bind-interfaces\n")
         f.write("dhcp-authoritative\n")
+        f.write(f"dhcp-leasefile={DNSMASQ_LEASE_FILE}\n")
         f.write(f"dhcp-range={dhcp_cfg['range_start']},{dhcp_cfg['range_end']},{dhcp_cfg['netmask']},{dhcp_cfg['lease_time']}\n")
         f.write(f"dhcp-option=option:router,{dhcp_cfg['gateway']}\n")
         f.write(f"dhcp-option=option:dns-server,{dhcp_cfg['gateway']}\n")
@@ -815,6 +817,54 @@ def get_station_dump(iface):
     if current:
         stations.append(current)
     return stations
+
+
+def _get_dnsmasq_leases():
+    leases = {}
+    if not os.path.exists(DNSMASQ_LEASE_FILE):
+        return leases
+    try:
+        with open(DNSMASQ_LEASE_FILE, "r", errors="replace") as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) < 3:
+                    continue
+                expiry, mac, ip = parts[:3]
+                hostname = parts[3] if len(parts) > 3 and parts[3] != "*" else ""
+                client_id = parts[4] if len(parts) > 4 and parts[4] != "*" else ""
+                leases[mac.lower()] = {
+                    "lease_expiry": expiry,
+                    "lease_ip": ip,
+                    "lease_hostname": hostname,
+                    "lease_client_id": client_id,
+                }
+    except Exception:
+        pass
+    return leases
+
+
+def _get_neighbor_map():
+    neighbor_map = {}
+    bridge = _bridge_name()
+    for family in ("-4", "-6"):
+        try:
+            out = subprocess.check_output(["ip", family, "neigh", "show", "dev", bridge], text=True, stderr=subprocess.DEVNULL)
+        except Exception:
+            continue
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) < 5 or "lladdr" not in parts:
+                continue
+            ip_addr = parts[0]
+            mac = parts[parts.index("lladdr") + 1].lower()
+            state = parts[-1] if parts else ""
+            entry = neighbor_map.setdefault(mac, {"ipv4": [], "ipv6": [], "neighbor_states": []})
+            bucket = "ipv6" if ":" in ip_addr else "ipv4"
+            if ip_addr not in entry[bucket]:
+                entry[bucket].append(ip_addr)
+            if state and state not in entry["neighbor_states"]:
+                entry["neighbor_states"].append(state)
+    return neighbor_map
 
 
 def _uplink_interface():
@@ -1160,11 +1210,28 @@ def api_interfaces():
 @app.route("/api/clients", methods=["GET"])
 def api_clients():
     cfg = load_config()
+    leases = _get_dnsmasq_leases()
+    neighbors = _get_neighbor_map()
     result = []
     for radio in cfg.get("radios", []):
         if not radio.get("enabled") or not radio.get("interface"):
             continue
         for sta in get_station_dump(radio["interface"]):
+            mac = sta.get("mac", "").lower()
+            lease = leases.get(mac, {})
+            neighbor = neighbors.get(mac, {})
+            ipv4 = neighbor.get("ipv4", [])
+            ipv6 = neighbor.get("ipv6", [])
+            lease_ip = lease.get("lease_ip")
+            if lease_ip and lease_ip not in ipv4 and lease_ip not in ipv6:
+                (ipv6 if ":" in lease_ip else ipv4).append(lease_ip)
+            sta["hostname"] = lease.get("lease_hostname", "")
+            sta["lease_expiry"] = lease.get("lease_expiry", "")
+            sta["ipv4"] = ipv4
+            sta["ipv6"] = ipv6
+            sta["ip_addresses"] = ipv4 + ipv6
+            sta["primary_ip"] = (ipv4 + ipv6)[0] if (ipv4 + ipv6) else ""
+            sta["neighbor_states"] = neighbor.get("neighbor_states", [])
             sta["band"] = radio.get("band", "?")
             sta["ssid"] = radio.get("ssid", "?")
             result.append(sta)
@@ -1249,9 +1316,8 @@ def _startup():
         print("    (no interfaces found)")
 
     if os.path.exists(CONFIG_FILE):
-        print("==> Saved config found — applying on startup...")
-        result = apply_config(load_config())
-        print(f"==> {result['message']}")
+        print("==> Saved config found — not auto-applying on startup.")
+        print("==> Open the web UI and click Apply & Start when you want to bring radios up.")
     else:
         print("==> No saved config yet — open the web UI to configure.")
 
