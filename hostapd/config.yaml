@@ -1,5 +1,5 @@
 name: Hostapd AP
-version: "0.10.5"
+version: "0.10.6"
 slug: hostapd
 description: >-
   WiFi access point managed via a built-in web UI.

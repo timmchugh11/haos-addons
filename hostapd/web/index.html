@@ -45,7 +45,7 @@
   nav button.active svg,nav button:hover svg{opacity:1}
   .client-badge{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:700;background:rgba(59,130,246,.2);color:var(--accent);margin-left:4px}
   main{flex:1;overflow-y:auto;padding:24px}
-  .page{display:none;max-width:900px}
+  .page{display:none;}
   .page.active{display:block}
   .page-title{font-size:1.1rem;font-weight:700;margin-bottom:4px}
   .page-sub{font-size:13px;color:var(--text2);margin-bottom:20px}
@@ -186,13 +186,6 @@
         <div class="field">
           <label>Country Code</label>
           <input type="text" id="country_code" maxlength="2" placeholder="US">
-        </div>
-      </div>
-      <div class="toggle-row">
-        <label class="toggle"><input type="checkbox" id="disable_client_ipv6"><span class="slider"></span></label>
-        <div>
-          <div class="toggle-label">Disable Client IPv6</div>
-          <div class="hint">Blocks IPv6 for AP clients on the bridge so clients fall back to IPv4/DNS from DHCP.</div>
         </div>
       </div>
     </div>
@@ -424,7 +417,6 @@ async function loadConfig() {
   const cfg = await api('GET', '/api/config');
   document.getElementById('password').value     = cfg.password     || '';
   document.getElementById('country_code').value = cfg.country_code || 'US';
-  document.getElementById('disable_client_ipv6').checked = cfg.disable_client_ipv6 !== false;
   BANDS.forEach(band => {
     const r = (cfg.radios || []).find(x => x.band === band) || { band };
     document.getElementById(`en_${r.band}`).checked  = !!r.enabled;
@@ -445,7 +437,6 @@ function buildConfig() {
   return {
     password:     document.getElementById('password').value,
     country_code: document.getElementById('country_code').value.toUpperCase(),
-    disable_client_ipv6: document.getElementById('disable_client_ipv6').checked,
     radios: BANDS.map(band => ({
       band,
       enabled:   document.getElementById(`en_${band}`).checked,

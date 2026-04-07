@@ -12,10 +12,13 @@ app = Flask(__name__, static_folder="/web", static_url_path="")
 
 CONFIG_FILE = "/data/hostapd_config.json"
 HOSTAPD_LOG_FILE = "/tmp/hostapd.log"
+TCP_MSS_CLAMP_RULES = [
+    ["iptables", "-t", "mangle", "-I", "FORWARD", "-i", "br-ap", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu"],
+    ["iptables", "-t", "mangle", "-I", "FORWARD", "-o", "br-ap", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu"],
+]
 
 DEFAULT_CONFIG = {
     "country_code": "US",
-    "disable_client_ipv6": True,
     "password": "changeme123",
     "radios": [
         {"band": "2g", "enabled": True,  "interface": "wlan0", "ssid": "HomeAssistant-AP",    "channel": 6},
@@ -40,7 +43,6 @@ def normalize_config(cfg):
     cfg = cfg or {}
     normalized = {
         "country_code": str(cfg.get("country_code", DEFAULT_CONFIG["country_code"])).upper(),
-        "disable_client_ipv6": bool(cfg.get("disable_client_ipv6", DEFAULT_CONFIG["disable_client_ipv6"])),
         "password": cfg.get("password", DEFAULT_CONFIG["password"]),
         "radios": [],
     }
@@ -263,31 +265,10 @@ def _tail_file(path, max_lines=20):
         return ""
 
 
-def _write_proc_value(path, value):
-    try:
-        with open(path, "w") as f:
-            f.write(str(value))
-        return True
-    except Exception:
-        return False
-
-
-def _set_iface_ipv6_disabled(iface, disabled):
-    if not iface:
-        return
-    base = f"/proc/sys/net/ipv6/conf/{iface}"
-    if not os.path.isdir(base):
-        return
-    _write_proc_value(os.path.join(base, "disable_ipv6"), "1" if disabled else "0")
-    if disabled:
-        _write_proc_value(os.path.join(base, "accept_ra"), "0")
-        _write_proc_value(os.path.join(base, "autoconf"), "0")
-
-
-def _set_client_ipv6_disabled(disabled, ifaces=None):
-    _set_iface_ipv6_disabled(_bridge_name(), disabled)
-    for iface in ifaces or []:
-        _set_iface_ipv6_disabled(iface, disabled)
+def _set_tcp_mss_clamp(enabled):
+    rules = TCP_MSS_CLAMP_RULES if enabled else [[rule[0], "-t", "mangle", "-D"] + rule[4:] for rule in TCP_MSS_CLAMP_RULES]
+    for cmd in rules:
+        subprocess.run(cmd, capture_output=True)
 
 
 def get_station_dump(iface):
@@ -443,9 +424,7 @@ def _kill(name):
 
 def stop_ap():
     _kill("hostapd")
-    cfg = load_config()
-    radio_ifaces = [radio.get("interface") for radio in cfg.get("radios", []) if radio.get("interface")]
-    _set_client_ipv6_disabled(False, radio_ifaces)
+    _set_tcp_mss_clamp(False)
     bridge_state = _procs.pop("bridge", None)
     if bridge_state:
         uplink, gateway = bridge_state if isinstance(bridge_state, tuple) else (bridge_state, None)
@@ -463,7 +442,6 @@ def apply_config(cfg):
     cfg = normalize_config(cfg)
     stop_ap()
     country = cfg.get("country_code", "US")
-    disable_client_ipv6 = cfg.get("disable_client_ipv6", True)
     password = cfg.get("password", "changeme123")
     hostapd_confs = []
     enabled_radios = [radio for radio in cfg.get("radios", []) if radio.get("enabled")]
@@ -489,7 +467,7 @@ def apply_config(cfg):
     bridge = _bridge_name()
     gateway = _setup_bridge(bridge, uplink)
     _procs["bridge"] = (uplink, gateway)
-    _set_client_ipv6_disabled(disable_client_ipv6, [radio["interface"] for radio in enabled_radios])
+    _set_tcp_mss_clamp(True)
 
     for radio in enabled_radios:
         band = radio["band"]
