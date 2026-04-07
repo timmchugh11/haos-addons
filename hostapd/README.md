@@ -56,16 +56,16 @@ and attaches both the uplink and the WiFi interface to it.
 
 ## Adapter compatibility
 
-The add-on checks AP mode support on startup and logs the result. To be usable as an AP,
-the adapter's driver must include `AP` in its supported interface modes.
+The add-on checks AP mode and band support on startup and logs the result. To be usable
+as an AP, the adapter's driver must include `AP` in its supported interface modes.
 
 **Quick check in the add-on log:**
 ```
-AP mode: SUPPORTED
+    wlan0  AP:yes  6GHz:no  bands=2.4GHz/5GHz
 ```
 or
 ```
-AP mode: NOT SUPPORTED — this adapter cannot be used as an access point
+    wlan1  AP:yes  6GHz:yes  bands=2.4GHz/5GHz/6GHz
 ```
 
 ### Recommended chipsets

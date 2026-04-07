@@ -79,8 +79,47 @@ def get_wireless_interfaces():
         return []
 
 
+def _bands_from_phy_block(lines):
+    """Infer supported bands from frequency lines within one Wiphy block."""
+    bands = []
+
+    def add_band(name):
+        if name not in bands:
+            bands.append(name)
+
+    in_freqs = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("Frequencies:"):
+            in_freqs = True
+            continue
+        if in_freqs and stripped.startswith("*"):
+            mhz_token = stripped.lstrip("* ").split()[0]
+            try:
+                mhz = int(float(mhz_token))
+            except ValueError:
+                continue
+            if 2400 <= mhz <= 2500:
+                add_band("2.4GHz")
+            elif 4900 <= mhz < 5925:
+                add_band("5GHz")
+            elif 5925 <= mhz <= 7125:
+                add_band("6GHz")
+            continue
+        if in_freqs and stripped and not stripped.startswith("*"):
+            in_freqs = False
+
+    return bands
+
+
 def get_interface_info(iface):
-    info = {"ap_supported": False, "bands": [], "usb_info": None, "usb_speed": None}
+    info = {
+        "ap_supported": False,
+        "bands": [],
+        "supports_6ghz": False,
+        "usb_info": None,
+        "usb_speed": None,
+    }
     phy = _phy_for(iface)
     if not phy:
         info["error"] = "Interface not found"
@@ -91,12 +130,15 @@ def get_interface_info(iface):
         raw = subprocess.check_output(["iw", "list"], text=True, stderr=subprocess.DEVNULL)
         in_phy = False
         in_modes = False
+        phy_lines = []
         for line in raw.splitlines():
             if line.startswith(f"Wiphy {phy}"):
                 in_phy = True
+                phy_lines = []
             elif line.startswith("Wiphy ") and in_phy:
                 break
             if in_phy:
+                phy_lines.append(line)
                 stripped = line.strip()
                 if "Supported interface modes" in line:
                     in_modes = True
@@ -107,11 +149,8 @@ def get_interface_info(iface):
                             info["ap_supported"] = True
                     else:
                         in_modes = False
-                if "Band 1:" in line:
-                    info["bands"].append("2.4GHz")
-                if "Band 2:" in line or "Band 4:" in line:
-                    if "5GHz" not in info["bands"]:
-                        info["bands"].append("5GHz")
+        info["bands"] = _bands_from_phy_block(phy_lines)
+        info["supports_6ghz"] = "6GHz" in info["bands"]
     except Exception as e:
         info["error"] = str(e)
 
@@ -448,11 +487,12 @@ def _startup():
         for iface in ifaces:
             info = get_interface_info(iface)
             ap   = "AP:yes" if info.get("ap_supported") else "AP:no"
+            s6   = "6GHz:yes" if info.get("supports_6ghz") else "6GHz:no"
             bands = "/".join(info.get("bands", [])) or "?"
             usb  = f"  USB: {info['usb_info']}" if info.get("usb_info") else ""
             spd  = f"  Speed: {info['usb_speed']}" if info.get("usb_speed") else ""
             err  = f"  ERR: {info['error']}" if info.get("error") else ""
-            print(f"    {iface}  {ap}  bands={bands}{usb}{spd}{err}")
+            print(f"    {iface}  {ap}  {s6}  bands={bands}{usb}{spd}{err}")
     else:
         print("    (no interfaces found)")
 
