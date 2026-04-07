@@ -1517,6 +1517,7 @@ function renderDiagnostics(d) {
 
 const charts = {};
 const HIST_INTERVAL_SEC = 1;   // Starlink dishes sample at 1 s/sample
+const OBSTRUCTED_SNR_THRESHOLD = 0.65;
 let _histBufSize  = 0;
 let _histLoadedAt = null;
 
@@ -1721,9 +1722,11 @@ function renderChart(id) {
 const obstructionView = {
   canvas: null, renderer: null, scene: null, camera: null,
   obsGroup: null,  // cells + dish — rotates with yaw AND pitch
+  mapOrientGroup: null, // obstruction field — rotates into the dish frame
   yawGroup: null,  // compass ring — rotates with yaw only
   cellMesh: null, cellMeshes: [], THREE: null,
   dishLoadStarted: false, dishOrientGroup: null,
+  pendingAlign: null,
   cells: [],
   yaw: 0, pitch: 0.5, zoom: 1.27,
   yawVel: 0.0003, baseYawVel: 0.0003, spinRaf: null,
@@ -1746,6 +1749,7 @@ async function loadObstruction() {
       const aAz = alignData.value?.boresightAzimuthDeg;
       const aEl = alignData.value?.boresightElevationDeg;
       if (typeof aAz === 'number' && typeof aEl === 'number') {
+        obstructionView.pendingAlign = { az: aAz, el: aEl };
         applyObstructionDishOrientation(aAz, aEl);
       }
     }
@@ -1770,7 +1774,7 @@ async function loadObstruction() {
       renderObstructionMap();
       startObstructionSpin();
     }
-    const obstructed = obstructionView.cells.filter(c => c.value < 0.02).length;
+    const obstructed = obstructionView.cells.filter(c => c.value < OBSTRUCTED_SNR_THRESHOLD).length;
     set('obs-samples',   obstructionView.cells.length.toLocaleString());
     set('obs-untracked', untracked.toLocaleString());
     set('obs-obstructed', obstructed.toLocaleString());
@@ -1868,6 +1872,8 @@ function ensureScene() {
   // obsGroup: cells + dish — both axes of rotation
   const obsGroup = new THREE.Group();
   scene.add(obsGroup);
+  const mapOrientGroup = new THREE.Group();
+  obsGroup.add(mapOrientGroup);
 
   // yawGroup: compass ring — yaw only, stays flat on the ground plane
   const yawGroup = new THREE.Group();
@@ -1880,6 +1886,7 @@ function ensureScene() {
   obstructionView.scene    = scene;
   obstructionView.camera   = camera;
   obstructionView.obsGroup = obsGroup;
+  obstructionView.mapOrientGroup = mapOrientGroup;
   obstructionView.yawGroup = yawGroup;
 
   // Load dish model
@@ -1903,11 +1910,13 @@ function ensureScene() {
         child.material = new THREE.MeshStandardMaterial({ color: 0xe0e8f8, metalness: 0.3, roughness: 0.55, side: THREE.DoubleSide });
       });
       dishOrientGroup.add(model);
+      if (obstructionView.pendingAlign) applyObstructionDishOrientation(obstructionView.pendingAlign.az, obstructionView.pendingAlign.el);
       renderObstructionMap();
     });
   }
 
   if (obstructionView.cells.length) buildCellMesh();
+  if (obstructionView.pendingAlign) applyObstructionDishOrientation(obstructionView.pendingAlign.az, obstructionView.pendingAlign.el);
   renderObstructionMap();
 }
 
@@ -1920,6 +1929,7 @@ function applyObstructionDishOrientation(az, el) {
   const qTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tiltRad);
   const qAz   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI - azRad);
   g.quaternion.multiplyQuaternions(qAz, qTilt);
+  if (obstructionView.mapOrientGroup) obstructionView.mapOrientGroup.quaternion.copy(qAz);
   renderObstructionMap();
 }
 
@@ -1962,10 +1972,10 @@ function buildCompassRing(THREE, yawGroup) {
 }
 
 function buildCellMesh() {
-  const THREE = obstructionView.THREE, obsGroup = obstructionView.obsGroup;
-  if (!THREE || !obsGroup) return;
+  const THREE = obstructionView.THREE, mapOrientGroup = obstructionView.mapOrientGroup;
+  if (!THREE || !mapOrientGroup) return;
   for (const m of obstructionView.cellMeshes) {
-    obsGroup.remove(m);
+    mapOrientGroup.remove(m);
     m.geometry.dispose();
     m.material.dispose();
   }
@@ -1979,8 +1989,8 @@ function buildCellMesh() {
   const clearMat   = new THREE.MeshBasicMaterial({ ...matOpts, color: new THREE.Color(cols.clear) });
   const blockedMat = new THREE.MeshBasicMaterial({ ...matOpts, color: new THREE.Color(cols.obstructed) });
 
-  const clearCells   = cells.filter(c => c.value >= 0.02);
-  const blockedCells = cells.filter(c => c.value <  0.02);
+  const clearCells   = cells.filter(c => c.value >= OBSTRUCTED_SNR_THRESHOLD);
+  const blockedCells = cells.filter(c => c.value <  OBSTRUCTED_SNR_THRESHOLD);
 
   const dummy = new THREE.Object3D();
   for (const [subset, mat] of [[clearCells, clearMat], [blockedCells, blockedMat]]) {
@@ -1996,7 +2006,7 @@ function buildCellMesh() {
     }
     mesh.instanceMatrix.needsUpdate = true;
     obstructionView.cellMeshes.push(mesh);
-    obsGroup.add(mesh);
+    mapOrientGroup.add(mesh);
   }
 }
 

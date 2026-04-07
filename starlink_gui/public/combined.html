@@ -103,11 +103,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:transparent;font-fam
 // ── Config ────────────────────────────────────────────────────────────────────
 const BASE = (typeof window.__BASE__ === 'string') ? window.__BASE__ : '';
 const REFRESH_INTERVAL_MS = 5000;
+const OBSTRUCTED_SNR_THRESHOLD = 0.65;
 
 // ── View state ────────────────────────────────────────────────────────────────
 const view = {
   canvas: null, renderer: null, scene: null, camera: null,
-  obsGroup: null, yawGroup: null, THREE: null,
+  obsGroup: null, mapOrientGroup: null, yawGroup: null, THREE: null,
   cellMeshes: [], cells: [],
   dishLoadStarted: false,
   dishOrientGroup: null,     // solid dish — actual az/el
@@ -158,7 +159,7 @@ async function loadData() {
       }
     }
     if (view.scene) { buildCellMesh(); renderMap(); startSpin(); }
-    const obstructed = view.cells.filter(c => c.value < 0.02).length;
+    const obstructed = view.cells.filter(c => c.value < OBSTRUCTED_SNR_THRESHOLD).length;
     setEl('st-samples',    view.cells.length.toLocaleString());
     setEl('st-untracked',  untracked.toLocaleString());
     setEl('st-obstructed', obstructed.toLocaleString());
@@ -285,13 +286,14 @@ function initScene() {
 
   // obsGroup: everything that rotates with yaw+pitch
   const obsGroup = new THREE.Group(); scene.add(obsGroup);
+  const mapOrientGroup = new THREE.Group(); obsGroup.add(mapOrientGroup);
   // yawGroup: compass ring — yaw only
   const yawGroup = new THREE.Group(); scene.add(yawGroup);
   buildCompassRing(THREE, yawGroup);
   yawGroup.scale.setScalar(0.5);
 
   view.THREE = THREE; view.renderer = renderer; view.scene = scene;
-  view.camera = camera; view.obsGroup = obsGroup; view.yawGroup = yawGroup;
+  view.camera = camera; view.obsGroup = obsGroup; view.mapOrientGroup = mapOrientGroup; view.yawGroup = yawGroup;
 
   // Dish groups — added to obsGroup so they rotate with the scene
   const dishOrientGroup    = new THREE.Group(); obsGroup.add(dishOrientGroup);
@@ -382,8 +384,8 @@ function getObstructionColors() {
 
 function buildCellMesh() {
   const THREE = view.THREE;
-  if (!THREE || !view.obsGroup) return;
-  for (const m of view.cellMeshes) { view.obsGroup.remove(m); m.geometry.dispose(); m.material.dispose(); }
+  if (!THREE || !view.mapOrientGroup) return;
+  for (const m of view.cellMeshes) { view.mapOrientGroup.remove(m); m.geometry.dispose(); m.material.dispose(); }
   view.cellMeshes = [];
   if (!view.cells.length) return;
   const geom    = new THREE.BoxGeometry(0.022, 0.001, 0.022);
@@ -397,8 +399,8 @@ function buildCellMesh() {
   const blocked = new THREE.MeshBasicMaterial({ ...opts, color: new THREE.Color(cols.obstructed) });
   const dummy   = new THREE.Object3D();
   for (const [subset, mat] of [
-    [view.cells.filter(c => c.value >= 0.02), clear],
-    [view.cells.filter(c => c.value  < 0.02), blocked],
+    [view.cells.filter(c => c.value >= OBSTRUCTED_SNR_THRESHOLD), clear],
+    [view.cells.filter(c => c.value  < OBSTRUCTED_SNR_THRESHOLD), blocked],
   ]) {
     if (!subset.length) continue;
     const mesh = new THREE.InstancedMesh(geom, mat, subset.length);
@@ -409,7 +411,7 @@ function buildCellMesh() {
       mesh.setMatrixAt(i, dummy.matrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
-    view.cellMeshes.push(mesh); view.obsGroup.add(mesh);
+    view.cellMeshes.push(mesh); view.mapOrientGroup.add(mesh);
   }
 }
 
@@ -419,6 +421,7 @@ function applyDishOrientation(az, el) {
   const qTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), (90 - el) * Math.PI / 180);
   const qAz   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI - az * Math.PI / 180);
   g.quaternion.multiplyQuaternions(qAz, qTilt);
+  if (view.mapOrientGroup) view.mapOrientGroup.quaternion.copy(qAz);
   renderMap();
 }
 
