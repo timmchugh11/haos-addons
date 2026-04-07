@@ -46,8 +46,8 @@ AP mode is not supported, and displays USB device info and USB bus speed on sele
 ## Networking
 
 WiFi clients are **bridged directly to your existing network**. The add-on automatically
-detects your host's uplink interface, creates a Linux bridge (`br-ap-2g` / `br-ap-5g`),
-`br-ap-6g`), and attaches both the uplink and the WiFi interface to it.
+detects your host's uplink interface, creates a Linux bridge (`br-ap`), and attaches
+both the uplink and enabled WiFi interfaces to it.
 
 - WiFi clients get their IP, gateway, and DNS from **your existing router's DHCP server**
 - No separate subnet, no NAT, no dnsmasq required

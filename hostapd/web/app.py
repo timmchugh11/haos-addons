@@ -287,8 +287,8 @@ def _uplink_interface():
     return None
 
 
-def _bridge_name(band):
-    return f"br-ap-{band}"
+def _bridge_name():
+    return "br-ap"
 
 
 def _get_default_gateway(iface=None):
@@ -308,8 +308,8 @@ def _get_default_gateway(iface=None):
     return None
 
 
-def _setup_bridge(bridge, uplink, wifi_iface):
-    """Create bridge, attach uplink.  Move uplink IP/gateway to bridge."""
+def _setup_bridge(bridge, uplink):
+    """Create a shared bridge and move the host uplink IP/gateway onto it."""
     # Snapshot IP and gateway BEFORE touching anything
     ip_prefix = None
     try:
@@ -394,13 +394,17 @@ def _kill(name):
 
 def stop_ap():
     _kill("hostapd")
-    # Tear down bridges
+    bridge_state = _procs.pop("bridge", None)
+    if bridge_state:
+        uplink, gateway = bridge_state if isinstance(bridge_state, tuple) else (bridge_state, None)
+        _teardown_bridge(_bridge_name(), uplink, gateway)
+
+    # Backward-compatible cleanup for older in-memory state that tracked one bridge per band.
     for key in [k for k in list(_procs.keys()) if k.startswith("bridge_")]:
-        band = key[len("bridge_"):]
         val = _procs.pop(key, None)
         if val:
             uplink, gateway = val if isinstance(val, tuple) else (val, None)
-            _teardown_bridge(_bridge_name(band), uplink, gateway)
+            _teardown_bridge(_bridge_name(), uplink, gateway)
 
 
 def apply_config(cfg):
@@ -429,17 +433,16 @@ def apply_config(cfg):
         return {"ok": False, "message": "Could not determine host uplink interface"}
     print(f"==> Uplink interface: {uplink}")
 
+    bridge = _bridge_name()
+    gateway = _setup_bridge(bridge, uplink)
+    _procs["bridge"] = (uplink, gateway)
+
     for radio in enabled_radios:
         band = radio["band"]
         iface = radio["interface"]
         ssid = radio["ssid"]
         channel = int(radio["channel"])
         hw_mode = HW_MODE.get(band, "g")
-        bridge = _bridge_name(band)
-
-        # Create bridge and attach uplink
-        gateway = _setup_bridge(bridge, uplink, iface)
-        _procs[f"bridge_{band}"] = (uplink, gateway)  # remember for teardown
 
         # Bring wifi iface up without IP — hostapd manages it via the bridge
         for cmd in [
