@@ -3,7 +3,8 @@
 > Warning: This is a personal project and is not production-hardened. It can and will break the host's network configuration while testing or applying AP/NAT/bridge changes. Do not use it unless you are comfortable recovering the host from a lost network connection.
 
 WiFi access point managed via a built-in web UI. Uses `hostapd` for AP mode and supports
-either routed/NAT mode or experimental bridge mode.
+either routed/NAT mode or experimental bridge mode. 5 GHz radios can optionally enable
+Wi-Fi 6 / 802.11ax when the adapter, driver, and hostapd build support it.
 Supports independent 2.4 GHz and 5 GHz radios. 6 GHz detection remains in the backend
 and logs, but 6 GHz AP configuration is currently hidden in the UI while support is
 being revisited.
@@ -37,9 +38,10 @@ Accessible via HA ingress (sidebar) or directly at `http://<ha-ip>:8080`.
 | Section | Description |
 |---|---|
 | **Status** | Live indicator (updates every 5 s). Apply & Start / Stop AP buttons. |
-| **Shared Settings** | Password (shared across both radios) and country code. |
-| **2.4 GHz Radio** | Toggle, interface selector, SSID, channel (1–13). |
-| **5 GHz Radio** | Toggle, interface selector, SSID, channel (36/40/44/48…). |
+| **Shared Settings** | Password, country code, and network mode. |
+| **2.4 GHz Radio** | Toggle, interface selector, SSID, channel (1–13), WPA3 toggle, conservative AX toggle. |
+| **5 GHz Radio** | Toggle, interface selector, SSID, channel (36/40/44/48…), channel width, AX toggle, WPA3 toggle. |
+| **DHCP** | Private subnet, gateway, lease range, and lease duration for NAT mode. |
 
 The interface dropdown shows each detected wireless interface with an inline warning if
 AP mode is not supported, and displays USB device info and USB bus speed on selection.
@@ -47,6 +49,11 @@ AP mode is not supported, and displays USB device info and USB bus speed on sele
 **6 GHz status:** the add-on still detects and logs 6 GHz-capable adapters, but the
 6 GHz radio controls are currently hidden because 6 GHz AP broadcasting is not working
 reliably yet.
+
+**5 GHz Wi-Fi 6 status:** when enabled in the UI, the add-on writes `ieee80211ax=1`
+plus conservative HE operating settings that match the selected 20/40/80 MHz width.
+If the adapter or hostapd build rejects those settings, startup will fail and the
+hostapd log will show the reason.
 
 ---
 
@@ -56,6 +63,10 @@ The add-on supports two network modes:
 
 - `NAT (Recommended)`: clients are placed on a dedicated AP subnet behind the add-on. The add-on creates an internal bridge (`br-ap`) for the AP radios, runs `dnsmasq` for DHCP/DNS, and NATs client traffic out through the detected host uplink.
 - `Bridge (Experimental)`: clients are bridged onto the upstream LAN. This is better for same-LAN use cases, but it is less reliable and can fail to pass DHCP/client traffic depending on the host, adapter, and driver.
+
+For non-6 GHz radios, enabling **Use WPA3** puts the radio into WPA2/WPA3 transition
+mode (`WPA-PSK` + `SAE`) with optional PMF for compatibility. 6 GHz remains SAE-only
+with required PMF and should still be treated as experimental.
 
 ---
 

@@ -37,9 +37,9 @@ DEFAULT_CONFIG = {
         "lease_time": "12h",
     },
     "radios": [
-        {"band": "2g", "enabled": True,  "interface": "wlan0", "ssid": "HomeAssistant-AP",    "channel": 6,  "channel_width": "20"},
-        {"band": "5g", "enabled": False, "interface": "wlan1", "ssid": "HomeAssistant-AP-5G", "channel": 36, "channel_width": "80"},
-        {"band": "6g", "enabled": False, "interface": "wlan2", "ssid": "HomeAssistant-AP-6G", "channel": 5},
+        {"band": "2g", "enabled": True,  "interface": "wlan0", "ssid": "HomeAssistant-AP",    "channel": 6,  "channel_width": "20", "ax_enabled": False, "wpa3": False},
+        {"band": "5g", "enabled": False, "interface": "wlan1", "ssid": "HomeAssistant-AP-5G", "channel": 36, "channel_width": "80", "ax_enabled": True,  "wpa3": False},
+        {"band": "6g", "enabled": False, "interface": "wlan2", "ssid": "HomeAssistant-AP-6G", "channel": 5,  "channel_width": "20", "ax_enabled": True,  "wpa3": True},
     ],
 }
 
@@ -94,6 +94,8 @@ def normalize_config(cfg):
         merged["channel_width"] = str(merged.get("channel_width", default_radio.get("channel_width", "20")))
         if merged["channel_width"] not in RADIO_WIDTHS.get(band, {"20"}):
             merged["channel_width"] = default_radio.get("channel_width", "20")
+        merged["ax_enabled"] = bool(merged.get("ax_enabled", default_radio.get("ax_enabled", False)))
+        merged["wpa3"] = bool(merged.get("wpa3", default_radio.get("wpa3", False)))
         normalized["radios"].append(merged)
 
     return normalized
@@ -408,6 +410,20 @@ def _vht_center_seg0(channel, width):
         if channel in channels:
             return center
     return None
+
+
+def _he_oper(channel, width):
+    try:
+        channel = int(channel)
+    except (TypeError, ValueError):
+        return None, None
+    width = str(width)
+    if width in {"20", "40"}:
+        center = channel if width == "20" else _vht_center_seg0(channel, width)
+        return 0, center
+    if width == "80":
+        return 1, _vht_center_seg0(channel, width)
+    return None, None
 
 
 def get_debug_snapshot():
@@ -740,6 +756,8 @@ def apply_config(cfg):
         ssid = radio["ssid"]
         channel = int(radio["channel"])
         channel_width = str(radio.get("channel_width", "20"))
+        ax_enabled = bool(radio.get("ax_enabled"))
+        wpa3 = bool(radio.get("wpa3"))
         hw_mode = HW_MODE.get(band, "g")
 
         # Bring wifi iface up without IP — hostapd manages it via the bridge
@@ -787,6 +805,13 @@ def apply_config(cfg):
                         return {"ok": False, "message": f"5GHz: channel {channel} does not support 80 MHz width"}
                     f.write("vht_oper_chwidth=1\n")
                     f.write(f"vht_oper_centr_freq_seg0_idx={center}\n")
+                if ax_enabled:
+                    he_width, he_center = _he_oper(channel, channel_width)
+                    if he_width is None or he_center is None:
+                        return {"ok": False, "message": f"5GHz: channel {channel} does not support HE operation at {channel_width} MHz"}
+                    f.write("ieee80211ax=1\n")
+                    f.write(f"he_oper_chwidth={he_width}\n")
+                    f.write(f"he_oper_centr_freq_seg0_idx={he_center}\n")
             elif band == "6g":
                 op_class = _op_class_for_6ghz(channel)
                 if op_class is None:
@@ -804,8 +829,13 @@ def apply_config(cfg):
                 f.write(f"wpa_passphrase={password}\n")
             if band != "6g":
                 f.write("wpa=2\n")
-                f.write("wpa_key_mgmt=WPA-PSK\n")
                 f.write("rsn_pairwise=CCMP\n")
+                if wpa3:
+                    f.write("wpa_key_mgmt=WPA-PSK SAE\n")
+                    f.write("ieee80211w=1\n")
+                    f.write("sae_pwe=1\n")
+                else:
+                    f.write("wpa_key_mgmt=WPA-PSK\n")
                 f.write(f"wpa_passphrase={password}\n")
         hostapd_confs.append(conf_path)
 
