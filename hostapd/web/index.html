@@ -104,6 +104,7 @@
   .cmd-grid input{flex:1;min-width:260px}
   .kv{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;font-size:13px}
   .kv div:nth-child(odd){color:var(--text2)}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap}
   #toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 18px;font-size:13px;box-shadow:0 4px 20px rgba(0,0,0,.5);transform:translateY(80px);opacity:0;transition:all .25s;z-index:999;max-width:320px}
   #toast.show{transform:translateY(0);opacity:1}
   .no-data{color:var(--muted);font-size:13px;padding:24px 18px;text-align:center;display:block}
@@ -261,9 +262,13 @@
       <div class="box-body">
         <div class="cmd-grid" style="margin-bottom:12px">
           <input type="text" id="term-cmd" placeholder="bridge link">
-          <button class="btn btn-primary" onclick="runTerminal()">Run</button>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="runTerminal()">Run</button>
+            <button class="btn btn-ghost" onclick="streamTerminal()">Stream</button>
+            <button class="btn btn-danger" onclick="stopTerminal()">Stop</button>
+          </div>
         </div>
-        <div class="hint" style="margin-top:0;margin-bottom:10px">Runs commands inside the add-on container with `sh -lc`.</div>
+        <div class="hint" style="margin-top:0;margin-bottom:10px">Runs commands inside the add-on container with `sh -lc`. Use `Stream` for long-running commands like `tcpdump -l ...`.</div>
         <textarea id="term-out" class="term" readonly></textarea>
       </div>
     </div>
@@ -285,6 +290,7 @@
 <script>
 let _interfaces = {};
 let _currentPage = 'overview';
+let _termStream = null;
 const BANDS = ['2g', '5g'];
 const BAND_LABELS = {'2g': '2.4 GHz', '5g': '5 GHz', '6g': '6 GHz'};
 const BAND_CAPS = {'2g': '2.4GHz', '5g': '5GHz', '6g': '6GHz'};
@@ -552,6 +558,7 @@ async function loadDebug() {
 }
 
 async function runTerminal() {
+  stopTerminal();
   const input = document.getElementById('term-cmd');
   const out = document.getElementById('term-out');
   const cmd = input.value.trim();
@@ -563,6 +570,52 @@ async function runTerminal() {
   } catch (e) {
     out.value = `Error: ${e.message}`;
   }
+}
+
+function stopTerminal() {
+  if (_termStream) {
+    _termStream.close();
+    _termStream = null;
+  }
+}
+
+function appendTerm(line) {
+  const out = document.getElementById('term-out');
+  out.value += (out.value ? '\n' : '') + line;
+  out.scrollTop = out.scrollHeight;
+}
+
+function streamTerminal() {
+  stopTerminal();
+  const input = document.getElementById('term-cmd');
+  const out = document.getElementById('term-out');
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  const base = window.__BASE__ || '';
+  out.value = '';
+  _termStream = new EventSource(base + '/api/exec_stream?command=' + encodeURIComponent(cmd));
+  _termStream.addEventListener('meta', (e) => {
+    const data = JSON.parse(e.data);
+    appendTerm(`$ ${data.command}`);
+  });
+  _termStream.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    appendTerm(data.line);
+  };
+  _termStream.addEventListener('done', (e) => {
+    const data = JSON.parse(e.data);
+    appendTerm(`[exit ${data.code}]`);
+    stopTerminal();
+  });
+  _termStream.addEventListener('error', (e) => {
+    if (e.data) {
+      const data = JSON.parse(e.data);
+      appendTerm(`error: ${data.error}`);
+    } else {
+      appendTerm('[stream ended]');
+    }
+    stopTerminal();
+  });
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

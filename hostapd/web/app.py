@@ -6,7 +6,7 @@ import os
 import subprocess
 import time
 
-from flask import Flask, jsonify, request, make_response
+from flask import Flask, Response, jsonify, request, make_response, stream_with_context
 
 app = Flask(__name__, static_folder="/web", static_url_path="")
 
@@ -266,6 +266,13 @@ def _tail_file(path, max_lines=20):
 
 
 def _run_command(cmd, timeout=10):
+    def _as_text(val):
+        if val is None:
+            return ""
+        if isinstance(val, bytes):
+            return val.decode("utf-8", errors="replace")
+        return str(val)
+
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         return {
@@ -278,11 +285,20 @@ def _run_command(cmd, timeout=10):
         return {
             "ok": False,
             "code": None,
-            "stdout": e.stdout or "",
-            "stderr": (e.stderr or "") + "\nTimed out",
+            "stdout": _as_text(e.stdout),
+            "stderr": _as_text(e.stderr) + "\nTimed out",
         }
     except Exception as e:
         return {"ok": False, "code": None, "stdout": "", "stderr": str(e)}
+
+
+def _validate_exec_command(cmd):
+    cmd = str(cmd or "").strip()
+    if not cmd:
+        return None, "Command is required"
+    if len(cmd) > 1000:
+        return None, "Command is too long"
+    return cmd, None
 
 
 def get_debug_snapshot():
@@ -715,14 +731,48 @@ def api_debug():
 @app.route("/api/exec", methods=["POST"])
 def api_exec():
     payload = request.get_json(force=True) or {}
-    cmd = str(payload.get("command", "")).strip()
-    if not cmd:
-        return jsonify({"ok": False, "code": None, "stdout": "", "stderr": "Command is required"})
-    if len(cmd) > 1000:
-        return jsonify({"ok": False, "code": None, "stdout": "", "stderr": "Command is too long"})
+    cmd, err = _validate_exec_command(payload.get("command", ""))
+    if err:
+        return jsonify({"ok": False, "code": None, "stdout": "", "stderr": err})
     result = _run_command(["sh", "-lc", cmd], timeout=20)
     result["command"] = cmd
     return jsonify(result)
+
+
+@app.route("/api/exec_stream", methods=["GET"])
+def api_exec_stream():
+    cmd, err = _validate_exec_command(request.args.get("command", ""))
+    if err:
+        return jsonify({"ok": False, "stderr": err}), 400
+
+    @stream_with_context
+    def generate():
+        proc = None
+        try:
+            yield f"event: meta\ndata: {json.dumps({'command': cmd})}\n\n"
+            proc = subprocess.Popen(
+                ["sh", "-lc", cmd],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+            assert proc.stdout is not None
+            for line in proc.stdout:
+                yield f"data: {json.dumps({'line': line.rstrip(chr(10))})}\n\n"
+            code = proc.wait()
+            yield f"event: done\ndata: {json.dumps({'code': code})}\n\n"
+        except Exception as e:
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            if proc and proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+
+    return Response(generate(), mimetype="text/event-stream")
 
 
 # ---------------------------------------------------------------------------
