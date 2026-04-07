@@ -8,6 +8,8 @@ open directly from the HA sidebar without publishing a separate public endpoint.
 
 ## What It Does
 
+![Starlink gui screenshot](img/starlink-gui.png)
+
 - Live dashboard with dish and router summary cards
 - Dish pages for:
   - status
