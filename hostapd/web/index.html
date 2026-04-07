@@ -224,6 +224,7 @@
         <div class="field"><label>Interface</label><select id="iface_2g" onchange="loadIfaceInfo('2g')"><option value="">-- select --</option></select></div>
         <div class="field"><label>SSID</label><input type="text" id="ssid_2g" placeholder="HomeAssistant-AP"></div>
         <div class="field"><label>Channel (1–13)</label><input type="number" id="ch_2g" min="1" max="13" value="6"></div>
+        <div class="field"><label>Channel Width</label><select id="width_2g"><option value="20">20 MHz</option></select></div>
       </div>
       <div class="iface-info" id="info_2g"></div>
     </div>
@@ -239,7 +240,9 @@
         <div class="field"><label>Interface</label><select id="iface_5g" onchange="loadIfaceInfo('5g')"><option value="">-- select --</option></select></div>
         <div class="field"><label>SSID</label><input type="text" id="ssid_5g" placeholder="HomeAssistant-AP-5G"></div>
         <div class="field"><label>Channel (36/40/44/48…)</label><input type="number" id="ch_5g" min="36" max="165" value="36"></div>
+        <div class="field"><label>Channel Width</label><select id="width_5g"><option value="20">20 MHz</option><option value="40">40 MHz</option><option value="80">80 MHz</option></select></div>
       </div>
+      <div class="hint">Wider channels can improve negotiated link rates, but they require compatible channels, adapters, and cleaner spectrum.</div>
       <div class="iface-info" id="info_5g"></div>
     </div>
   </div>
@@ -556,6 +559,7 @@ async function loadConfig() {
     document.getElementById(`iface_${r.band}`).value = r.interface || '';
     document.getElementById(`ssid_${r.band}`).value  = r.ssid      || '';
     document.getElementById(`ch_${r.band}`).value    = r.channel   || (r.band === '2g' ? 6 : r.band === '5g' ? 36 : 5);
+    document.getElementById(`width_${r.band}`).value = r.channel_width || '20';
     toggleBand(r.band);
     renderIfaceInfo(r.band, r.interface);
   });
@@ -586,6 +590,7 @@ function buildConfig() {
       interface: document.getElementById(`iface_${band}`).value,
       ssid:      document.getElementById(`ssid_${band}`).value,
       channel:   parseInt(document.getElementById(`ch_${band}`).value, 10),
+      channel_width: document.getElementById(`width_${band}`).value,
     })),
   };
 }

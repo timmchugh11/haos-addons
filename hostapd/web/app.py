@@ -37,8 +37,8 @@ DEFAULT_CONFIG = {
         "lease_time": "12h",
     },
     "radios": [
-        {"band": "2g", "enabled": True,  "interface": "wlan0", "ssid": "HomeAssistant-AP",    "channel": 6},
-        {"band": "5g", "enabled": False, "interface": "wlan1", "ssid": "HomeAssistant-AP-5G", "channel": 36},
+        {"band": "2g", "enabled": True,  "interface": "wlan0", "ssid": "HomeAssistant-AP",    "channel": 6,  "channel_width": "20"},
+        {"band": "5g", "enabled": False, "interface": "wlan1", "ssid": "HomeAssistant-AP-5G", "channel": 36, "channel_width": "80"},
         {"band": "6g", "enabled": False, "interface": "wlan2", "ssid": "HomeAssistant-AP-6G", "channel": 5},
     ],
 }
@@ -48,6 +48,7 @@ _procs = {}
 
 HW_MODE = {"2g": "g", "5g": "a", "6g": "a"}
 BAND_LABELS = {"2g": "2.4GHz", "5g": "5GHz", "6g": "6GHz"}
+RADIO_WIDTHS = {"2g": {"20"}, "5g": {"20", "40", "80"}, "6g": {"20"}}
 
 
 def _default_radio_map():
@@ -90,6 +91,9 @@ def normalize_config(cfg):
         merged["enabled"] = bool(merged.get("enabled"))
         merged["interface"] = str(merged.get("interface", ""))
         merged["ssid"] = str(merged.get("ssid", ""))
+        merged["channel_width"] = str(merged.get("channel_width", default_radio.get("channel_width", "20")))
+        if merged["channel_width"] not in RADIO_WIDTHS.get(band, {"20"}):
+            merged["channel_width"] = default_radio.get("channel_width", "20")
         normalized["radios"].append(merged)
 
     return normalized
@@ -250,6 +254,7 @@ def _validate_radio_selection(radio):
     ssid = radio.get("ssid", "").strip()
     channel = radio.get("channel")
     band_label = BAND_LABELS.get(band, band or "unknown")
+    channel_width = str(radio.get("channel_width", "20"))
 
     if not iface:
         return f"{band_label}: interface is required"
@@ -259,6 +264,8 @@ def _validate_radio_selection(radio):
         return f"{band_label}: SSID must be 32 characters or fewer"
     if channel is None:
         return f"{band_label}: channel is required"
+    if channel_width not in RADIO_WIDTHS.get(band, {"20"}):
+        return f"{band_label}: invalid channel width"
     if band == "6g" and _op_class_for_6ghz(int(channel)) is None:
         return "6 GHz channel must be a valid 20 MHz channel (1, 5, 9 ... 233)"
 
@@ -365,6 +372,42 @@ def _validate_dhcp_config(dhcp):
         "netmask": str(netmask),
         "lease_time": dhcp["lease_time"],
     }, None
+
+
+def _ht40_capab(channel):
+    try:
+        channel = int(channel)
+    except (TypeError, ValueError):
+        return None
+    if channel in {36, 44, 52, 60, 100, 108, 116, 124, 132, 149, 157}:
+        return "[HT40+]"
+    if channel in {40, 48, 56, 64, 104, 112, 120, 128, 136, 153, 161}:
+        return "[HT40-]"
+    return None
+
+
+def _vht_center_seg0(channel, width):
+    try:
+        channel = int(channel)
+    except (TypeError, ValueError):
+        return None
+    width = str(width)
+    if width == "40":
+        return channel + 2 if _ht40_capab(channel) == "[HT40+]" else channel - 2 if _ht40_capab(channel) == "[HT40-]" else None
+    if width != "80":
+        return None
+    groups = [
+        ({36, 40, 44, 48}, 42),
+        ({52, 56, 60, 64}, 58),
+        ({100, 104, 108, 112}, 106),
+        ({116, 120, 124, 128}, 122),
+        ({132, 136, 140, 144}, 138),
+        ({149, 153, 157, 161}, 155),
+    ]
+    for channels, center in groups:
+        if channel in channels:
+            return center
+    return None
 
 
 def get_debug_snapshot():
@@ -696,6 +739,7 @@ def apply_config(cfg):
         iface = radio["interface"]
         ssid = radio["ssid"]
         channel = int(radio["channel"])
+        channel_width = str(radio.get("channel_width", "20"))
         hw_mode = HW_MODE.get(band, "g")
 
         # Bring wifi iface up without IP — hostapd manages it via the bridge
@@ -725,7 +769,24 @@ def apply_config(cfg):
                 f.write("ieee80211n=1\n")
             elif band == "5g":
                 f.write("ieee80211n=1\n")
-                f.write("ieee80211ac=1\n")
+                if channel_width in {"40", "80"}:
+                    ht_capab = _ht40_capab(channel)
+                    if ht_capab:
+                        f.write(f"ht_capab={ht_capab}\n")
+                if channel_width in {"40", "80"}:
+                    f.write("ieee80211ac=1\n")
+                if channel_width == "40":
+                    center = _vht_center_seg0(channel, channel_width)
+                    if center is None:
+                        return {"ok": False, "message": f"5GHz: channel {channel} does not support 40 MHz width"}
+                    f.write("vht_oper_chwidth=0\n")
+                    f.write(f"vht_oper_centr_freq_seg0_idx={center}\n")
+                elif channel_width == "80":
+                    center = _vht_center_seg0(channel, channel_width)
+                    if center is None:
+                        return {"ok": False, "message": f"5GHz: channel {channel} does not support 80 MHz width"}
+                    f.write("vht_oper_chwidth=1\n")
+                    f.write(f"vht_oper_centr_freq_seg0_idx={center}\n")
             elif band == "6g":
                 op_class = _op_class_for_6ghz(channel)
                 if op_class is None:
