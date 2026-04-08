@@ -1,6 +1,71 @@
 import * as THREE from './vendor/three/build/three.module.js';
 import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 
+const MODEL_CACHE_NAME = 'van-model-cache-v2';
+const MODEL_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function createCachedResponse(response) {
+  const headers = new Headers(response.headers);
+  headers.set('x-van-model-cached-at', String(Date.now()));
+  return response.blob().then((blob) => new Response(blob, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  }));
+}
+
+async function resolveModelSource(modelUrl) {
+  const resolvedUrl = new URL(modelUrl, window.location.href).toString();
+  if (!('caches' in window)) {
+    return { url: resolvedUrl, revoke() {} };
+  }
+
+  const cache = await caches.open(MODEL_CACHE_NAME);
+  const cached = await cache.match(resolvedUrl);
+  const cachedAt = Number.parseInt(cached?.headers.get('x-van-model-cached-at') || '0', 10);
+  const isFresh = cached && cachedAt && (Date.now() - cachedAt) < MODEL_CACHE_TTL_MS;
+
+  if (isFresh) {
+    const blob = await cached.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    return {
+      url: objectUrl,
+      revoke() {
+        URL.revokeObjectURL(objectUrl);
+      },
+    };
+  }
+
+  try {
+    const response = await fetch(resolvedUrl, { cache: 'force-cache' });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch model: ${response.status}`);
+    }
+
+    await cache.put(resolvedUrl, await createCachedResponse(response.clone()));
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    return {
+      url: objectUrl,
+      revoke() {
+        URL.revokeObjectURL(objectUrl);
+      },
+    };
+  } catch (error) {
+    if (cached) {
+      const blob = await cached.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      return {
+        url: objectUrl,
+        revoke() {
+          URL.revokeObjectURL(objectUrl);
+        },
+      };
+    }
+    throw error;
+  }
+}
+
 export function createVanScene(container, options = {}) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   const scene = new THREE.Scene();
@@ -23,6 +88,7 @@ export function createVanScene(container, options = {}) {
   let pointerDown = false;
   let lastX = 0;
   let lastY = 0;
+  let modelResource = null;
 
   const labelEntries = new Map();
   const labelSpecs = options.labelSpecs || {
@@ -188,12 +254,36 @@ export function createVanScene(container, options = {}) {
     object.updateMatrixWorld(true);
   }
 
-  loader.load(options.modelUrl || './van.glb', (gltf) => {
-    if (destroyed) return;
-    const model = gltf.scene;
-    fitModel(model);
-    modelGroup.clear();
-    modelGroup.add(model);
+  async function loadModel() {
+    const source = await resolveModelSource(options.modelUrl || './van.glb');
+    if (destroyed) {
+      source.revoke();
+      return;
+    }
+
+    modelResource?.revoke?.();
+    modelResource = source;
+
+    loader.load(source.url, (gltf) => {
+      if (destroyed) {
+        source.revoke();
+        if (modelResource === source) modelResource = null;
+        return;
+      }
+      const model = gltf.scene;
+      fitModel(model);
+      modelGroup.clear();
+      modelGroup.add(model);
+      source.revoke();
+      modelResource = null;
+    }, undefined, () => {
+      source.revoke();
+      if (modelResource === source) modelResource = null;
+    });
+  }
+
+  loadModel().catch((error) => {
+    console.error('Failed to load van model', error);
   });
 
   function resize() {
@@ -270,6 +360,7 @@ export function createVanScene(container, options = {}) {
     destroy() {
       destroyed = true;
       cancelAnimationFrame(frameId);
+      modelResource?.revoke?.();
       resizeObserver.disconnect();
       container.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);

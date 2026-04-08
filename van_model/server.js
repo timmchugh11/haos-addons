@@ -48,7 +48,14 @@ app.use((req, res, next) => {
 app.get('/vendor/three/build/three.core.js', (_req, res) => {
   res.sendFile(path.join(__dirname, 'node_modules', 'three', 'build', 'three.core.js'));
 });
-app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.use(express.static(path.join(__dirname, 'public'), {
+  index: false,
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.glb')) {
+      res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=2592000');
+    }
+  },
+}));
 
 function injectBase(html, req) {
   const base = req.headers['x-ingress-path'] || '';
