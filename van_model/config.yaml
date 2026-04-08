@@ -1,6 +1,6 @@
 name: "Van Power 3D"
 description: "Experimental 3D van power dashboard and Lovelace card backed by Home Assistant sensor states"
-version: "0.1.0"
+version: "0.1.1"
 slug: "van_model"
 init: false
 stage: "experimental"

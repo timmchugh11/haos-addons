@@ -10,10 +10,10 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#090b0f;
-  --surface:#11151a;
-  --surface-2:#171c22;
-  --surface-3:#1d242c;
+  --bg:transparent;
+  --surface:rgba(17,21,26,0.68);
+  --surface-2:rgba(23,28,34,0.6);
+  --surface-3:rgba(29,36,44,0.52);
   --border:rgba(255,255,255,0.08);
   --text:#f4f6f9;
   --muted:#9ca7b3;
@@ -23,14 +23,14 @@
   --header-h:62px;
   --sidebar-w:220px;
 }
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+html,body{height:100%;background:transparent;color:var(--text);font-family:Inter,system-ui,sans-serif}
 button,a{font:inherit;color:inherit;text-decoration:none}
-#app{display:flex;flex-direction:column;height:100vh}
+#app{display:flex;flex-direction:column;height:100vh;background:transparent}
 header{
   height:var(--header-h);
   display:flex;align-items:center;gap:16px;padding:0 26px;
   border-bottom:1px solid var(--border);
-  background:rgba(9,11,15,0.94);
+  background:rgba(9,11,15,0.38);
   backdrop-filter:blur(16px);
 }
 .brand{display:flex;flex-direction:column}
@@ -49,7 +49,8 @@ header{
 .body-wrap{display:flex;flex:1;min-height:0}
 nav{
   width:var(--sidebar-w);padding:18px 0;border-right:1px solid var(--border);
-  background:#0d1014;overflow:auto
+  background:rgba(13,16,20,0.28);overflow:auto;
+  backdrop-filter:blur(14px)
 }
 .nav-group{
   padding:0 20px 10px;color:var(--muted);font-size:10px;font-weight:800;
@@ -67,8 +68,9 @@ main{flex:1;overflow:auto;padding:26px}
 .hero{
   margin-top:24px;padding:18px;border:1px solid var(--border);border-radius:24px;
   background:
-    radial-gradient(circle at top, rgba(255,255,255,0.1), transparent 35%),
-    linear-gradient(180deg, #11161c 0%, #0b0e12 100%);
+    radial-gradient(circle at top, rgba(255,255,255,0.08), transparent 35%),
+    linear-gradient(180deg, rgba(17,22,28,0.42) 0%, rgba(11,14,18,0.18) 100%);
+  backdrop-filter:blur(16px);
 }
 .hero-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
 .hero-copy h2{font-size:20px;font-weight:800;letter-spacing:-0.03em}
@@ -81,9 +83,10 @@ main{flex:1;overflow:auto;padding:26px}
 .stage{
   position:relative;min-height:620px;border-radius:20px;overflow:hidden;
   background:
-    radial-gradient(circle at 50% 45%, rgba(133,145,159,0.18), transparent 30%),
-    linear-gradient(180deg, #1a2027 0%, #0a0d11 100%);
-  border:1px solid rgba(255,255,255,0.05)
+    radial-gradient(circle at 50% 45%, rgba(133,145,159,0.12), transparent 30%),
+    linear-gradient(180deg, rgba(26,32,39,0.18) 0%, rgba(10,13,17,0.04) 100%);
+  border:1px solid rgba(255,255,255,0.05);
+  backdrop-filter:blur(10px)
 }
 .stage-canvas{position:absolute;inset:0;touch-action:none}
 .stage-canvas canvas{display:block;width:100%;height:100%}
@@ -119,10 +122,11 @@ main{flex:1;overflow:auto;padding:26px}
 .tbl th{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase}
 pre{
   margin-top:16px;padding:16px;border-radius:16px;overflow:auto;
-  background:#0c1015;border:1px solid rgba(255,255,255,0.05);color:#e4edf6
+  background:rgba(12,16,21,0.46);border:1px solid rgba(255,255,255,0.05);color:#e4edf6;
+  backdrop-filter:blur(12px)
 }
 .info-list{display:grid;gap:12px;margin-top:18px}
-.info-line{padding:14px 16px;border-radius:14px;background:var(--surface-2);border:1px solid rgba(255,255,255,0.05)}
+.info-line{padding:14px 16px;border-radius:14px;background:var(--surface-2);border:1px solid rgba(255,255,255,0.05);backdrop-filter:blur(12px)}
 .info-line strong{display:block;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)}
 .info-line span{display:block;margin-top:6px;font-size:14px;font-weight:600;word-break:break-all}
 @media (max-width: 980px){
