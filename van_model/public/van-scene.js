@@ -44,14 +44,6 @@ export function createVanScene(container, options = {}) {
   rimLight.position.set(0, 7, -12);
   scene.add(rimLight);
 
-  const ground = new THREE.Mesh(
-    new THREE.CircleGeometry(7.5, 64),
-    new THREE.MeshBasicMaterial({ color: 0x06090c, transparent: true, opacity: 0.55 })
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -1.8;
-  scene.add(ground);
-
   function updateCamera() {
     camera.position.set(
       Math.sin(rotationY) * radius,
@@ -143,6 +135,7 @@ export function createVanScene(container, options = {}) {
 
     rotationY += (targetRotationY - rotationY) * 0.08;
     pitch += (targetPitch - pitch) * 0.08;
+    options.onFrame?.({ rotationY, pitch });
     updateCamera();
     renderer.render(scene, camera);
   }
@@ -150,6 +143,9 @@ export function createVanScene(container, options = {}) {
   render();
 
   return {
+    getRotation() {
+      return rotationY;
+    },
     resize,
     destroy() {
       destroyed = true;

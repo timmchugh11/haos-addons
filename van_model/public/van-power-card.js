@@ -23,6 +23,8 @@ class VanPowerCard extends HTMLElement {
     this._config = { ...DEFAULT_CONFIG };
     this._scene = null;
     this._elements = {};
+    this._spinLabels = false;
+    this._labelRefs = {};
   }
 
   setConfig(config) {
@@ -65,6 +67,50 @@ class VanPowerCard extends HTMLElement {
     this._elements[`${prefix}-watt`].textContent = this.format(wattId, 'W');
   }
 
+  updateLabelLayout(rotation = 0) {
+    const specs = {
+      solar: { angle: -2.72, radiusX: 0.37, radiusY: 0.14 },
+      grid: { angle: -0.78, radiusX: 0.35, radiusY: 0.26 },
+      alternator: { angle: 2.45, radiusX: 0.31, radiusY: 0.24 },
+      battery: { angle: 0.62, radiusX: 0.33, radiusY: 0.2 },
+    };
+
+    Object.entries(specs).forEach(([key, spec]) => {
+      const label = this._labelRefs[key];
+      if (!label) return;
+
+      if (!this._spinLabels) {
+        label.style.left = '';
+        label.style.top = '';
+        label.style.right = '';
+        label.style.bottom = '';
+        label.style.transform = '';
+        label.style.transformOrigin = '';
+        label.style.alignItems = '';
+        return;
+      }
+
+      const angle = spec.angle + rotation;
+      const x = 50 + Math.cos(angle) * (spec.radiusX * 100);
+      const y = 50 + Math.sin(angle) * (spec.radiusY * 100);
+      label.style.left = `${x}%`;
+      label.style.top = `${y}%`;
+      label.style.right = 'auto';
+      label.style.bottom = 'auto';
+      label.style.transform = `translate(-50%, -50%) rotate(${rotation}rad)`;
+      label.style.transformOrigin = 'center center';
+      label.style.alignItems = x >= 50 ? 'flex-end' : 'flex-start';
+    });
+  }
+
+  toggleSpinLabels() {
+    this._spinLabels = !this._spinLabels;
+    const toggle = this.shadowRoot.getElementById('spin-toggle');
+    toggle.textContent = this._spinLabels ? 'Labels Spin: On' : 'Labels Spin: Off';
+    toggle.classList.toggle('active', this._spinLabels);
+    this.updateLabelLayout(this._scene?.getRotation?.() || 0);
+  }
+
   render() {
     this.shadowRoot.innerHTML = `
       <style>
@@ -101,6 +147,30 @@ class VanPowerCard extends HTMLElement {
           border-radius:18px;
           overflow:hidden;
           background:transparent;
+        }
+        .toolbar{
+          position:absolute;
+          top:14px;
+          right:14px;
+          z-index:2;
+          pointer-events:auto;
+        }
+        .toggle{
+          border:1px solid rgba(255,255,255,0.14);
+          background:rgba(12,16,21,0.6);
+          color:#f5f7fa;
+          padding:8px 12px;
+          border-radius:999px;
+          font-size:12px;
+          font-weight:700;
+          letter-spacing:0.04em;
+          cursor:pointer;
+          backdrop-filter:blur(10px);
+        }
+        .toggle.active{
+          border-color:rgba(0,212,126,0.4);
+          background:rgba(0,212,126,0.14);
+          color:#b8ffe0;
         }
         .canvas{position:absolute;inset:0;touch-action:none}
         .canvas canvas{width:100%;height:100%;display:block}
@@ -146,27 +216,30 @@ class VanPowerCard extends HTMLElement {
       <ha-card>
         <div class="wrap">
           <div class="stage">
+            <div class="toolbar">
+              <button id="spin-toggle" class="toggle" type="button">Labels Spin: Off</button>
+            </div>
             <div class="canvas" id="scene"></div>
             <div class="overlay">
-              <div class="label solar">
+              <div class="label solar" id="label-solar">
                 <small>Solar</small>
                 <span id="solar-voltage">—</span>
                 <span id="solar-amp">—</span>
                 <span id="solar-watt">—</span>
               </div>
-              <div class="label grid">
+              <div class="label grid" id="label-grid">
                 <small>Hookup</small>
                 <span id="grid-voltage">—</span>
                 <span id="grid-amp">—</span>
                 <span id="grid-watt">—</span>
               </div>
-              <div class="label alternator">
+              <div class="label alternator" id="label-alternator">
                 <small>Alternator</small>
                 <span id="alternator-voltage">—</span>
                 <span id="alternator-amp">—</span>
                 <span id="alternator-watt">—</span>
               </div>
-              <div class="label battery">
+              <div class="label battery" id="label-battery">
                 <small>Battery</small>
                 <span id="battery-voltage">—</span>
                 <span id="battery-amp">—</span>
@@ -185,6 +258,11 @@ class VanPowerCard extends HTMLElement {
       this._elements[`${prefix}-watt`] = this.shadowRoot.getElementById(`${prefix}-watt`);
     });
     this._elements['battery-percent'] = this.shadowRoot.getElementById('battery-percent');
+    this._labelRefs.solar = this.shadowRoot.getElementById('label-solar');
+    this._labelRefs.grid = this.shadowRoot.getElementById('label-grid');
+    this._labelRefs.alternator = this.shadowRoot.getElementById('label-alternator');
+    this._labelRefs.battery = this.shadowRoot.getElementById('label-battery');
+    this.shadowRoot.getElementById('spin-toggle').addEventListener('click', () => this.toggleSpinLabels());
 
     if (!this._scene) {
       const modelUrl = new URL('./van.glb', import.meta.url).toString();
@@ -193,8 +271,11 @@ class VanPowerCard extends HTMLElement {
         interactive: true,
         autoRotate: true,
         autoRotateSpeed: 0.18,
+        onFrame: ({ rotationY }) => this.updateLabelLayout(rotationY),
       });
     }
+
+    this.updateLabelLayout(this._scene?.getRotation?.() || 0);
   }
 
   update() {
