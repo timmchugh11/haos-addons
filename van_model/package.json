@@ -1,6 +1,6 @@
 {
   "name": "van-power-3d",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "3D van dashboard and Lovelace card for Home Assistant",
   "main": "server.js",
   "type": "commonjs",

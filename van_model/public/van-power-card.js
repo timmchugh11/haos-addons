@@ -1,5 +1,8 @@
 import { createVanScene } from './van-scene.js';
 
+const LOCAL_MODEL_HOSTNAME = '192.168.1.10';
+const REMOTE_MODEL_URL = 'https://www.tmch.me/static/van.glb';
+
 const DEFAULT_CONFIG = {
   solar_voltage: 'sensor.epever_pv_voltage',
   solar_amp: 'sensor.epever_pv_current',
@@ -96,6 +99,12 @@ class VanPowerCard extends HTMLElement {
     };
   }
 
+  resolveModelUrl() {
+    return window.location.hostname === LOCAL_MODEL_HOSTNAME
+      ? new URL('./van.glb', import.meta.url).toString()
+      : REMOTE_MODEL_URL;
+  }
+
   render() {
     this.shadowRoot.innerHTML = `
       <style>
@@ -152,7 +161,7 @@ class VanPowerCard extends HTMLElement {
     `;
 
     if (!this._scene) {
-      const modelUrl = new URL('./van.glb', import.meta.url).toString();
+      const modelUrl = this.resolveModelUrl();
       this._scene = createVanScene(this.shadowRoot.getElementById('scene'), {
         modelUrl,
         interactive: true,
