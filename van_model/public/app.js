@@ -60,9 +60,13 @@ function buildSceneLabels(data) {
 }
 
 function updateMetricBlock(idPrefix, group) {
-  document.getElementById(`${idPrefix}-voltage`).textContent = fmtMetric(group?.voltage, 'V');
-  document.getElementById(`${idPrefix}-amp`).textContent = fmtMetric(group?.amp, 'A');
-  document.getElementById(`${idPrefix}-watt`).textContent = fmtMetric(group?.watt, 'W');
+  const voltageEl = document.getElementById(`${idPrefix}-voltage`);
+  const ampEl = document.getElementById(`${idPrefix}-amp`);
+  const wattEl = document.getElementById(`${idPrefix}-watt`);
+
+  if (voltageEl) voltageEl.textContent = fmtMetric(group?.voltage, 'V');
+  if (ampEl) ampEl.textContent = fmtMetric(group?.amp, 'A');
+  if (wattEl) wattEl.textContent = fmtMetric(group?.watt, 'W');
 }
 
 function updateConnection(ok) {
