@@ -69,31 +69,46 @@ class VanPowerCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         *{box-sizing:border-box}
+        :host{
+          display:block;
+          height:100%;
+          min-height:100%;
+        }
         ha-card{
+          height:100%;
+          min-height:calc(100vh - 32px);
+          display:flex;
+          flex-direction:column;
           overflow:hidden;
           border-radius:20px;
-          background:
-            radial-gradient(circle at top, rgba(255,255,255,0.12), transparent 40%),
-            linear-gradient(180deg, #14181d 0%, #090b0f 100%);
+          background:transparent;
+          box-shadow:none;
           color:#f5f7fa;
         }
-        .wrap{padding:18px}
+        .wrap{
+          padding:0;
+          flex:1;
+          display:flex;
+          min-height:0;
+        }
         .stage{
           position:relative;
-          min-height:520px;
-          border:1px solid rgba(255,255,255,0.08);
+          flex:1;
+          min-height:620px;
+          height:100%;
+          width:100%;
+          border:none;
           border-radius:18px;
           overflow:hidden;
-          background:
-            radial-gradient(circle at center, rgba(91,107,123,0.18), transparent 45%),
-            linear-gradient(180deg, #1b1f24 0%, #0c0f12 100%);
+          background:transparent;
         }
         .canvas{position:absolute;inset:0;touch-action:none}
         .canvas canvas{width:100%;height:100%;display:block}
         .overlay{
           position:relative;
           z-index:1;
-          min-height:520px;
+          min-height:100%;
+          height:100%;
           pointer-events:none;
           font-family:Inter,system-ui,sans-serif;
         }
@@ -122,6 +137,10 @@ class VanPowerCard extends HTMLElement {
           margin-top:8px;
           font-size:clamp(2.5rem, 6vw, 5rem);
           line-height:0.95;
+        }
+        @media (max-width: 900px){
+          ha-card{min-height:70vh}
+          .stage{min-height:540px}
         }
       </style>
       <ha-card>
