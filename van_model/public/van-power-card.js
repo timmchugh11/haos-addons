@@ -1,7 +1,5 @@
 import { createVanScene } from './van-scene.js';
 
-const LOCAL_MODEL_HOSTNAME = '192.168.1.10';
-
 const DEFAULT_CONFIG = {
   solar_voltage: 'sensor.epever_pv_voltage',
   solar_amp: 'sensor.epever_pv_current',
@@ -98,12 +96,6 @@ class VanPowerCard extends HTMLElement {
     };
   }
 
-  resolveModelUrl() {
-    return window.location.hostname === LOCAL_MODEL_HOSTNAME
-      ? new URL('./van.glb', import.meta.url).toString()
-      : `${window.location.origin}/api/van/model`;
-  }
-
   render() {
     this.shadowRoot.innerHTML = `
       <style>
@@ -160,7 +152,7 @@ class VanPowerCard extends HTMLElement {
     `;
 
     if (!this._scene) {
-      const modelUrl = this.resolveModelUrl();
+      const modelUrl = new URL('./van.glb', import.meta.url).toString();
       this._scene = createVanScene(this.shadowRoot.getElementById('scene'), {
         modelUrl,
         interactive: true,

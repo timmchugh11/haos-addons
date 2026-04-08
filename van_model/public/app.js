@@ -2,7 +2,6 @@ import { createVanScene } from './van-scene.js';
 
 const APP_CONFIG = window.__APP_CONFIG__ || {};
 const BASE = window.__BASE__ || '';
-const LOCAL_MODEL_HOSTNAME = '192.168.1.10';
 
 const demoConfig = {
   type: 'custom:van-power-card',
@@ -15,12 +14,6 @@ let refreshTimer = 0;
 
 function apiUrl(path) {
   return `${BASE}${path}`;
-}
-
-function resolveModelUrl() {
-  return window.location.hostname === LOCAL_MODEL_HOSTNAME
-    ? `${BASE}/van.glb`
-    : `${BASE}/api/van/model`;
 }
 
 function fmtMetric(sensor, fallbackUnit = '') {
@@ -168,7 +161,7 @@ function initNav() {
 
 function initScene() {
   scene = createVanScene(document.getElementById('stage-canvas'), {
-    modelUrl: resolveModelUrl(),
+    modelUrl: `${BASE}/van.glb`,
     interactive: true,
     autoRotate: true,
     autoRotateSpeed: 0.18,
