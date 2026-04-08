@@ -219,7 +219,7 @@ export function createVanScene(container, options = {}) {
     lastX = event.clientX;
     lastY = event.clientY;
     targetRotationY -= dx * 0.008;
-    targetPitch = Math.max(-0.18, Math.min(0.32, targetPitch - dy * 0.003));
+    targetPitch = Math.max(-0.18, Math.min(0.32, targetPitch + dy * 0.003));
   }
 
   function onPointerUp() {

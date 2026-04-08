@@ -134,7 +134,7 @@ async function refresh() {
     document.getElementById('stat-battery').textContent = fmtMetric(data.groups.battery?.watt, 'W');
     scene?.setLabels?.(buildSceneLabels(data));
     updateRawTable(data.sensors);
-    updateConnection(Object.values(data.sensors).every((sensor) => sensor.ok));
+    updateConnection(Object.values(data.sensors).some((sensor) => sensor.ok));
   } catch (error) {
     updateConnection(false);
     document.getElementById('last-updated').textContent = error.message;
