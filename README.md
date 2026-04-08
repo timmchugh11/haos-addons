@@ -38,7 +38,7 @@ Includes a bypass mode to hide all router pages when the Starlink router is not 
 
 ### Van Power 3D
 
-[![version](https://img.shields.io/badge/version-0.1.9-blue.svg)](van_model/config.yaml)
+[![version](https://img.shields.io/badge/version-0.1.10-blue.svg)](van_model/config.yaml)
 
 3D van power dashboard add-on with a rotating GLB model, Home Assistant sensor overlays,
 and a hosted `custom:van-power-card` Lovelace module for the same visual layout inside dashboards.

@@ -32,6 +32,8 @@ const APP_CONFIG = {
   modelUrl: './van.glb',
   entityMap: ENTITY_MAP,
 };
+const LOCAL_MODEL_HOSTNAME = '192.168.1.10';
+const REMOTE_MODEL_URL = 'https://www.tmch.me/static/van.glb';
 
 app.use(express.json());
 app.use((req, res, next) => {
@@ -150,6 +152,32 @@ async function buildSnapshot() {
 
 app.get('/api/config', (_req, res) => {
   res.json(APP_CONFIG);
+});
+
+app.get('/api/van/model', async (req, res) => {
+  const hostname = req.hostname || '';
+
+  if (hostname === LOCAL_MODEL_HOSTNAME) {
+    res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=2592000');
+    res.sendFile(path.join(__dirname, 'public', 'van.glb'));
+    return;
+  }
+
+  try {
+    const response = await fetch(REMOTE_MODEL_URL, { cache: 'force-cache' });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`Remote model fetch failed: ${response.status} ${detail}`.trim());
+    }
+
+    res.setHeader('Content-Type', response.headers.get('content-type') || 'model/gltf-binary');
+    res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=2592000');
+
+    const arrayBuffer = await response.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (error) {
+    res.status(502).json({ ok: false, error: error.message || String(error) });
+  }
 });
 
 app.get('/api/van/snapshot', async (_req, res) => {

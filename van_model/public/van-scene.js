@@ -1,7 +1,7 @@
 import * as THREE from './vendor/three/build/three.module.js';
 import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 
-const MODEL_CACHE_NAME = 'van-model-cache-v3';
+const MODEL_CACHE_NAME = 'van-model-cache-v4';
 const MODEL_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function createCachedResponse(response) {

@@ -3,7 +3,6 @@ import { createVanScene } from './van-scene.js';
 const APP_CONFIG = window.__APP_CONFIG__ || {};
 const BASE = window.__BASE__ || '';
 const LOCAL_MODEL_HOSTNAME = '192.168.1.10';
-const REMOTE_MODEL_URL = 'https://www.tmch.me/static/van.glb';
 
 const demoConfig = {
   type: 'custom:van-power-card',
@@ -21,7 +20,7 @@ function apiUrl(path) {
 function resolveModelUrl() {
   return window.location.hostname === LOCAL_MODEL_HOSTNAME
     ? `${BASE}/van.glb`
-    : REMOTE_MODEL_URL;
+    : `${BASE}/api/van/model`;
 }
 
 function fmtMetric(sensor, fallbackUnit = '') {

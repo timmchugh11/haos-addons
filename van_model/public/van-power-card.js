@@ -1,7 +1,6 @@
 import { createVanScene } from './van-scene.js';
 
 const LOCAL_MODEL_HOSTNAME = '192.168.1.10';
-const REMOTE_MODEL_URL = 'https://www.tmch.me/static/van.glb';
 
 const DEFAULT_CONFIG = {
   solar_voltage: 'sensor.epever_pv_voltage',
@@ -102,7 +101,7 @@ class VanPowerCard extends HTMLElement {
   resolveModelUrl() {
     return window.location.hostname === LOCAL_MODEL_HOSTNAME
       ? new URL('./van.glb', import.meta.url).toString()
-      : REMOTE_MODEL_URL;
+      : `${window.location.origin}/api/van/model`;
   }
 
   render() {
