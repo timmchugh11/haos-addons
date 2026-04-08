@@ -1,0 +1,62 @@
+name: "Van Power 3D"
+description: "Experimental 3D van power dashboard and Lovelace card backed by Home Assistant sensor states"
+version: "0.1.0"
+slug: "van_model"
+init: false
+stage: "experimental"
+
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+
+startup: services
+boot: auto
+
+ingress: true
+ingress_port: 3050
+panel_icon: mdi:van-passenger
+panel_title: Van Power
+
+ports:
+  3050/tcp: 3050
+ports_description:
+  3050/tcp: "Van Power 3D web interface and Lovelace card asset host"
+
+homeassistant_api: true
+
+options:
+  title: "Van Power"
+  refresh_seconds: 5
+  solar_voltage: "sensor.epever_pv_voltage"
+  solar_amp: "sensor.epever_pv_current"
+  solar_watt: "sensor.epever_pv_power"
+  battery_voltage: "sensor.epever_battery_voltage"
+  battery_amp: "sensor.battery_current"
+  battery_watt: "sensor.battery_wattage"
+  grid_voltage: "sensor.charger_hookup_voltage"
+  grid_amp: "sensor.charger_hookup_current"
+  grid_watt: "sensor.charger_hookup_power"
+  alternator_voltage: "sensor.charger_alternator_voltage"
+  alternator_amp: "sensor.charger_alternator_current"
+  alternator_watt: "sensor.charger_alternator_power"
+  battery_percent: "sensor.battery_percentage"
+
+schema:
+  title: str
+  refresh_seconds: int
+  solar_voltage: str
+  solar_amp: str
+  solar_watt: str
+  battery_voltage: str
+  battery_amp: str
+  battery_watt: str
+  grid_voltage: str
+  grid_amp: str
+  grid_watt: str
+  alternator_voltage: str
+  alternator_amp: str
+  alternator_watt: str
+  battery_percent: str

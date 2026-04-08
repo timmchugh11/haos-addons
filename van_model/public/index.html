@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Van Power 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#090b0f;
+  --surface:#11151a;
+  --surface-2:#171c22;
+  --surface-3:#1d242c;
+  --border:rgba(255,255,255,0.08);
+  --text:#f4f6f9;
+  --muted:#9ca7b3;
+  --green:#62d69b;
+  --amber:#f5b95d;
+  --blue:#77a7ff;
+  --header-h:62px;
+  --sidebar-w:220px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+button,a{font:inherit;color:inherit;text-decoration:none}
+#app{display:flex;flex-direction:column;height:100vh}
+header{
+  height:var(--header-h);
+  display:flex;align-items:center;gap:16px;padding:0 26px;
+  border-bottom:1px solid var(--border);
+  background:rgba(9,11,15,0.94);
+  backdrop-filter:blur(16px);
+}
+.brand{display:flex;flex-direction:column}
+.brand strong{font-size:15px;letter-spacing:0.16em;text-transform:uppercase}
+.brand span{font-size:11px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase}
+.spacer{flex:1}
+.conn-badge{
+  display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;
+  border:1px solid var(--border);font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
+}
+.conn-badge::before{content:"";width:8px;height:8px;border-radius:50%}
+.conn-badge.ok{color:var(--green);background:rgba(98,214,155,0.08)}
+.conn-badge.ok::before{background:var(--green)}
+.conn-badge.err{color:#ff8f8f;background:rgba(255,99,99,0.08)}
+.conn-badge.err::before{background:#ff8f8f}
+.body-wrap{display:flex;flex:1;min-height:0}
+nav{
+  width:var(--sidebar-w);padding:18px 0;border-right:1px solid var(--border);
+  background:#0d1014;overflow:auto
+}
+.nav-group{
+  padding:0 20px 10px;color:var(--muted);font-size:10px;font-weight:800;
+  letter-spacing:0.14em;text-transform:uppercase
+}
+.nav-link{
+  display:block;padding:12px 20px;color:#c6d0da;font-size:13px;font-weight:600
+}
+.nav-link.active,.nav-link:hover{background:var(--surface);color:#fff}
+main{flex:1;overflow:auto;padding:26px}
+.page{display:none}
+.page.active{display:block}
+.page-title{font-size:28px;font-weight:800;letter-spacing:-0.04em}
+.page-sub{margin-top:8px;color:var(--muted);max-width:760px}
+.hero{
+  margin-top:24px;padding:18px;border:1px solid var(--border);border-radius:24px;
+  background:
+    radial-gradient(circle at top, rgba(255,255,255,0.1), transparent 35%),
+    linear-gradient(180deg, #11161c 0%, #0b0e12 100%);
+}
+.hero-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
+.hero-copy h2{font-size:20px;font-weight:800;letter-spacing:-0.03em}
+.hero-copy p{margin-top:6px;color:var(--muted)}
+.pill{
+  display:inline-flex;align-items:center;padding:8px 12px;border-radius:999px;
+  border:1px solid var(--border);color:var(--amber);background:rgba(245,185,93,0.08);
+  font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase
+}
+.stage{
+  position:relative;min-height:620px;border-radius:20px;overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(133,145,159,0.18), transparent 30%),
+    linear-gradient(180deg, #1a2027 0%, #0a0d11 100%);
+  border:1px solid rgba(255,255,255,0.05)
+}
+.stage-canvas{position:absolute;inset:0;touch-action:none}
+.stage-canvas canvas{display:block;width:100%;height:100%}
+.stage-overlay{position:relative;z-index:1;min-height:620px;pointer-events:none}
+.metric{
+  position:absolute;display:flex;flex-direction:column;gap:6px;
+  text-shadow:0 2px 20px rgba(0,0,0,0.55)
+}
+.metric small{
+  font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted)
+}
+.metric span{font-size:clamp(1.1rem, 2.5vw, 2.2rem);font-weight:800;letter-spacing:-0.04em}
+.metric.solar{left:4%;top:35%}
+.metric.grid{right:5%;top:6%;align-items:flex-end}
+.metric.alternator{left:13%;bottom:24%}
+.metric.battery{right:7%;bottom:22%;align-items:flex-end}
+.metric .percent{font-size:clamp(3rem, 8vw, 5.4rem);line-height:0.94}
+.grid{
+  margin-top:22px;display:grid;gap:18px;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr))
+}
+.card,.box{
+  background:var(--surface);border:1px solid var(--border);border-radius:18px
+}
+.card{padding:18px}
+.card small{display:block;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase}
+.card strong{display:block;margin-top:10px;font-size:2rem;font-weight:800;letter-spacing:-0.05em}
+.box{padding:20px;margin-top:22px}
+.box h3{font-size:15px;font-weight:800;letter-spacing:-0.02em}
+.box p{margin-top:8px;color:var(--muted)}
+.tbl{width:100%;border-collapse:collapse;margin-top:18px}
+.tbl th,.tbl td{text-align:left;padding:12px 10px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px}
+.tbl th{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase}
+pre{
+  margin-top:16px;padding:16px;border-radius:16px;overflow:auto;
+  background:#0c1015;border:1px solid rgba(255,255,255,0.05);color:#e4edf6
+}
+.info-list{display:grid;gap:12px;margin-top:18px}
+.info-line{padding:14px 16px;border-radius:14px;background:var(--surface-2);border:1px solid rgba(255,255,255,0.05)}
+.info-line strong{display:block;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)}
+.info-line span{display:block;margin-top:6px;font-size:14px;font-weight:600;word-break:break-all}
+@media (max-width: 980px){
+  nav{display:none}
+  .stage,.stage-overlay{min-height:540px}
+  .metric.solar{left:5%;top:31%}
+  .metric.grid{right:5%;top:5%}
+  .metric.alternator{left:9%;bottom:18%}
+  .metric.battery{right:5%;bottom:16%}
+}
+@media (max-width: 640px){
+  header{padding:0 16px}
+  main{padding:16px}
+  .hero{padding:12px}
+  .hero-head{flex-direction:column;align-items:flex-start}
+  .stage,.stage-overlay{min-height:460px}
+  .metric span{font-size:1rem}
+  .metric .percent{font-size:2.4rem}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <strong id="app-title">Van Power</strong>
+      <span>3D Energy Dashboard</span>
+    </div>
+    <div class="spacer"></div>
+    <span class="conn-badge" id="conn-status">Connecting</span>
+  </header>
+  <div class="body-wrap">
+    <nav>
+      <div class="nav-group">Overview</div>
+      <a href="#dashboard" class="nav-link active" data-page="dashboard">Dashboard</a>
+      <a href="#entities" class="nav-link" data-page="entities">Sensor States</a>
+      <a href="#lovelace" class="nav-link" data-page="lovelace">Lovelace</a>
+    </nav>
+    <main>
+      <section class="page active" data-page="dashboard">
+        <h1 class="page-title">Van Power Overview</h1>
+        <p class="page-sub">Rotating 3D model with live Home Assistant power metrics positioned around the vehicle, using the same add-on shell style as the Starlink project.</p>
+        <div class="hero">
+          <div class="hero-head">
+            <div class="hero-copy">
+              <h2 id="hero-title">Van Power</h2>
+              <p id="last-updated">Waiting for sensor data</p>
+            </div>
+            <span class="pill" id="refresh-pill">5s refresh</span>
+          </div>
+          <div class="stage">
+            <div class="stage-canvas" id="stage-canvas"></div>
+            <div class="stage-overlay">
+              <div class="metric solar">
+                <small>Solar</small>
+                <span id="solar-voltage">—</span>
+                <span id="solar-amp">—</span>
+                <span id="solar-watt">—</span>
+              </div>
+              <div class="metric grid">
+                <small>Hookup</small>
+                <span id="grid-voltage">—</span>
+                <span id="grid-amp">—</span>
+                <span id="grid-watt">—</span>
+              </div>
+              <div class="metric alternator">
+                <small>Alternator</small>
+                <span id="alternator-voltage">—</span>
+                <span id="alternator-amp">—</span>
+                <span id="alternator-watt">—</span>
+              </div>
+              <div class="metric battery">
+                <small>Battery</small>
+                <span id="battery-voltage">—</span>
+                <span id="battery-amp">—</span>
+                <span id="battery-watt">—</span>
+                <span id="battery-percent" class="percent">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="card">
+            <small>Solar Power</small>
+            <strong id="stat-solar">—</strong>
+          </div>
+          <div class="card">
+            <small>Hookup Power</small>
+            <strong id="stat-grid">—</strong>
+          </div>
+          <div class="card">
+            <small>Alternator Power</small>
+            <strong id="stat-alternator">—</strong>
+          </div>
+          <div class="card">
+            <small>Battery Load</small>
+            <strong id="stat-battery">—</strong>
+            <small style="margin-top:10px">State Of Charge</small>
+            <strong id="battery-percent-chip" style="font-size:1.3rem;margin-top:6px">—</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" data-page="entities">
+        <h1 class="page-title">Sensor States</h1>
+        <p class="page-sub">Raw Home Assistant state values fetched by the add-on through the Supervisor-backed Home Assistant API.</p>
+        <div class="box">
+          <h3>Live Entity Snapshot</h3>
+          <div id="raw-table"></div>
+        </div>
+      </section>
+
+      <section class="page" data-page="lovelace">
+        <h1 class="page-title">Lovelace Setup</h1>
+        <p class="page-sub">The add-on also hosts a real `custom:van-power-card` module. Load it as a Lovelace resource, then use the YAML below.</p>
+        <div class="box">
+          <h3>Resource URL</h3>
+          <div class="info-list">
+            <div class="info-line">
+              <strong>JavaScript Module</strong>
+              <span id="resource-url">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="box">
+          <h3>Card Configuration</h3>
+          <pre id="yaml-snippet"></pre>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
