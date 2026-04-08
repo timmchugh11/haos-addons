@@ -22,13 +22,47 @@ function fmtMetric(sensor, fallbackUnit = '') {
   return `${sensor.state}${unit}`;
 }
 
+function buildSceneLabels(data) {
+  return {
+    solar: {
+      title: 'SOLAR',
+      lines: [
+        fmtMetric(data.groups.solar?.watt, 'W'),
+        fmtMetric(data.groups.solar?.amp, 'A'),
+        fmtMetric(data.groups.solar?.voltage, 'V'),
+      ],
+    },
+    grid: {
+      title: 'HOOKUP',
+      lines: [
+        fmtMetric(data.groups.grid?.watt, 'W'),
+        fmtMetric(data.groups.grid?.amp, 'A'),
+        fmtMetric(data.groups.grid?.voltage, 'V'),
+      ],
+    },
+    alternator: {
+      title: 'ALTERNATOR',
+      lines: [
+        fmtMetric(data.groups.alternator?.watt, 'W'),
+        fmtMetric(data.groups.alternator?.amp, 'A'),
+        fmtMetric(data.groups.alternator?.voltage, 'V'),
+      ],
+    },
+    battery: {
+      title: 'BATTERY',
+      lines: [
+        data.groups.battery?.percent?.ok ? `${data.groups.battery.percent.state}%` : '—',
+        fmtMetric(data.groups.battery?.amp, 'A'),
+        fmtMetric(data.groups.battery?.voltage, 'V'),
+      ],
+    },
+  };
+}
+
 function updateMetricBlock(idPrefix, group) {
-  const voltage = fmtMetric(group?.voltage, 'V');
-  const amp = fmtMetric(group?.amp, 'A');
-  const watt = fmtMetric(group?.watt, 'W');
-  document.getElementById(`${idPrefix}-voltage`).textContent = voltage;
-  document.getElementById(`${idPrefix}-amp`).textContent = amp;
-  document.getElementById(`${idPrefix}-watt`).textContent = watt;
+  document.getElementById(`${idPrefix}-voltage`).textContent = fmtMetric(group?.voltage, 'V');
+  document.getElementById(`${idPrefix}-amp`).textContent = fmtMetric(group?.amp, 'A');
+  document.getElementById(`${idPrefix}-watt`).textContent = fmtMetric(group?.watt, 'W');
 }
 
 function updateConnection(ok) {
@@ -98,6 +132,7 @@ async function refresh() {
     document.getElementById('stat-grid').textContent = fmtMetric(data.groups.grid?.watt, 'W');
     document.getElementById('stat-alternator').textContent = fmtMetric(data.groups.alternator?.watt, 'W');
     document.getElementById('stat-battery').textContent = fmtMetric(data.groups.battery?.watt, 'W');
+    scene?.setLabels?.(buildSceneLabels(data));
     updateRawTable(data.sensors);
     updateConnection(Object.values(data.sensors).every((sensor) => sensor.ok));
   } catch (error) {
@@ -127,6 +162,7 @@ function initScene() {
     interactive: true,
     autoRotate: true,
     autoRotateSpeed: 0.18,
+    labelsSpinWithModel: false,
   });
 }
 

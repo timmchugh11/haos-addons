@@ -5,22 +5,32 @@ export function createVanScene(container, options = {}) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
-  const clock = new THREE.Clock();
   const loader = new GLTFLoader();
 
   let destroyed = false;
-  let rootGroup = new THREE.Group();
-  let modelGroup = new THREE.Group();
+  const rootGroup = new THREE.Group();
+  const modelGroup = new THREE.Group();
+  const labelGroup = new THREE.Group();
   let rotationY = options.initialRotationY ?? -0.78;
   let targetRotationY = rotationY;
   let targetPitch = options.initialPitch ?? 0.08;
   let pitch = targetPitch;
   let radius = 11;
-  let lookAtY = options.lookAtY ?? -0.5;
+  let lookAtY = options.lookAtY ?? 0.1;
+  let labelsSpinWithModel = Boolean(options.labelsSpinWithModel);
   let frameId = 0;
+  let lastFrameTime = performance.now();
   let pointerDown = false;
   let lastX = 0;
   let lastY = 0;
+
+  const labelEntries = new Map();
+  const labelSpecs = options.labelSpecs || {
+    solar: { angle: -2.72, radius: 3.55, y: 1.15, scale: 1.95, title: 'SOLAR' },
+    grid: { angle: -0.78, radius: 3.45, y: 1.15, scale: 1.95, title: 'HOOKUP' },
+    alternator: { angle: 2.45, radius: 3.1, y: 1.15, scale: 1.95, title: 'ALTERNATOR' },
+    battery: { angle: 0.62, radius: 2.85, y: 1.15, scale: 2.1, title: 'BATTERY' },
+  };
 
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -28,6 +38,7 @@ export function createVanScene(container, options = {}) {
   container.appendChild(renderer.domElement);
 
   scene.add(rootGroup);
+  scene.add(labelGroup);
   rootGroup.add(modelGroup);
 
   scene.add(new THREE.AmbientLight(0xffffff, 1.8));
@@ -43,6 +54,107 @@ export function createVanScene(container, options = {}) {
   const rimLight = new THREE.DirectionalLight(0xffe1be, 1.6);
   rimLight.position.set(0, 7, -12);
   scene.add(rimLight);
+
+  function createLabelEntry(name, spec) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 320;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      toneMapped: false,
+      sizeAttenuation: true,
+    });
+
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(spec.scale * 1.6, spec.scale, 1);
+    labelGroup.add(sprite);
+
+    const entry = {
+      name,
+      spec,
+      canvas,
+      texture,
+      sprite,
+      title: spec.title || name.toUpperCase(),
+      lines: ['—', '—', '—'],
+    };
+    labelEntries.set(name, entry);
+    return entry;
+  }
+
+  function drawLabel(entry) {
+    const ctx = entry.canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, entry.canvas.width, entry.canvas.height);
+    ctx.textAlign = 'center';
+
+    ctx.fillStyle = 'rgba(0,0,0,0.32)';
+    ctx.font = '900 76px Inter, Arial, sans-serif';
+    ctx.fillText(entry.lines[0] || '—', entry.canvas.width / 2 + 8, 94 + 8);
+    ctx.font = '800 56px Inter, Arial, sans-serif';
+    ctx.fillText(entry.lines[1] || '—', entry.canvas.width / 2 + 6, 168 + 6);
+    ctx.fillText(entry.lines[2] || '—', entry.canvas.width / 2 + 6, 232 + 6);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.68)';
+    ctx.font = '700 22px Inter, Arial, sans-serif';
+    ctx.fillText(entry.title, entry.canvas.width / 2, 278);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 76px Inter, Arial, sans-serif';
+    ctx.fillText(entry.lines[0] || '—', entry.canvas.width / 2, 94);
+    ctx.font = '800 56px Inter, Arial, sans-serif';
+    ctx.fillText(entry.lines[1] || '—', entry.canvas.width / 2, 168);
+    ctx.fillText(entry.lines[2] || '—', entry.canvas.width / 2, 232);
+
+    entry.texture.needsUpdate = true;
+  }
+
+  function ensureLabel(name) {
+    return labelEntries.get(name) || createLabelEntry(name, labelSpecs[name] || {
+      angle: 0,
+      radius: 3,
+      y: 1.2,
+      scale: 1.95,
+      title: name.toUpperCase(),
+    });
+  }
+
+  function setLabel(name, payload = {}) {
+    const entry = ensureLabel(name);
+    entry.title = payload.title || entry.spec.title || entry.title;
+    entry.lines = Array.isArray(payload.lines) && payload.lines.length
+      ? payload.lines.slice(0, 3).map((line) => String(line))
+      : ['—', '—', '—'];
+    drawLabel(entry);
+  }
+
+  function setLabels(labels = {}) {
+    Object.entries(labels).forEach(([name, payload]) => setLabel(name, payload));
+  }
+
+  function updateLabelPositions() {
+    labelEntries.forEach((entry) => {
+      const orbit = labelsSpinWithModel ? rotationY : 0;
+      const angle = entry.spec.angle + orbit;
+      entry.sprite.position.set(
+        Math.cos(angle) * entry.spec.radius,
+        entry.spec.y,
+        Math.sin(angle) * entry.spec.radius
+      );
+    });
+  }
+
+  Object.entries(labelSpecs).forEach(([name, spec]) => {
+    const entry = createLabelEntry(name, spec);
+    drawLabel(entry);
+  });
 
   function updateCamera() {
     camera.position.set(
@@ -127,7 +239,9 @@ export function createVanScene(container, options = {}) {
   function render() {
     if (destroyed) return;
     frameId = requestAnimationFrame(render);
-    const delta = Math.min(clock.getDelta(), 0.05);
+    const now = performance.now();
+    const delta = Math.min((now - lastFrameTime) / 1000, 0.05);
+    lastFrameTime = now;
 
     if (!pointerDown && options.autoRotate !== false) {
       targetRotationY += delta * (options.autoRotateSpeed ?? 0.2);
@@ -135,16 +249,22 @@ export function createVanScene(container, options = {}) {
 
     rotationY += (targetRotationY - rotationY) * 0.08;
     pitch += (targetPitch - pitch) * 0.08;
-    options.onFrame?.({ rotationY, pitch });
+    updateLabelPositions();
     updateCamera();
     renderer.render(scene, camera);
   }
 
+  updateLabelPositions();
   render();
 
   return {
     getRotation() {
       return rotationY;
+    },
+    setLabels,
+    setLabelsSpinWithModel(enabled) {
+      labelsSpinWithModel = Boolean(enabled);
+      updateLabelPositions();
     },
     resize,
     destroy() {

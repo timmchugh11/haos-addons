@@ -172,6 +172,10 @@ app.get('/api/van/card-example', (_req, res) => {
   ].join('\n'));
 });
 
+app.get('/favicon.ico', (_req, res) => {
+  res.status(204).end();
+});
+
 function serveIndex(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(injectBase(INDEX_HTML, req));
