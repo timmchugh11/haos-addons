@@ -124,7 +124,6 @@ async function refresh() {
     updateMetricBlock('battery', data.groups.battery);
 
     const percent = data.groups.battery?.percent;
-    document.getElementById('battery-percent').textContent = percent?.ok ? `${percent.state}%` : '—';
     document.getElementById('battery-percent-chip').textContent = percent?.ok ? `${percent.state}%` : 'Offline';
     document.getElementById('hero-title').textContent = data.title;
     document.getElementById('last-updated').textContent = `Updated ${new Date(data.fetchedAt).toLocaleTimeString()}`;
