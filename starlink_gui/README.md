@@ -181,4 +181,4 @@ local Starlink devices.
 
 ## Current Version
 
-The add-on version is `1.1.28`.
+The add-on version is `1.1.29`.

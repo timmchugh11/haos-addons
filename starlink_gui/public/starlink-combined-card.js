@@ -20,13 +20,16 @@ class StarlinkCombinedCard extends HTMLElement {
     this._status = 'loading';
     this._error = '';
     this._resolveToken = 0;
+    this._resolving = false;
     this.render();
     this.ensureFrameSource();
   }
 
   set hass(hass) {
     this._hass = hass;
-    this.ensureFrameSource();
+    if (!this._frameSrc && this._status !== 'fallback' && !this._resolving) {
+      this.ensureFrameSource();
+    }
   }
 
   getCardSize() {
@@ -34,15 +37,21 @@ class StarlinkCombinedCard extends HTMLElement {
   }
 
   async ensureFrameSource() {
-    if (!this._config) return;
+    if (!this._config || this._resolving) return;
+    if (this._frameSrc && this._status === 'ready') return;
 
+    this._resolving = true;
     const token = ++this._resolveToken;
     const ingressPath = this._ingressPath || await this.resolveIngressPath();
-    if (token !== this._resolveToken) return;
+    if (token !== this._resolveToken) {
+      this._resolving = false;
+      return;
+    }
 
     if (!ingressPath) {
       this._status = 'fallback';
       this._error = 'No ingress path is available for the Starlink add-on.';
+      this._resolving = false;
       this.render();
       return;
     }
@@ -51,6 +60,7 @@ class StarlinkCombinedCard extends HTMLElement {
     this._frameSrc = buildFrameUrl(ingressPath, this._config);
     this._status = 'ready';
     this._error = '';
+    this._resolving = false;
     this.render();
   }
 
@@ -226,6 +236,8 @@ class StarlinkCombinedCard extends HTMLElement {
     this.shadowRoot.querySelector('.retry-btn')?.addEventListener('click', () => {
       this._status = 'loading';
       this._error = '';
+      this._frameSrc = '';
+      this._resolving = false;
       this.render();
       this.ensureFrameSource();
     });
