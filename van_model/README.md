@@ -31,9 +31,7 @@ The add-on ships with these defaults:
 
 ## Lovelace resource
 
-Add the card module as a Lovelace resource, for example:
-
-`http://HOME_ASSISTANT_HOST:3050/van-power-card.js`
+Open the add-on and use the **Lovelace Setup** page to copy the exact bundled module URL for your current Home Assistant origin and ingress path.
 
 Then use:
 

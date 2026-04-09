@@ -84,10 +84,6 @@ Open the add-on and use the **Lovelace Setup** page to copy the exact bundled mo
 That page uses the current Home Assistant origin plus the add-on ingress base path, matching the
 same pattern as `van_model` and working correctly through HA Cloud / ingress.
 
-If you are using direct local access instead of ingress, the resource URL is:
-
-`http://HOME_ASSISTANT_HOST:3000/starlink-combined-card.js`
-
 Then use:
 
 ```yaml
@@ -175,4 +171,4 @@ local Starlink devices.
 
 ## Current Version
 
-The add-on version is `1.1.25`.
+The add-on version is `1.1.26`.

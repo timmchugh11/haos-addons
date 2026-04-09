@@ -119,6 +119,22 @@ function updateDemoYaml() {
   ].join('\n');
 }
 
+async function copyResourceUrl() {
+  const value = document.getElementById('resource-url').textContent || '';
+  const button = document.getElementById('copy-resource-url');
+  if (!value || value === '—' || !button) return;
+  const original = button.textContent;
+  try {
+    await navigator.clipboard.writeText(value);
+    button.textContent = 'Copied';
+  } catch (_) {
+    button.textContent = 'Copy failed';
+  }
+  window.setTimeout(() => {
+    button.textContent = original;
+  }, 1500);
+}
+
 async function refresh() {
   try {
     const data = await fetchSnapshot();
@@ -157,6 +173,7 @@ function initNav() {
       if (page) showPage(page);
     });
   });
+  document.getElementById('copy-resource-url')?.addEventListener('click', copyResourceUrl);
 }
 
 function initScene() {

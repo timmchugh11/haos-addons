@@ -1080,6 +1080,7 @@ main:has(#page-dishy-alignment.active){
         <div class="info-line">
           <strong>JavaScript Module</strong>
           <span id="resource-url">—</span>
+          <button class="btn btn-primary btn-sm" id="copy-resource-url" type="button" style="margin-top:12px">Copy Link</button>
         </div>
       </div>
     </div>
@@ -2897,6 +2898,19 @@ function updateLovelaceSetup() {
   ].join('\n');
 }
 
+async function copyResourceUrl() {
+  const el = document.getElementById('resource-url');
+  const button = document.getElementById('copy-resource-url');
+  const text = el?.textContent || '';
+  if (!text || text === '—' || !button) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Resource URL copied', 'ok');
+  } catch (_) {
+    toast('Clipboard copy failed', 'err');
+  }
+}
+
 function fmtClockDuration(s) {
   if (s == null) return '—';
   const total = Math.max(0, Math.floor(Number(s) || 0));
@@ -2963,6 +2977,7 @@ async function init() {
     event.preventDefault();
     navigate(link.dataset.page);
   });
+  document.getElementById('copy-resource-url')?.addEventListener('click', copyResourceUrl);
 
   // Load server-side defaults (from HA add-on options / env vars)
   try {
