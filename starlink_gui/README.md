@@ -11,6 +11,7 @@ open directly from the HA sidebar without publishing a separate public endpoint.
 ![Starlink gui screenshot](img/starlink-gui.png)
 
 - Live dashboard with dish and router summary cards
+- Bundled Lovelace custom card module for the combined Starlink page
 - Dish pages for:
   - status
   - diagnostics
@@ -77,25 +78,31 @@ you can leave it internal and use ingress only.
 - Router pages are based on the fields your Starlink firmware actually returns;
   some fields may be sparse depending on hardware and firmware version
 
-## HA Dashboard Card Pages
+## Lovelace Resource
 
-This add-on also has a companion Lovelace card project:
-[homeassitant-starlink-card](https://github.com/timmchugh11/homeassitant-starlink-card).
+Open the add-on and use the **Lovelace Setup** page to copy the exact bundled module URL.
+That page uses the current Home Assistant origin plus the add-on ingress base path, matching the
+same pattern as `van_model` and working correctly through HA Cloud / ingress.
 
-That card embeds the Starlink GUI add-on inside a Home Assistant dashboard card
-using an iframe. It can automatically resolve the add-on ingress URL through
-the Home Assistant Supervisor API, and also supports a manual ingress path
-override if auto-detection is not available.
+If you are using direct local access instead of ingress, the resource URL is:
 
-The companion card supports:
+`http://HOME_ASSISTANT_HOST:3000/starlink-combined-card.js`
 
-- embedding the Starlink GUI directly in Lovelace
-- automatic add-on detection from installed Supervisor add-ons
-- manual ingress override
-- configurable aspect ratios, including percent values and `16:9` style ratios, basically the height
-- a simple visual editor in Home Assistant
+Then use:
 
-This add-on is required for that card to work.
+```yaml
+type: custom:starlink-combined-card
+title: Starlink
+aspect_ratio: 16:9
+```
+
+Optional card fields:
+
+- `height`: fixed iframe height such as `420px`
+- `dish_host`: override the dish host for this card only
+- `dish_port`: override the dish gRPC port for this card only
+- `router_host`: override the router host for this card only
+- `router_port`: override the router gRPC port for this card only
 
 ## Sky Obstruction Map
 
@@ -168,4 +175,4 @@ local Starlink devices.
 
 ## Current Version
 
-The add-on version is `1.1.22`.
+The add-on version is `1.1.24`.

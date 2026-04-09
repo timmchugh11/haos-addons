@@ -1,6 +1,6 @@
 name: "Starlink GUI"
-description: "Full router-style admin interface for your local Starlink dish and WiFi router via gRPC"
-version: "1.1.22"
+description: "Full router-style admin interface for your local Starlink dish and WiFi router via gRPC with a bundled Lovelace card module for the combined page"
+version: "1.1.24"
 slug: "starlink_gui"
 init: false
 stage: "stable"
@@ -25,7 +25,7 @@ panel_title: Starlink
 ports:
   3000/tcp: 3000
 ports_description:
-  3000/tcp: "Starlink GUI web interface (optional direct access)"
+  3000/tcp: "Starlink GUI web interface and Lovelace card asset host (optional direct access)"
 
 options:
   dish_host: "192.168.100.1"

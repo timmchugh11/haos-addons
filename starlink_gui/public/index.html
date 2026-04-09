@@ -632,6 +632,10 @@ main:has(#page-dishy-alignment.active){
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     Settings
   </a>
+  <a href="#lovelace" class="nav-link" data-page="lovelace">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18"/><path d="M3 12h18"/><path d="M3 19h18"/></svg>
+    Lovelace
+  </a>
 </nav>
 
 <!-- ── MAIN ── -->
@@ -1064,6 +1068,24 @@ main:has(#page-dishy-alignment.active){
           <input id="cfg-color-obstructed" type="color" value="#f7524a" oninput="saveObstructionColors()"/>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section id="page-lovelace" class="page">
+    <div class="page-title">Lovelace Setup</div>
+    <div class="page-sub">The add-on also hosts a real `custom:starlink-combined-card` module. Load it as a Lovelace resource, then use the YAML below.</div>
+    <div class="box">
+      <div class="box-title">Resource URL</div>
+      <div class="info-list">
+        <div class="info-line">
+          <strong>JavaScript Module</strong>
+          <span id="resource-url">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="box">
+      <div class="box-title">Card Configuration</div>
+      <pre id="yaml-snippet"></pre>
     </div>
   </section>
 
@@ -2864,6 +2886,16 @@ function escHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function updateLovelaceSetup() {
+  const cardModulePath = window.__CARD_MODULE_PATH__ || '/starlink-combined-card.js';
+  document.getElementById('resource-url').textContent = `${window.location.origin}${BASE}${cardModulePath}`;
+  document.getElementById('yaml-snippet').textContent = [
+    'type: custom:starlink-combined-card',
+    'title: Starlink',
+    'aspect_ratio: 16:9',
+  ].join('\n');
+}
+
 function fmtClockDuration(s) {
   if (s == null) return '—';
   const total = Math.max(0, Math.floor(Number(s) || 0));
@@ -2940,6 +2972,7 @@ async function init() {
     cfg.dishPort   = defaults.dishPort   || cfg.dishPort;
     cfg.routerHost = defaults.routerHost || cfg.routerHost;
     cfg.routerPort = defaults.routerPort || cfg.routerPort;
+    window.__CARD_MODULE_PATH__ = defaults.cardModulePath || '/starlink-combined-card.js';
   } catch (_) { /* fall back to hard-coded defaults */ }
 
   // Pre-populate settings form
@@ -2948,6 +2981,7 @@ async function init() {
   document.getElementById('cfg-router-host').value = cfg.routerHost;
   document.getElementById('cfg-router-port').value = cfg.routerPort;
   document.getElementById('cfg-interval').value    = String(getStoredRefreshInterval());
+  updateLovelaceSetup();
 
   const cols = getObstructionColors();
   document.getElementById('cfg-color-clear').value      = cols.clear;

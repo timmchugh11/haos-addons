@@ -21,6 +21,7 @@ const INDEX_HTML        = fs.readFileSync(path.join(__dirname, 'public', 'index.
 const OBSTRUCTION_HTML  = fs.readFileSync(path.join(__dirname, 'public', 'obstruction.html'),  'utf8');
 const ALIGNMENT_HTML    = fs.readFileSync(path.join(__dirname, 'public', 'alignment.html'),    'utf8');
 const COMBINED_HTML     = fs.readFileSync(path.join(__dirname, 'public', 'combined.html'),     'utf8');
+const CARD_MODULE_NAME  = 'starlink-combined-card.js';
 
 app.use(cors());
 app.use(express.json());
@@ -514,7 +515,17 @@ app.get('/api/config', (_req, res) => {
         dishPort:   DEFAULT_DISH_PORT,
         routerHost: DEFAULT_ROUTER_HOST,
         routerPort: DEFAULT_ROUTER_PORT,
+        cardModulePath: `/${CARD_MODULE_NAME}`,
+        cardType: 'custom:starlink-combined-card',
     });
+});
+
+app.get('/api/card-example', (_req, res) => {
+    res.type('text/plain; charset=utf-8').send([
+        'type: custom:starlink-combined-card',
+        'title: Starlink',
+        'aspect_ratio: 16:9',
+    ].join('\n'));
 });
 
 // ── Serve SPA — inject HA ingress base path so frontend fetch() calls work ────
