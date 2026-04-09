@@ -1,0 +1,6 @@
+{
+  "name": "van_power",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone HACS-compatible Home Assistant custom card for the Van Power 3D dashboard"
+}

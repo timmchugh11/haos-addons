@@ -29,7 +29,7 @@ open directly from the HA sidebar without publishing a separate public endpoint.
   - diagnostics
 - Auto-refresh support in the web UI
 - **Bypass mode** — hides all router pages and dashboard router cards when the Starlink router is not present (e.g., bypassed in favour of a third-party router)
-- Home Assistant ingress support plus optional direct access on port `3000`
+- Home Assistant ingress support, with optional direct access on port `3000`
 
 The UI is read-heavy by design. Dish control actions are available, but router
 write/config actions are not exposed in the frontend.
@@ -84,8 +84,8 @@ Add the bundled module as a Lovelace resource:
 
 `/local/starlink-gui/starlink-combined-card.js`
 
-The add-on publishes this file into Home Assistant's `www` folder at startup so Lovelace can load
-the module without needing an active ingress session first.
+The add-on publishes this file into Home Assistant's `www` folder at startup, so
+Lovelace can always load the card module from Home Assistant's `/local` path.
 
 Then use:
 
@@ -98,24 +98,24 @@ aspect_ratio: 16:9
 Optional card fields:
 
 - `height`: fixed iframe height such as `420px`
-- `ingress_path`: optional manual ingress path override if automatic ingress discovery is unavailable
+- `ingress_path`: manual ingress path override if automatic discovery is unavailable
 - `dish_host`: override the dish host for this card only
 - `dish_port`: override the dish gRPC port for this card only
 - `router_host`: override the router host for this card only
 - `router_port`: override the router gRPC port for this card only
 
-If the add-on ingress session is not active on a device, the card now shows a custom fallback with
-an **Open Add-on** link and a retry button instead of leaving the raw `401 Unauthorized` page visible.
-When the add-on UI is opened through ingress, it also stores the current ingress path in browser
-storage so the `/local` card can reuse that path on later loads before falling back to Supervisor
-API discovery.
+Important:
+
+- The card JavaScript is served from `/local`, but the embedded Starlink page still uses Home Assistant ingress.
+- If the ingress session is not active on a device, the card shows a custom fallback with a retry button instead of exposing the raw `401 Unauthorized` page.
+- When the add-on UI is opened through ingress, it stores the current ingress path in browser `localStorage` so the `/local` card can reuse it on later loads before falling back to Supervisor API discovery.
 
 ## Sky Obstruction Map
 
 The obstruction map page shows a live interactive 3D view of the sky above your
 dish, rendered from the signal data reported by the dish firmware.
 
-- **Drag** to rotate the view 
+- **Drag** to rotate the view
 - **Scroll** to zoom in and out
 - **Reset View** button returns to the default orientation
 - Cell colours: clear/tracked cells are shown in the "clear" colour, obstructed
