@@ -15,5 +15,8 @@ export DISH_HOST DISH_PORT ROUTER_HOST ROUTER_PORT
 bashio::log.info "Dish:   ${DISH_HOST}:${DISH_PORT}"
 bashio::log.info "Router: ${ROUTER_HOST}:${ROUTER_PORT}"
 bashio::log.info "Listening on port 3000"
+bashio::log.info "Publishing Lovelace card to /homeassistant/www/starlink-gui/starlink-combined-card.js"
+
+install -D -m 0644 /app/public/starlink-combined-card.js /homeassistant/www/starlink-gui/starlink-combined-card.js
 
 exec node /app/server.js

@@ -2889,8 +2889,7 @@ function escHtml(value) {
 }
 
 function updateLovelaceSetup() {
-  const cardModulePath = window.__CARD_MODULE_PATH__ || '/starlink-combined-card.js';
-  document.getElementById('resource-url').textContent = `${window.location.origin}${BASE}${cardModulePath}`;
+  document.getElementById('resource-url').textContent = '/local/starlink-gui/starlink-combined-card.js';
   document.getElementById('yaml-snippet').textContent = [
     'type: custom:starlink-combined-card',
     'title: Starlink',
@@ -2988,7 +2987,6 @@ async function init() {
     cfg.dishPort   = defaults.dishPort   || cfg.dishPort;
     cfg.routerHost = defaults.routerHost || cfg.routerHost;
     cfg.routerPort = defaults.routerPort || cfg.routerPort;
-    window.__CARD_MODULE_PATH__ = defaults.cardModulePath || '/starlink-combined-card.js';
   } catch (_) { /* fall back to hard-coded defaults */ }
 
   // Pre-populate settings form

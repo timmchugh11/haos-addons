@@ -1,6 +1,6 @@
 name: "Starlink GUI"
 description: "Full router-style admin interface for your local Starlink dish and WiFi router via gRPC with a bundled Lovelace card module for the combined page"
-version: "1.1.26"
+version: "1.1.27"
 slug: "starlink_gui"
 init: false
 stage: "stable"
@@ -20,6 +20,9 @@ ingress: true
 ingress_port: 3000
 panel_icon: mdi:satellite-uplink
 panel_title: Starlink
+
+map:
+  - homeassistant_config:rw
 
 # Optional direct port access (0 = disabled by default)
 ports:

@@ -80,9 +80,12 @@ you can leave it internal and use ingress only.
 
 ## Lovelace Resource
 
-Open the add-on and use the **Lovelace Setup** page to copy the exact bundled module URL.
-That page uses the current Home Assistant origin plus the add-on ingress base path, matching the
-same pattern as `van_model` and working correctly through HA Cloud / ingress.
+Add the bundled module as a Lovelace resource:
+
+`/local/starlink-gui/starlink-combined-card.js`
+
+The add-on publishes this file into Home Assistant's `www` folder at startup so Lovelace can load
+the module without needing an active ingress session first.
 
 Then use:
 
@@ -95,10 +98,14 @@ aspect_ratio: 16:9
 Optional card fields:
 
 - `height`: fixed iframe height such as `420px`
+- `ingress_path`: optional manual ingress path override if automatic ingress discovery is unavailable
 - `dish_host`: override the dish host for this card only
 - `dish_port`: override the dish gRPC port for this card only
 - `router_host`: override the router host for this card only
 - `router_port`: override the router gRPC port for this card only
+
+If the add-on ingress session is not active on a device, the card now shows a custom fallback with
+an **Open Add-on** link and a retry button instead of leaving the raw `401 Unauthorized` page visible.
 
 ## Sky Obstruction Map
 
@@ -171,4 +178,4 @@ local Starlink devices.
 
 ## Current Version
 
-The add-on version is `1.1.26`.
+The add-on version is `1.1.27`.
