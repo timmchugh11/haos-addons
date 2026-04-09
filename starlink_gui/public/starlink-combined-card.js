@@ -15,7 +15,7 @@ class StarlinkCombinedCard extends HTMLElement {
       aspect_ratio: '16:9',
       ...config,
     };
-    this._ingressPath = normalizeIngressPath(this._config.ingress_path || '');
+    this._ingressPath = normalizeIngressPath(this._config.ingress_path || '') || getStoredIngressPath();
     this._frameSrc = '';
     this._status = 'loading';
     this._error = '';
@@ -57,6 +57,11 @@ class StarlinkCombinedCard extends HTMLElement {
   async resolveIngressPath() {
     if (this._ingressPath) {
       return this._ingressPath;
+    }
+
+    const storedIngressPath = getStoredIngressPath();
+    if (storedIngressPath) {
+      return storedIngressPath;
     }
 
     const hass = this._hass;
@@ -334,6 +339,16 @@ function normalizeIngressPath(value) {
   if (!str) return '';
   if (/^https?:\/\//i.test(str)) return str;
   return str.startsWith('/') ? str : `/${str}`;
+}
+
+function getStoredIngressPath() {
+  try {
+    const value = window.localStorage.getItem('starlink_gui.ingress_path');
+    const normalized = normalizeIngressPath(value || '');
+    return normalized.startsWith('/api/hassio_ingress/') ? normalized : '';
+  } catch (_) {
+    return '';
+  }
 }
 
 function ensureTrailingSlash(value) {

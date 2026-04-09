@@ -1114,6 +1114,7 @@ const STORAGE_KEYS = {
   refreshInterval:   'starlink_gui.refresh_interval_secs',
   bypassMode:        'starlink_gui.bypass_mode',
   obstructionColors: 'starlink_gui.obstruction_colors',
+  ingressPath:       'starlink_gui.ingress_path',
 };
 
 let autoRefreshTimer = null;
@@ -2031,6 +2032,16 @@ function buildCellMesh() {
     mesh.instanceMatrix.needsUpdate = true;
     obstructionView.cellMeshes.push(mesh);
     mapOrientGroup.add(mesh);
+  }
+}
+
+function persistIngressPath(path) {
+  const value = String(path || '').trim();
+  if (!value || !value.startsWith('/api/hassio_ingress/')) return;
+  try {
+    window.localStorage.setItem(STORAGE_KEYS.ingressPath, value);
+  } catch (_) {
+    // Ignore storage failures.
   }
 }
 
@@ -2981,6 +2992,7 @@ async function init() {
   // Load server-side defaults (from HA add-on options / env vars)
   try {
     const base = window.__BASE__ || '';
+    persistIngressPath(base);
     const r = await fetch(base + '/api/config');
     const defaults = await r.json();
     cfg.dishHost   = defaults.dishHost   || cfg.dishHost;

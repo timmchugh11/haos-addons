@@ -106,6 +106,9 @@ Optional card fields:
 
 If the add-on ingress session is not active on a device, the card now shows a custom fallback with
 an **Open Add-on** link and a retry button instead of leaving the raw `401 Unauthorized` page visible.
+When the add-on UI is opened through ingress, it also stores the current ingress path in browser
+storage so the `/local` card can reuse that path on later loads before falling back to Supervisor
+API discovery.
 
 ## Sky Obstruction Map
 
@@ -178,4 +181,4 @@ local Starlink devices.
 
 ## Current Version
 
-The add-on version is `1.1.27`.
+The add-on version is `1.1.28`.
