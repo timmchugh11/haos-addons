@@ -83,28 +83,28 @@ dashboard.
 - [x] Disable room-server posting by default
 - [x] Disable high-risk bulk restores/contact imports by default
 - [x] Maintenance mode to block write-capable API actions
-- [ ] Radio parameter viewer: frequency, bandwidth, spreading factor, coding rate, TX power
-- [ ] Safe radio parameter editor with validation and confirmation
-- [ ] Repeater/admin login flow for managed nodes
-- [ ] Reboot and clock sync commands
-- [ ] Flood advert and zero-hop advert commands
-- [ ] Routing flags: repeat, loop detection, advert path hash size
-- [ ] Retransmit delay factors for flood/direct traffic
-- [ ] Duty cycle and airtime factor display/config
-- [ ] Multi-ACK enable/disable where supported
-- [ ] Flood hop limit config
+- [x] Radio parameter viewer: frequency, bandwidth, spreading factor, coding rate, TX power
+- [x] Safe radio parameter editor with validation and confirmation
+- [x] Repeater/admin login flow for managed nodes
+- [x] Reboot and clock sync commands
+- [x] Flood advert and zero-hop advert commands
+- [x] Routing flags: repeat, loop detection, advert path hash size
+- [x] Retransmit delay factors for flood/direct traffic
+- [x] Duty cycle and airtime factor display/config
+- [x] Multi-ACK enable/disable where supported
+- [x] Flood hop limit config
 - [ ] Region management: list, allow/block, home/default region, save
 - [ ] ACL viewer/editor for repeaters and room servers
 - [ ] Bridge status/config where firmware supports bridge features
 
 ## Priority 6 - Sensors, Telemetry, and Diagnostics
 
-- [ ] Sensor list and values when sensor support is compiled in
+- [x] Sensor list and values when sensor support is compiled in
 - [ ] Telemetry history charts
 - [ ] Battery calibration/admin controls where supported
-- [ ] Packet/event log viewer
-- [ ] Raw protocol event inspector for debugging
-- [ ] Connection health panel with reconnect attempts and last error
+- [x] Packet/event log viewer
+- [x] Raw protocol event inspector for debugging
+- [x] Connection health panel with reconnect attempts and last error
 - [ ] BLE pairing/status diagnostics
 - [ ] Serial port scanner and connection test endpoint
 - [ ] Simulator coverage for messages, contacts, channels, and map coordinates

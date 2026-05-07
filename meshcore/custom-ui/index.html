@@ -144,6 +144,7 @@ main{flex:1;overflow:auto;padding:30px}
       <a href="#nodes" data-page="nodes">Nodes</a>
       <a href="#channels" data-page="channels">Channels</a>
       <a href="#rooms" data-page="rooms">Room Servers</a>
+      <a href="#diagnostics" data-page="diagnostics">Diagnostics</a>
       <a href="#map" data-page="map">Map</a>
       <a href="#identity" data-page="identity">Identity</a>
       <a href="#admin" data-page="admin">Admin</a>
@@ -365,6 +366,42 @@ main{flex:1;overflow:auto;padding:30px}
         <div class="box"><table class="tbl"><thead><tr><th>Name</th><th>Public Key</th><th>Last Seen</th><th>Status</th></tr></thead><tbody id="roomsTable"></tbody></table></div>
         <div class="box"><div class="box-title">Room Response</div><pre id="roomOutput" class="status-line"></pre></div>
       </section>
+      <section id="diagnostics" class="page">
+        <h1 class="page-title">Diagnostics</h1>
+        <div class="page-sub">Sensor and connection diagnostics, protocol logs, and device health tests.</div>
+        <div class="grid">
+          <div class="box">
+            <div class="box-title">Connection Health</div>
+            <div class="kv">
+              <div>Connection</div><div id="diagConnection">-</div>
+              <div>Status</div><div id="diagStatus">-</div>
+              <div>Last Connect</div><div id="diagLastConnect">-</div>
+              <div>Last Disconnect</div><div id="diagLastDisconnect">-</div>
+              <div>Disconnect Reason</div><div id="diagDisconnectReason">-</div>
+              <div>Event Log</div><div id="diagLogCount">-</div>
+              <div>Reconnects</div><div id="diagReconnects">-</div>
+              <div>Transport</div><div id="diagTransport">-</div>
+              <div>Device</div><div id="diagDevice">-</div>
+            </div>
+            <div class="composer-actions">
+              <button id="connectionTest" class="btn" type="button">Run Connection Test</button>
+              <span id="connectionTestStatus" class="send-status"></span>
+            </div>
+          </div>
+          <div class="box">
+            <div class="box-title">Sensor Telemetry</div>
+            <table class="tbl"><thead><tr><th>Name</th><th>Type</th><th>Last Seen</th><th>Location</th><th>Telemetry</th></tr></thead><tbody id="sensorTable"></tbody></table>
+            <div id="sensorStatus" class="status-line"></div>
+          </div>
+          <div class="box">
+            <div class="box-title">Protocol / Event Log</div>
+            <div class="form-grid">
+              <div class="field"><label for="logFilter">Filter</label><input id="logFilter" placeholder="event type or payload"></div>
+            </div>
+            <table class="tbl"><thead><tr><th>Time</th><th>Event</th><th>Payload</th></tr></thead><tbody id="eventLogs"></tbody></table>
+          </div>
+        </div>
+      </section>
       <section id="map" class="page">
         <h1 class="page-title">Live Map</h1>
         <div class="page-sub">Leaflet live view of contacts that advertise latitude and longitude.</div>
@@ -426,9 +463,37 @@ main{flex:1;overflow:auto;padding:30px}
               <div>Battery</div><div id="identityBattery">-</div>
               <div>Storage</div><div id="identityStorage">-</div>
               <div>Radio</div><div id="identityRadio">-</div>
+              <div>Duty Cycle</div><div id="identityDuty">-</div>
+              <div>Airtime Factor</div><div id="identityAirtime">-</div>
               <div>Telemetry</div><div id="identityTelemetry">-</div>
               <div>Packet Stats</div><div id="identityPackets">-</div>
             </div>
+          </div>
+        </div>
+        <div class="box">
+          <div class="box-title">Radio Control</div>
+          <form id="radioForm" class="composer">
+            <div class="form-grid">
+              <div class="field"><label for="radioFreq">Frequency (MHz)</label><input id="radioFreq" type="number" step="0.001" min="0"></div>
+              <div class="field"><label for="radioBw">Bandwidth (kHz)</label><input id="radioBw" type="number" step="0.1" min="0"></div>
+              <div class="field"><label for="radioSf">Spreading Factor</label><input id="radioSf" type="number" step="1" min="5" max="12"></div>
+              <div class="field"><label for="radioCr">Coding Rate</label><input id="radioCr" type="number" step="1" min="5" max="8"></div>
+              <div class="field"><label for="radioTx">TX Power</label><input id="radioTx" type="number" step="1"></div>
+              <div class="field"><label for="radioDuty">Duty Cycle (%)</label><input id="radioDuty" type="number" step="0.1" min="0" max="100"></div>
+              <div class="field"><label for="radioAirtime">Airtime Factor</label><input id="radioAirtime" type="number" step="0.1" min="0.1" max="100"></div>
+              <div class="field"><label for="radioRxDelay">RX Delay</label><input id="radioRxDelay" type="number" step="1" min="0"></div>
+              <div class="field"><label for="radioAf">Anti-flood</label><input id="radioAf" type="number" step="1" min="0"></div>
+            </div>
+            <div class="composer-actions">
+              <span id="radioSaveStatus" class="send-status"></span>
+              <button class="btn" type="submit">Save Radio</button>
+            </div>
+          </form>
+          <div class="composer-actions">
+            <button id="rebootDevice" class="btn" type="button">Reboot Device</button>
+            <button id="syncClock" class="btn" type="button">Sync Clock</button>
+            <button id="sendFloodAdvert" class="btn" type="button">Send Flood Advert</button>
+            <button id="sendLocalAdvert" class="btn" type="button">Send Local Advert</button>
           </div>
         </div>
       </section>
@@ -450,6 +515,8 @@ main{flex:1;overflow:auto;padding:30px}
               <label class="toggle-row"><input id="adminContactWrites" type="checkbox"><div><strong>Contact writes</strong><span>Allow add, remove, trust, and metadata changes.</span></div></label>
               <label class="toggle-row"><input id="adminContactImport" type="checkbox"><div><strong>Contact import</strong><span>Allow importing meshcore:// contact cards.</span></div></label>
               <label class="toggle-row"><input id="adminIdentityWrites" type="checkbox"><div><strong>Identity writes</strong><span>Allow local name and advertised coordinate changes.</span></div></label>
+              <label class="toggle-row"><input id="adminRadioWrites" type="checkbox"><div><strong>Radio writes</strong><span>Allow changing radio frequency, bandwidth, SF, CR, and power.</span></div></label>
+              <label class="toggle-row"><input id="adminDeviceActions" type="checkbox"><div><strong>Device actions</strong><span>Allow reboot, clock sync, and advert commands.</span></div></label>
             </div>
             <div class="field">
               <label for="adminNote">Admin Note</label>
@@ -539,7 +606,7 @@ async function refresh() {
   setBadge('warn', 'Refreshing');
   try {
     const conversationFilter = state.selectedConversation ? state.selectedConversation.id : '';
-    const [stats, identity, messages, conversations, nodes, channels, rooms, mapData, admin] = await Promise.all([
+    const [stats, identity, messages, conversations, nodes, channels, rooms, mapData, admin, diagnostics, sensors, diagnosticLogs] = await Promise.all([
       getJson('stats'),
       getJson('identity'),
       getJson(`messages?${messageParams({ conversation: conversationFilter }).toString()}`),
@@ -549,9 +616,15 @@ async function refresh() {
       getJson('rooms'),
       getJson('map'),
       getJson('admin/settings'),
+      getJson('diagnostics'),
+      getJson('sensors'),
+      getJson('diagnostics/logs?limit=100'),
     ]);
     state.stats = stats;
     state.identity = identity;
+    state.diagnostics = diagnostics;
+    state.sensors = sensors;
+    state.diagnosticLogs = diagnosticLogs;
     state.messages = Array.isArray(messages) ? messages : (messages.items || []);
     state.messageTotal = Array.isArray(messages) ? state.messages.length : (messages.total || 0);
     state.conversations = conversations;
@@ -607,6 +680,7 @@ function render() {
   renderNodes();
   renderChannels();
   renderRooms();
+  renderDiagnostics();
   renderIdentity();
   renderAdmin();
 }
@@ -840,9 +914,20 @@ function renderIdentity() {
   $('identityBattery').textContent = bat.battery_mv ? `${bat.battery_mv} mV` : fmt(bat.mv || bat.voltage);
   $('identityStorage').textContent = bat.used_kb && bat.total_kb ? `${bat.used_kb}/${bat.total_kb} KB` : '-';
   $('identityRadio').textContent = self.radio_freq ? `${self.radio_freq} MHz / ${self.radio_bw} kHz / SF${self.radio_sf} / CR${self.radio_cr}` : '-';
+  $('identityDuty').textContent = self.duty_cycle !== undefined && self.duty_cycle !== null ? `${self.duty_cycle} %` : '-';
+  $('identityAirtime').textContent = self.airtime_factor !== undefined && self.airtime_factor !== null ? `${self.airtime_factor}` : '-';
   $('identityTelemetry').textContent = `base ${fmt(self.telemetry_mode_base, '0')}, loc ${fmt(self.telemetry_mode_loc, '0')}, env ${fmt(self.telemetry_mode_env, '0')}`;
   const packets = data.packet_stats || {};
   $('identityPackets').textContent = Object.keys(packets).length ? JSON.stringify(packets) : '-';
+  $('radioFreq').value = self.radio_freq ?? '';
+  $('radioBw').value = self.radio_bw ?? '';
+  $('radioSf').value = self.radio_sf ?? '';
+  $('radioCr').value = self.radio_cr ?? '';
+  $('radioTx').value = self.tx_power ?? '';
+  $('radioDuty').value = self.duty_cycle ?? '';
+  $('radioAirtime').value = self.airtime_factor ?? '';
+  $('radioRxDelay').value = self.radio_rx_delay ?? '';
+  $('radioAf').value = self.radio_af ?? '';
 }
 
 function renderAdmin() {
@@ -859,8 +944,72 @@ function renderAdmin() {
   $('adminContactWrites').checked = settings.allow_contact_writes !== false;
   $('adminContactImport').checked = !!settings.allow_contact_import;
   $('adminIdentityWrites').checked = settings.allow_identity_writes !== false;
+  $('adminRadioWrites').checked = settings.allow_radio_writes !== false;
+  $('adminDeviceActions').checked = settings.allow_device_actions !== false;
   $('adminNote').value = settings.admin_note || '';
   $('adminStatus').textContent = settings.maintenance_mode ? 'Maintenance mode' : 'Active';
+}
+
+function renderDiagnostics() {
+  const diag = state.diagnostics || {};
+  $('diagConnection').textContent = diag.connected ? 'Connected' : 'Disconnected';
+  $('diagStatus').textContent = fmt(diag.status, '-');
+  $('diagLastConnect').textContent = diag.last_connect_at ? new Date(diag.last_connect_at).toLocaleString() : '-';
+  $('diagLastDisconnect').textContent = diag.last_disconnect_at ? new Date(diag.last_disconnect_at).toLocaleString() : '-';
+  $('diagDisconnectReason').textContent = fmt(diag.last_disconnect_reason, '-');
+  $('diagLogCount').textContent = fmt(diag.log_count, '0');
+  $('diagReconnects').textContent = fmt(diag.connect_count, '0');
+  const transport = diag.transport || {};
+  $('diagTransport').textContent = transport.type ? `${fmt(transport.type, '')}${transport.ble_pin ? ` / PIN ${fmt(transport.ble_pin, '')}` : ''}` : '-';
+  $('diagDevice').textContent = fmt(transport.device, '-');
+  renderSensors();
+  renderEventLogs();
+}
+
+function renderSensors() {
+  const sensors = (state.sensors && state.sensors.sensors) || [];
+  const rows = sensors.map((sensor) => {
+    const location = sensor.location && sensor.location.valid ? `${Number(sensor.location.lat).toFixed(5)}, ${Number(sensor.location.lon).toFixed(5)}` : '-';
+    const telemetry = sensor.battery_mv
+      ? `${fmt(sensor.battery_mv, '0')} mV`
+      : sensor.location && sensor.location.source
+        ? `${fmt(sensor.location.source)} ${fmt(sensor.location.freshness)}`
+        : '-';
+    const lastSeen = sensor.last_seen ? new Date(sensor.last_seen).toLocaleString() : '-';
+    return `<tr><td>${escapeHtml(fmt(sensor.name))}</td><td>${escapeHtml(fmt(sensor.type))}</td><td>${escapeHtml(lastSeen)}</td><td>${escapeHtml(location)}</td><td>${escapeHtml(telemetry)}</td></tr>`;
+  }).join('');
+  $('sensorTable').innerHTML = rows || emptyRow(5, 'No sensor nodes discovered yet.');
+  const summaries = [];
+  if (state.sensors && state.sensors.self_telemetry) {
+    summaries.push(`Self telemetry: ${JSON.stringify(state.sensors.self_telemetry)}`);
+  }
+  if (state.sensors && state.sensors.custom_vars) {
+    summaries.push(`Custom vars: ${JSON.stringify(state.sensors.custom_vars)}`);
+  }
+  $('sensorStatus').textContent = summaries.length ? summaries.join(' | ') : 'Self telemetry unavailable.';
+}
+
+function renderEventLogs() {
+  const filter = $('logFilter') ? $('logFilter').value.trim().toLowerCase() : '';
+  const logs = state.diagnosticLogs || [];
+  const filtered = logs.filter((entry) => {
+    if (!filter) return true;
+    return entry.type.toLowerCase().includes(filter) || JSON.stringify(entry.payload).toLowerCase().includes(filter);
+  });
+  $('eventLogs').innerHTML = filtered.map((entry) => `<tr><td>${escapeHtml(entry.timestamp)}</td><td>${escapeHtml(entry.type)}</td><td>${escapeHtml(JSON.stringify(entry.payload))}</td></tr>`).join('') || emptyRow(3, 'No diagnostic events available.');
+}
+
+async function runDiagnosticsTest() {
+  if (!guardWrite('Run connection test')) return;
+  $('connectionTestStatus').textContent = 'Testing...';
+  try {
+    const result = await postJson('diagnostics/test', {});
+    $('connectionTestStatus').textContent = result.ok ? 'OK' : JSON.stringify(result);
+    await refresh();
+    return result;
+  } catch (err) {
+    $('connectionTestStatus').textContent = err.message;
+  }
 }
 
 async function saveAdmin(event) {
@@ -877,6 +1026,8 @@ async function saveAdmin(event) {
     allow_contact_writes:$('adminContactWrites').checked,
     allow_contact_import:$('adminContactImport').checked,
     allow_identity_writes:$('adminIdentityWrites').checked,
+    allow_radio_writes:$('adminRadioWrites').checked,
+    allow_device_actions:$('adminDeviceActions').checked,
     admin_note:$('adminNote').value.trim(),
   };
   $('adminSaveStatus').textContent = 'Saving...';
@@ -976,6 +1127,103 @@ async function saveIdentity(event) {
     await refresh();
   } catch (err) {
     $('identitySaveStatus').textContent = err.message;
+  }
+}
+
+async function saveRadio(event) {
+  event.preventDefault();
+  if (!guardWrite('Save radio configuration')) return;
+  $('radioSaveStatus').textContent = 'Saving...';
+  try {
+    const payload = {};
+    const freq = $('radioFreq').value.trim();
+    const bw = $('radioBw').value.trim();
+    const sf = $('radioSf').value.trim();
+    const cr = $('radioCr').value.trim();
+    const tx = $('radioTx').value.trim();
+    const rxDelay = $('radioRxDelay').value.trim();
+    const af = $('radioAf').value.trim();
+    if (freq !== '') payload.radio_freq = Number(freq);
+    if (bw !== '') payload.radio_bw = Number(bw);
+    if (sf !== '') payload.radio_sf = Number(sf);
+    if (cr !== '') payload.radio_cr = Number(cr);
+    if (tx !== '') payload.tx_power = Number(tx);
+    const duty = $('radioDuty').value.trim();
+    const airtime = $('radioAirtime').value.trim();
+    if (duty !== '') payload.duty_cycle = Number(duty);
+    if (airtime !== '') payload.airtime_factor = Number(airtime);
+    if (rxDelay !== '') payload.rx_delay = Number(rxDelay);
+    if (af !== '') payload.af = Number(af);
+    await patchJson('radio', payload);
+    $('radioSaveStatus').textContent = 'Saved';
+    await refresh();
+  } catch (err) {
+    $('radioSaveStatus').textContent = err.message;
+  }
+}
+
+async function rebootDevice() {
+  if (!guardWrite('Reboot the device')) return;
+  try {
+    await postJson('admin/reboot', {});
+    alert('Reboot command sent. The device may disconnect.');
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function syncClock() {
+  if (!guardWrite('Sync device clock')) return;
+  try {
+    await postJson('admin/clock-sync', {});
+    alert('Device clock synchronized.');
+    await refresh();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function sendFloodAdvert() {
+  if (!guardWrite('Send flood advert')) return;
+  try {
+    await postJson('admin/advert?flood=true', {});
+    alert('Flood advert command sent.');
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function sendLocalAdvert() {
+  if (!guardWrite('Send local advert')) return;
+  try {
+    await postJson('admin/advert', {});
+    alert('Local advert command sent.');
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function saveRouting(event) {
+  event.preventDefault();
+  if (!guardWrite('Save routing settings')) return;
+  $('routingSaveStatus').textContent = 'Saving...';
+  try {
+    const payload = {};
+    const scope = $('floodScope').value.trim();
+    const multiAcks = $('multiAcks').value.trim();
+    const hopLimit = $('hopLimit').value.trim();
+    if (scope !== '') payload.flood_scope = scope;
+    if (multiAcks !== '') payload.multi_acks = Number(multiAcks);
+    if (hopLimit !== '') payload.hop_limit = Number(hopLimit);
+    if (!Object.keys(payload).length) {
+      $('routingSaveStatus').textContent = 'Enter at least one routing setting';
+      return;
+    }
+    await patchJson('routing', payload);
+    $('routingSaveStatus').textContent = 'Saved';
+    await refresh();
+  } catch (err) {
+    $('routingSaveStatus').textContent = err.message;
   }
 }
 
@@ -1258,6 +1506,14 @@ $('contactForm').addEventListener('submit', addContact);
 $('importForm').addEventListener('submit', importContact);
 $('identityForm').addEventListener('submit', saveIdentity);
 $('exportSelf').addEventListener('click', exportSelfContact);
+$('radioForm').addEventListener('submit', saveRadio);
+$('routingForm').addEventListener('submit', saveRouting);
+$('connectionTest').addEventListener('click', runDiagnosticsTest);
+$('logFilter').addEventListener('input', renderEventLogs);
+$('rebootDevice').addEventListener('click', rebootDevice);
+$('syncClock').addEventListener('click', syncClock);
+$('sendFloodAdvert').addEventListener('click', sendFloodAdvert);
+$('sendLocalAdvert').addEventListener('click', sendLocalAdvert);
 $('adminForm').addEventListener('submit', saveAdmin);
 $('channelForm').addEventListener('submit', saveChannel);
 $('exportChannels').addEventListener('click', exportChannels);

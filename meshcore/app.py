@@ -14,6 +14,11 @@ from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+try:
+    from serial.tools import list_ports
+except ImportError:
+    list_ports = None  # type: ignore
+
 from meshcore import EventType, MeshCore
 
 
@@ -51,8 +56,12 @@ class MeshState:
         self.contact_meta: Dict[str, Dict[str, Any]] = {}
         self.admin_settings: Dict[str, Any] = {}
         self.messages: List[Dict[str, Any]] = []
+        self.event_logs: List[Dict[str, Any]] = []
         self.next_message_id = 1
         self.started_at = datetime.now(timezone.utc)
+        self.last_connect_at: Optional[datetime] = None
+        self.last_disconnect_at: Optional[datetime] = None
+        self.last_disconnect_reason: Optional[str] = None
         self.updated_at = self.started_at
 
     def set_status(self, status: str, connected: Optional[bool] = None) -> None:
@@ -66,6 +75,18 @@ class MeshState:
 state = MeshState()
 worker_loop: Optional[asyncio.AbstractEventLoop] = None
 meshcore_client: Optional[MeshCore] = None
+
+
+def discover_serial_ports() -> List[Dict[str, str]]:
+    if list_ports is None:
+        return []
+    try:
+        return [
+            {"device": str(port.device), "description": str(port.description), "hwid": str(port.hwid)}
+            for port in list_ports.comports()
+        ]
+    except Exception:
+        return []
 
 
 class SendMessageRequest(BaseModel):
@@ -132,6 +153,26 @@ class RoomPostRequest(BaseModel):
     password: str = Field(default="", max_length=128)
 
 
+class RadioUpdateRequest(BaseModel):
+    radio_freq: Optional[float] = None
+    radio_bw: Optional[float] = None
+    radio_sf: Optional[int] = None
+    radio_cr: Optional[int] = None
+    tx_power: Optional[int] = None
+    rx_delay: Optional[int] = None
+    af: Optional[int] = None
+
+
+class RoutingUpdateRequest(BaseModel):
+    flood_scope: Optional[str] = None
+    multi_acks: Optional[int] = None
+    hop_limit: Optional[int] = None
+
+
+class ContactLoginRequest(BaseModel):
+    password: str = Field(default="", max_length=128)
+
+
 class AdminSettingsRequest(BaseModel):
     allow_channel_messages: bool = True
     allow_direct_messages: bool = True
@@ -142,6 +183,8 @@ class AdminSettingsRequest(BaseModel):
     allow_room_sync: bool = True
     allow_channel_restore: bool = False
     allow_contact_import: bool = False
+    allow_radio_writes: bool = True
+    allow_device_actions: bool = True
     require_confirm_for_writes: bool = True
     maintenance_mode: bool = False
     admin_note: str = Field(default="", max_length=500)
@@ -202,6 +245,20 @@ def update_message(message_id: int, updates: Dict[str, Any]) -> Optional[Dict[st
                 save_messages()
                 return dict(message)
     return None
+
+
+def append_event_log(event: Any) -> None:
+    if event is None:
+        return
+    log_entry = {
+        "timestamp": utcnow(),
+        "type": event_type_value(event),
+        "payload": event_payload(event),
+    }
+    with state.lock:
+        state.event_logs.insert(0, log_entry)
+        state.event_logs = state.event_logs[:200]
+        state.updated_at = datetime.now(timezone.utc)
 
 
 def find_message(message_id: int) -> Optional[Dict[str, Any]]:
@@ -304,6 +361,8 @@ DEFAULT_ADMIN_SETTINGS: Dict[str, Any] = {
     "allow_room_sync": True,
     "allow_channel_restore": False,
     "allow_contact_import": False,
+    "allow_radio_writes": True,
+    "allow_device_actions": True,
     "require_confirm_for_writes": True,
     "maintenance_mode": False,
     "admin_note": "",
@@ -701,7 +760,18 @@ async def wire_events(mc: MeshCore) -> None:
         })
 
     async def on_disconnect(event) -> None:
-        state.set_status(f"Disconnected: {(event.payload or {}).get('reason', 'unknown')}", False)
+        reason = (event.payload or {}).get('reason', 'unknown')
+        with state.lock:
+            state.last_disconnect_at = datetime.now(timezone.utc)
+            state.last_disconnect_reason = str(reason)
+        state.set_status(f"Disconnected: {reason}", False)
+        append_event_log(event)
+
+    async def on_connect(event) -> None:
+        with state.lock:
+            state.last_connect_at = datetime.now(timezone.utc)
+        state.set_status("Connected", True)
+        append_event_log(event)
 
     async def on_new_contact(event) -> None:
         payload = event.payload or {}
@@ -710,6 +780,7 @@ async def wire_events(mc: MeshCore) -> None:
             with state.lock:
                 state.contacts[pubkey] = dict(payload)
                 state.updated_at = datetime.now(timezone.utc)
+        append_event_log(event)
 
     async def on_ack(event) -> None:
         payload = event.payload or {}
@@ -730,12 +801,27 @@ async def wire_events(mc: MeshCore) -> None:
                 state.updated_at = datetime.now(timezone.utc)
         if matched:
             save_messages()
+        append_event_log(event)
+
+    async def on_diagnostic_event(event) -> None:
+        append_event_log(event)
 
     mc.subscribe(EventType.CHANNEL_MSG_RECV, on_channel_msg)
     mc.subscribe(EventType.CONTACT_MSG_RECV, on_contact_msg)
     mc.subscribe(EventType.NEW_CONTACT, on_new_contact)
     mc.subscribe(EventType.DISCONNECTED, on_disconnect)
     mc.subscribe(EventType.ACK, on_ack)
+    mc.subscribe(EventType.CONNECTED, on_connect)
+    mc.subscribe(EventType.LOG_DATA, on_diagnostic_event)
+    mc.subscribe(EventType.RAW_DATA, on_diagnostic_event)
+    mc.subscribe(EventType.TELEMETRY_RESPONSE, on_diagnostic_event)
+    mc.subscribe(EventType.STATUS_RESPONSE, on_diagnostic_event)
+    mc.subscribe(EventType.ACL_RESPONSE, on_diagnostic_event)
+    mc.subscribe(EventType.MMA_RESPONSE, on_diagnostic_event)
+    mc.subscribe(EventType.ADVERTISEMENT, on_diagnostic_event)
+    mc.subscribe(EventType.PATH_UPDATE, on_diagnostic_event)
+    mc.subscribe(EventType.PATH_RESPONSE, on_diagnostic_event)
+    mc.subscribe(EventType.TRACE_DATA, on_diagnostic_event)
 
 
 async def load_initial_data(mc: MeshCore) -> None:
@@ -830,6 +916,8 @@ async def api_admin_settings() -> Dict[str, Any]:
             "allow_room_sync": "Login/sync room server history and ACL/status",
             "allow_channel_restore": "Bulk restore channel configuration from backup JSON",
             "allow_contact_import": "Import meshcore:// contact cards",
+            "allow_radio_writes": "Configure radio parameters like frequency, bandwidth, spreading factor, coding rate, and TX power",
+            "allow_device_actions": "Perform device actions such as reboot, clock sync, and adverts",
             "maintenance_mode": "Block all write operations except changing admin settings",
         },
     }
@@ -880,6 +968,86 @@ async def api_identity() -> Dict[str, Any]:
         }
 
 
+@app.get("/api/v1/diagnostics")
+async def api_diagnostics() -> Dict[str, Any]:
+    with state.lock:
+        event_counts: Dict[str, int] = {}
+        for entry in state.event_logs:
+            event_counts[entry["type"]] = event_counts.get(entry["type"], 0) + 1
+        transport_info: Dict[str, Any] = {"type": TRANSPORT, "device": DEVICE}
+        if TRANSPORT == "serial":
+            transport_info["serial_ports"] = discover_serial_ports()
+        elif TRANSPORT == "ble":
+            transport_info["ble_pin"] = BLE_PIN
+        return {
+            "connected": state.connected,
+            "status": state.status,
+            "device": state.device,
+            "device_info": state.device_info,
+            "started_at": state.started_at.isoformat(),
+            "last_updated": state.updated_at.isoformat(),
+            "last_connect_at": state.last_connect_at.isoformat() if state.last_connect_at else None,
+            "last_disconnect_at": state.last_disconnect_at.isoformat() if state.last_disconnect_at else None,
+            "last_disconnect_reason": state.last_disconnect_reason,
+            "log_count": len(state.event_logs),
+            "connect_count": event_counts.get("CONNECTED", 0),
+            "disconnect_count": event_counts.get("DISCONNECTED", 0),
+            "transport": transport_info,
+            "event_counts": event_counts,
+        }
+
+
+@app.get("/api/v1/diagnostics/logs")
+async def api_diagnostics_logs(limit: int = Query(default=100, ge=1, le=200)) -> Dict[str, Any]:
+    with state.lock:
+        return {
+            "total": len(state.event_logs),
+            "limit": limit,
+            "items": state.event_logs[:limit],
+        }
+
+
+@app.get("/api/v1/sensors")
+async def api_sensors() -> Dict[str, Any]:
+    sensors = []
+    with state.lock:
+        for pubkey, contact in state.contacts.items():
+            raw_type = int(contact.get("type", 0) or contact.get("adv_type", 0) or 0)
+            if raw_type == 4:
+                sensors.append(contact_display(pubkey, contact))
+        self_info = dict(state.device)
+    self_telemetry = None
+    custom_vars = None
+    if state.connected and meshcore_client and worker_loop:
+        try:
+            result = await run_device_command(meshcore_client.commands.get_self_telemetry())
+            self_telemetry = event_payload(result)
+        except HTTPException:
+            pass
+        try:
+            result = await run_device_command(meshcore_client.commands.get_custom_vars())
+            custom_vars = event_payload(result)
+        except HTTPException:
+            pass
+    return {
+        "self": self_info,
+        "self_telemetry": self_telemetry,
+        "custom_vars": custom_vars,
+        "sensors": sensors,
+    }
+
+
+@app.post("/api/v1/diagnostics/test")
+async def api_diagnostics_test() -> Dict[str, Any]:
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    try:
+        result = await run_device_command(meshcore_client.commands.get_time())
+    except HTTPException:
+        result = await run_device_command(meshcore_client.commands.get_bat())
+    return {"ok": True, "result": event_payload(result)}
+
+
 @app.patch("/api/v1/identity")
 async def api_update_identity(request: IdentityUpdateRequest) -> Dict[str, Any]:
     enforce_write("allow_identity_writes", "identity update")
@@ -901,6 +1069,132 @@ async def api_update_identity(request: IdentityUpdateRequest) -> Dict[str, Any]:
             with state.lock:
                 state.device = dict(result.payload)
     return await api_identity()
+
+
+@app.patch("/api/v1/radio")
+async def api_update_radio(request: RadioUpdateRequest) -> Dict[str, Any]:
+    enforce_write("allow_radio_writes", "radio update")
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    if request.radio_freq is not None or request.radio_bw is not None or request.radio_sf is not None or request.radio_cr is not None:
+        if None in (request.radio_freq, request.radio_bw, request.radio_sf, request.radio_cr):
+            raise HTTPException(status_code=400, detail="radio_freq, radio_bw, radio_sf, and radio_cr must all be provided together")
+        if request.radio_freq <= 0 or request.radio_bw <= 0:
+            raise HTTPException(status_code=400, detail="radio_freq and radio_bw must be greater than zero")
+        if request.radio_sf < 5 or request.radio_sf > 12:
+            raise HTTPException(status_code=400, detail="radio_sf must be between 5 and 12")
+        if request.radio_cr < 5 or request.radio_cr > 8:
+            raise HTTPException(status_code=400, detail="radio_cr must be between 5 and 8")
+        await run_device_command(meshcore_client.commands.set_radio(request.radio_freq, request.radio_bw, request.radio_sf, request.radio_cr))
+    if request.tx_power is not None:
+        await run_device_command(meshcore_client.commands.set_tx_power(request.tx_power))
+    if request.duty_cycle is not None:
+        if request.duty_cycle < 0 or request.duty_cycle > 100:
+            raise HTTPException(status_code=400, detail="duty_cycle must be between 0 and 100")
+        command = get_command_by_names(meshcore_client.commands, "set_duty_cycle", "set_dutycycle")
+        if not command:
+            raise HTTPException(status_code=501, detail="Duty cycle configuration is not supported by this MeshCore library")
+        await run_device_command(command(request.duty_cycle))
+    if request.airtime_factor is not None:
+        if request.airtime_factor <= 0 or request.airtime_factor > 100:
+            raise HTTPException(status_code=400, detail="airtime_factor must be greater than 0 and at most 100")
+        command = get_command_by_names(meshcore_client.commands, "set_airtime_factor", "set_airtimefactor", "set_airtime")
+        if not command:
+            raise HTTPException(status_code=501, detail="Airtime factor configuration is not supported by this MeshCore library")
+        await run_device_command(command(request.airtime_factor))
+    if request.rx_delay is not None or request.af is not None:
+        rx_delay = int(request.rx_delay or 0)
+        af = int(request.af or 0)
+        await run_device_command(meshcore_client.commands.set_tuning(rx_delay, af))
+    if meshcore_client:
+        result = await run_device_command(meshcore_client.commands.send_appstart())
+        if result and result.payload:
+            with state.lock:
+                state.device = dict(result.payload)
+    return await api_identity()
+
+
+@app.patch("/api/v1/routing")
+async def api_update_routing(request: RoutingUpdateRequest) -> Dict[str, Any]:
+    enforce_write("allow_radio_writes", "routing update")
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    updated: List[str] = []
+    if request.flood_scope is not None:
+        if not hasattr(meshcore_client.commands, "set_flood_scope"):
+            raise HTTPException(status_code=501, detail="Flood scope configuration is not supported by this MeshCore library")
+        await run_device_command(meshcore_client.commands.set_flood_scope(request.flood_scope))
+        updated.append("flood_scope")
+    if request.multi_acks is not None:
+        if request.multi_acks < 0 or request.multi_acks > 8:
+            raise HTTPException(status_code=400, detail="multi_acks must be between 0 and 8")
+        if not hasattr(meshcore_client.commands, "set_multi_acks"):
+            raise HTTPException(status_code=501, detail="Multi-ACK configuration is not supported by this MeshCore library")
+        await run_device_command(meshcore_client.commands.set_multi_acks(request.multi_acks))
+        updated.append("multi_acks")
+    if request.hop_limit is not None:
+        if request.hop_limit < 1 or request.hop_limit > 32:
+            raise HTTPException(status_code=400, detail="hop_limit must be between 1 and 32")
+        hop_cmd = None
+        for name in ("set_hop_limit", "set_flood_hop_limit", "set_hoplimit"):
+            if hasattr(meshcore_client.commands, name):
+                hop_cmd = getattr(meshcore_client.commands, name)
+                break
+        if not hop_cmd:
+            raise HTTPException(status_code=501, detail="Hop limit configuration is not supported by this MeshCore library")
+        await run_device_command(hop_cmd(request.hop_limit))
+        updated.append("hop_limit")
+    if not updated:
+        raise HTTPException(status_code=400, detail="no routing configuration provided")
+    return {"ok": True, "updated": updated}
+
+
+@app.post("/api/v1/admin/reboot")
+async def api_reboot_device() -> Dict[str, Any]:
+    enforce_write("allow_device_actions", "device reboot")
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    await run_device_command(meshcore_client.commands.reboot())
+    return {"ok": True, "action": "reboot_requested"}
+
+
+@app.post("/api/v1/admin/clock-sync")
+async def api_clock_sync() -> Dict[str, Any]:
+    enforce_write("allow_device_actions", "clock sync")
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    timestamp = int(time.time())
+    await run_device_command(meshcore_client.commands.set_time(timestamp))
+    return {"ok": True, "timestamp": timestamp}
+
+
+@app.post("/api/v1/admin/advert")
+async def api_send_advert(flood: bool = Query(default=False)) -> Dict[str, Any]:
+    enforce_write("allow_device_actions", "send advert")
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    result = await run_device_command(meshcore_client.commands.send_advert(flood=flood))
+    return {"ok": True, "flood": bool(flood), "result": event_payload(result)}
+
+
+@app.post("/api/v1/contacts/{key}/login")
+async def api_contact_login(key: str, request: ContactLoginRequest) -> Dict[str, Any]:
+    enforce_write("allow_room_sync", "contact login")
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    pubkey, contact = contact_by_key(key)
+    await run_device_command(meshcore_client.commands.send_login(contact, request.password))
+    return {"ok": True, "contact": pubkey}
+
+
+@app.get("/api/v1/contacts/{key}/acl")
+async def api_contact_acl(key: str) -> Dict[str, Any]:
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    pubkey, contact = contact_by_key(key)
+    acl_event = await run_device_command(meshcore_client.commands.req_acl_sync(contact, min_timeout=5))
+    payload = event_payload(acl_event)
+    return {"acl": payload, "read_only": infer_room_read_only(payload)}
 
 
 @app.get("/api/v1/stats")
