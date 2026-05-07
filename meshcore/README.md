@@ -62,4 +62,4 @@ permanent Home Assistant install.
 
 ## Version
 
-Current add-on version: `0.1.4`
+Current add-on version: `0.1.5`

@@ -25,9 +25,11 @@ ENV PATH="/opt/meshcore-venv/bin:${PATH}" \
 
 COPY requirements.txt /tmp/requirements.txt
 COPY patch_meshcore_serial.py /tmp/patch_meshcore_serial.py
+COPY patch_nicegui_ingress.py /tmp/patch_nicegui_ingress.py
 RUN pip install --upgrade pip setuptools wheel \
     && pip install -r /tmp/requirements.txt \
     && python /tmp/patch_meshcore_serial.py \
+    && python /tmp/patch_nicegui_ingress.py \
     && git clone --depth 1 https://github.com/pe1hvh/meshcore-gui.git /opt/meshcore-gui \
     && cd /opt/meshcore-gui \
     && git fetch --depth 1 origin "${MESHCORE_GUI_REF}" \
