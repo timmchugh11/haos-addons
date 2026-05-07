@@ -489,6 +489,18 @@ main{flex:1;overflow:auto;padding:30px}
               <button class="btn" type="submit">Save Radio</button>
             </div>
           </form>
+          <div class="box-title">Routing Configuration</div>
+          <form id="routingForm" class="composer">
+            <div class="form-grid">
+              <div class="field"><label for="floodScope">Flood Scope</label><input id="floodScope" placeholder="e.g. 0/1/2"></div>
+              <div class="field"><label for="multiAcks">Multi-ACKs</label><input id="multiAcks" type="number" step="1" min="0" max="8"></div>
+              <div class="field"><label for="hopLimit">Flood Hop Limit</label><input id="hopLimit" type="number" step="1" min="1" max="32"></div>
+            </div>
+            <div class="composer-actions">
+              <span id="routingSaveStatus" class="send-status"></span>
+              <button class="btn" type="submit">Save Routing</button>
+            </div>
+          </form>
           <div class="composer-actions">
             <button id="rebootDevice" class="btn" type="button">Reboot Device</button>
             <button id="syncClock" class="btn" type="button">Sync Clock</button>
