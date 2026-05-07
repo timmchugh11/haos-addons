@@ -59,3 +59,7 @@ permanent Home Assistant install.
 - Companion Protocol: https://docs.meshcore.io/companion_protocol/
 - MeshCore GUI: https://github.com/pe1hvh/meshcore-gui
 - MeshCore Python protocol library: https://github.com/meshcore-dev/meshcore_py
+
+## Version
+
+Current add-on version: `0.1.1`
