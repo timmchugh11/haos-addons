@@ -1,6 +1,6 @@
 # MeshCore GUI Add-on Documentation
 
-This add-on runs the upstream MeshCore GUI inside Home Assistant.
+This add-on runs a custom MeshCore web GUI inside Home Assistant.
 
 ## Quick Start
 
@@ -16,7 +16,12 @@ address, and confirm the host Bluetooth adapter is working.
 ## API
 
 The bundled GUI exposes read-only endpoints under `/api/v1/`, including stats,
-nodes, messages and channels. These are provided by the upstream application.
+nodes, messages and channels.
+
+## Roadmap
+
+See [TODO.md](TODO.md) for the remaining work toward full MeshCore companion
+feature coverage.
 
 ## References Used
 

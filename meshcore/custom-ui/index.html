@@ -51,6 +51,23 @@ main{flex:1;overflow:auto;padding:30px}
 .unit{font-size:11px;color:var(--muted);margin-top:6px}
 .green .value{color:var(--green)}.yellow .value{color:var(--yellow)}.red .value{color:var(--red)}
 .grid{display:grid;gap:16px;grid-template-columns:1.25fr .75fr}
+.message-grid{display:grid;gap:16px;grid-template-columns:320px 1fr}
+.conversation-list{display:grid;gap:8px}
+.conversation{width:100%;text-align:left;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);padding:12px}
+.conversation:hover,.conversation.active{border-color:#444;background:var(--surface3)}
+.conversation strong{display:block;font-size:13px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conversation span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.composer{display:grid;gap:12px}
+.composer-row{display:grid;gap:12px;grid-template-columns:160px 1fr}
+.field{display:grid;gap:6px}
+.field label{color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.field select,.field input,.field textarea{width:100%;background:#090909;color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:9px 10px;font:inherit}
+.field textarea{min-height:92px;resize:vertical}
+.composer-actions{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap}
+.check{display:inline-flex;align-items:center;gap:8px;color:var(--text2);font-size:12px;font-weight:700}
+.send-status{color:var(--muted);font-size:12px}
+.msg-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;border:1px solid var(--border2);border-radius:999px;padding:2px 7px;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
 .map-grid{display:grid;gap:16px;grid-template-columns:1fr 320px}
 .box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;min-width:0}
 .box-title{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;font-weight:650;margin-bottom:16px}
@@ -80,7 +97,7 @@ main{flex:1;overflow:auto;padding:30px}
   header{padding:0 16px}.brand-title{font-size:16px}.brand-sub{display:none}.layout{display:block;overflow:auto}
   nav{width:100%;display:flex;gap:4px;padding:8px;border-right:none;border-bottom:1px solid var(--border)}
   .nav-group{display:none}nav a{padding:10px 12px;border-radius:6px;white-space:nowrap}
-  main{padding:18px}.grid,.map-grid{grid-template-columns:1fr}.top-actions .btn{display:none}
+  main{padding:18px}.grid,.map-grid,.message-grid,.composer-row{grid-template-columns:1fr}.top-actions .btn{display:none}
 }
 </style>
 </head>
@@ -139,8 +156,53 @@ main{flex:1;overflow:auto;padding:30px}
       </section>
       <section id="messages" class="page">
         <h1 class="page-title">Messages</h1>
-        <div class="page-sub">Public and hashtag channel messages exposed by the read-only API.</div>
-        <div class="box"><table class="tbl"><thead><tr><th>Sender</th><th>Channel</th><th>Message</th><th>Route</th><th>Time</th></tr></thead><tbody id="messagesTable"></tbody></table></div>
+        <div class="page-sub">Channel and direct messages with send support through the connected MeshCore companion.</div>
+        <div class="message-grid">
+          <div class="box">
+            <div class="box-title">Conversations <span id="conversationCount">0</span></div>
+            <div id="conversationList" class="conversation-list"></div>
+          </div>
+          <div>
+            <div class="box">
+              <div class="box-title">Composer <span id="selectedConversation">No target selected</span></div>
+              <form id="composerForm" class="composer">
+                <div class="composer-row">
+                  <div class="field">
+                    <label for="targetType">Target</label>
+                    <select id="targetType">
+                      <option value="channel">Channel</option>
+                      <option value="direct">Direct</option>
+                    </select>
+                  </div>
+                  <div class="field" id="channelTargetField">
+                    <label for="channelTarget">Channel</label>
+                    <select id="channelTarget"></select>
+                  </div>
+                  <div class="field" id="directTargetField" style="display:none">
+                    <label for="directTarget">Contact or Public Key</label>
+                    <input id="directTarget" list="contactOptions" placeholder="contact name, prefix, or full public key">
+                    <datalist id="contactOptions"></datalist>
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="messageText">Message</label>
+                  <textarea id="messageText" maxlength="512" placeholder="Type a MeshCore message"></textarea>
+                </div>
+                <div class="composer-actions">
+                  <label class="check"><input id="retryDirect" type="checkbox" checked> Retry direct messages until ACK</label>
+                  <div>
+                    <span id="sendStatus" class="send-status"></span>
+                    <button id="sendBtn" class="btn" type="submit">Send</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <div class="box">
+              <div class="box-title">Message History <span id="messageScope">All</span></div>
+              <table class="tbl"><thead><tr><th>From</th><th>Target</th><th>Message</th><th>Status</th><th>Time</th></tr></thead><tbody id="messagesTable"></tbody></table>
+            </div>
+          </div>
+        </div>
       </section>
       <section id="nodes" class="page">
         <h1 class="page-title">Nodes</h1>
@@ -186,7 +248,8 @@ main{flex:1;overflow:auto;padding:30px}
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
 const state = {
-  stats:null, messages:[], nodes:[], channels:[], error:null,
+  stats:null, messages:[], conversations:[], nodes:[], channels:[], error:null,
+  selectedConversation:null,
   mapReady:false, map:null, tileLayer:null, heatLayer:null, markerLayer:null,
   labelsVisible:false,
 };
@@ -207,17 +270,30 @@ async function getJson(path) {
   return res.json();
 }
 
+async function postJson(path, payload) {
+  const res = await fetch(api(path), {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : `${path}: HTTP ${res.status}`);
+  return data;
+}
+
 async function refresh() {
   setBadge('warn', 'Refreshing');
   try {
-    const [stats, messages, nodes, channels] = await Promise.all([
+    const [stats, messages, conversations, nodes, channels] = await Promise.all([
       getJson('stats'),
-      getJson('messages?limit=100'),
+      getJson('messages?limit=200&scope=all'),
+      getJson('conversations'),
       getJson('nodes'),
       getJson('channels'),
     ]);
     state.stats = stats;
     state.messages = Array.isArray(messages) ? messages : (messages.items || []);
+    state.conversations = conversations;
     state.nodes = nodes;
     state.channels = channels;
     state.error = null;
@@ -244,8 +320,10 @@ function render() {
   $('channelSummary').textContent = `${state.channels.length} discovered`;
   $('nodeSummary').textContent = `${state.nodes.length} known`;
   $('messageCount').textContent = `${state.messages.length} loaded`;
-  $('statusLine').textContent = state.error ? state.error.message : 'Read-only dashboard refreshed successfully.';
+  $('statusLine').textContent = state.error ? state.error.message : 'Dashboard refreshed successfully.';
   renderMessages();
+  renderComposerOptions();
+  renderConversations();
   renderNodes();
   renderChannels();
 }
@@ -255,17 +333,113 @@ function emptyRow(cols, text) {
 }
 
 function renderMessages() {
-  const rows = state.messages.map((m) => {
-    const sender = fmt(m.sender || m.sender_name || m.sender_pubkey || m.pubkey_prefix);
-    const channel = fmt(m.channel_name || m.channel || 'Public');
+  const selected = state.selectedConversation;
+  const visible = selected ? state.messages.filter((m) => conversationIdForMessage(m) === selected.id) : state.messages;
+  const fullRows = visible.map((m) => {
+    const outgoing = m.direction === 'outgoing';
+    const sender = outgoing ? 'You' : fmt(m.sender || m.sender_name || m.sender_pubkey || m.pubkey_prefix);
+    const channel = m.conversation_type === 'direct'
+      ? `Direct ${fmt(m.recipient || m.contact || m.sender_pubkey || m.pubkey_prefix, '')}`
+      : fmt(m.channel_name || m.channel || 'Public');
     const text = fmt(m.text || m.message);
-    const hops = m.hops ?? m.path_len;
-    const route = hops === undefined ? '-' : `${hops} hop${hops === 1 ? '' : 's'}`;
+    const status = fmt(m.status, 'received');
     const time = m.timestamp_utc || m.timestamp ? new Date(m.timestamp_utc || m.timestamp).toLocaleString() : '-';
-    return `<tr><td>${escapeHtml(sender)}</td><td>${escapeHtml(channel)}</td><td>${escapeHtml(text)}</td><td>${escapeHtml(route)}</td><td>${escapeHtml(time)}</td></tr>`;
+    const meta = `<div class="msg-meta"><span class="pill">${escapeHtml(fmt(m.direction, 'incoming'))}</span>${m.is_private ? '<span class="pill">private</span>' : ''}</div>`;
+    return `<tr><td>${escapeHtml(sender)}${meta}</td><td>${escapeHtml(channel)}</td><td>${escapeHtml(text)}</td><td>${escapeHtml(status)}</td><td>${escapeHtml(time)}</td></tr>`;
   }).join('');
-  $('recentMessages').innerHTML = rows || emptyRow(4, 'No public messages yet.');
-  $('messagesTable').innerHTML = rows || emptyRow(5, 'No public messages yet.');
+  const recentRows = state.messages.slice(0, 12).map((m) => {
+    const outgoing = m.direction === 'outgoing';
+    const sender = outgoing ? 'You' : fmt(m.sender || m.sender_name || m.sender_pubkey || m.pubkey_prefix);
+    const channel = m.conversation_type === 'direct'
+      ? `Direct ${fmt(m.recipient || m.contact || m.sender_pubkey || m.pubkey_prefix, '')}`
+      : fmt(m.channel_name || m.channel || 'Public');
+    const text = fmt(m.text || m.message);
+    const time = m.timestamp_utc || m.timestamp ? new Date(m.timestamp_utc || m.timestamp).toLocaleString() : '-';
+    return `<tr><td>${escapeHtml(sender)}</td><td>${escapeHtml(channel)}</td><td>${escapeHtml(text)}</td><td>${escapeHtml(time)}</td></tr>`;
+  }).join('');
+  $('recentMessages').innerHTML = recentRows || emptyRow(4, 'No messages yet.');
+  $('messagesTable').innerHTML = fullRows || emptyRow(5, 'No messages yet.');
+  $('messageScope').textContent = selected ? selected.label : 'All';
+}
+
+function conversationIdForMessage(m) {
+  if (m.conversation_type === 'direct') {
+    return `direct:${m.contact || m.sender_pubkey || m.sender || m.recipient || ''}`;
+  }
+  return `channel:${m.channel_idx ?? 0}`;
+}
+
+function renderConversations() {
+  const rows = state.conversations.map((conv) => {
+    const active = state.selectedConversation && state.selectedConversation.id === conv.id ? ' active' : '';
+    return `<button type="button" class="conversation${active}" data-conversation="${escapeHtml(conv.id)}">
+      <strong>${escapeHtml(fmt(conv.label))}</strong>
+      <span>${escapeHtml(fmt(conv.type))}${conv.is_private ? ' / private' : ''}</span>
+      <span>${escapeHtml(fmt(conv.last_message, 'No messages yet'))}</span>
+    </button>`;
+  }).join('');
+  $('conversationCount').textContent = String(state.conversations.length);
+  $('conversationList').innerHTML = rows || '<div class="empty">No channels or contacts discovered yet.</div>';
+  document.querySelectorAll('.conversation[data-conversation]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const conv = state.conversations.find((c) => c.id === button.dataset.conversation);
+      selectConversation(conv || null);
+    });
+  });
+}
+
+function renderComposerOptions() {
+  const channelOptions = state.channels.map((c) => `<option value="${escapeHtml(fmt(c.idx ?? c.index, '0'))}">${escapeHtml(fmt(c.name, `Channel ${c.idx ?? c.index}`))}${c.is_private ? ' (private)' : ''}</option>`).join('');
+  $('channelTarget').innerHTML = channelOptions || '<option value="0">Public</option>';
+  $('contactOptions').innerHTML = state.nodes.map((n) => `<option value="${escapeHtml(fmt(n.public_key || n.pubkey_prefix))}">${escapeHtml(fmt(n.name))}</option>`).join('');
+}
+
+function selectConversation(conv) {
+  state.selectedConversation = conv;
+  if (conv) {
+    $('selectedConversation').textContent = conv.label;
+    $('targetType').value = conv.type;
+    updateTargetFields();
+    if (conv.type === 'channel') $('channelTarget').value = String(conv.channel_idx ?? 0);
+    if (conv.type === 'direct') $('directTarget').value = conv.contact || conv.pubkey_prefix || '';
+  } else {
+    $('selectedConversation').textContent = 'No target selected';
+  }
+  renderConversations();
+  renderMessages();
+}
+
+function updateTargetFields() {
+  const direct = $('targetType').value === 'direct';
+  $('channelTargetField').style.display = direct ? 'none' : 'grid';
+  $('directTargetField').style.display = direct ? 'grid' : 'none';
+  $('retryDirect').disabled = !direct;
+}
+
+async function sendMessage(event) {
+  event.preventDefault();
+  const text = $('messageText').value.trim();
+  if (!text) return;
+  const targetType = $('targetType').value;
+  const payload = {
+    target_type: targetType,
+    text,
+    retry: $('retryDirect').checked,
+  };
+  if (targetType === 'channel') payload.channel_idx = Number($('channelTarget').value || 0);
+  if (targetType === 'direct') payload.contact = $('directTarget').value.trim();
+  $('sendBtn').disabled = true;
+  $('sendStatus').textContent = 'Sending...';
+  try {
+    const result = await postJson('messages', payload);
+    $('messageText').value = '';
+    $('sendStatus').textContent = result.status === 'ack_timeout' ? 'Sent, ACK not received' : 'Sent';
+    await refresh();
+  } catch (err) {
+    $('sendStatus').textContent = err.message;
+  } finally {
+    $('sendBtn').disabled = false;
+  }
 }
 
 function renderNodes() {
@@ -399,6 +573,8 @@ document.querySelectorAll('nav a[data-page]').forEach((link) => {
 });
 
 $('refreshBtn').addEventListener('click', refresh);
+$('composerForm').addEventListener('submit', sendMessage);
+$('targetType').addEventListener('change', updateTargetFields);
 $('mapType').addEventListener('change', (event) => setMapLayer(event.target.value));
 $('heatIntensity').addEventListener('input', renderMap);
 $('toggleLabels').addEventListener('click', () => {

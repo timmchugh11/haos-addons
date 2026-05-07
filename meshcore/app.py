@@ -1,14 +1,17 @@
 import asyncio
+import concurrent.futures
+import json
 import os
 import threading
 import time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import FastAPI, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel, Field
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from meshcore import EventType, MeshCore
@@ -16,6 +19,8 @@ from meshcore import EventType, MeshCore
 
 APP_DIR = Path("/app")
 UI_DIR = APP_DIR / "custom-ui"
+DATA_DIR = Path(os.environ.get("MESHCORE_DATA_DIR", "/data/.meshcore"))
+MESSAGE_ARCHIVE = DATA_DIR / "messages.json"
 
 DEVICE = os.environ.get("MESHCORE_DEVICE", "/dev/ttyACM0")
 TRANSPORT = os.environ.get("MESHCORE_TRANSPORT", "serial")
@@ -39,6 +44,7 @@ class MeshState:
         self.channels: List[Dict[str, Any]] = []
         self.contacts: Dict[str, Dict[str, Any]] = {}
         self.messages: List[Dict[str, Any]] = []
+        self.next_message_id = 1
         self.started_at = datetime.now(timezone.utc)
         self.updated_at = self.started_at
 
@@ -55,6 +61,91 @@ worker_loop: Optional[asyncio.AbstractEventLoop] = None
 meshcore_client: Optional[MeshCore] = None
 
 
+class SendMessageRequest(BaseModel):
+    target_type: Literal["channel", "direct"]
+    text: str = Field(min_length=1, max_length=512)
+    channel_idx: Optional[int] = Field(default=None, ge=0, le=255)
+    contact: Optional[str] = Field(default=None, min_length=6, max_length=128)
+    retry: bool = True
+
+
+def utcnow() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def event_type_value(event: Any) -> str:
+    value = getattr(event, "type", None)
+    return getattr(value, "value", str(value))
+
+
+def event_payload(event: Any) -> Any:
+    return json_safe(getattr(event, "payload", None))
+
+
+def json_safe(value: Any) -> Any:
+    if isinstance(value, bytes):
+        return value.hex()
+    if isinstance(value, bytearray):
+        return bytes(value).hex()
+    if isinstance(value, dict):
+        return {str(k): json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [json_safe(v) for v in value]
+    if isinstance(value, tuple):
+        return [json_safe(v) for v in value]
+    return value
+
+
+def next_message_id() -> int:
+    with state.lock:
+        message_id = state.next_message_id
+        state.next_message_id += 1
+        return message_id
+
+
+def append_message(message: Dict[str, Any]) -> Dict[str, Any]:
+    if "id" not in message:
+        message["id"] = next_message_id()
+    with state.lock:
+        state.messages.insert(0, message)
+        state.messages = state.messages[:1000]
+        state.updated_at = datetime.now(timezone.utc)
+    save_messages()
+    return message
+
+
+def save_messages() -> None:
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with state.lock:
+            payload = {
+                "next_message_id": state.next_message_id,
+                "messages": state.messages[:1000],
+            }
+        MESSAGE_ARCHIVE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def load_messages() -> None:
+    try:
+        data = json.loads(MESSAGE_ARCHIVE.read_text(encoding="utf-8"))
+        messages = data.get("messages", [])
+        if not isinstance(messages, list):
+            return
+        with state.lock:
+            state.messages = messages[:1000]
+            max_id = max((int(m.get("id", 0) or 0) for m in state.messages), default=0)
+            state.next_message_id = max(int(data.get("next_message_id", 0) or 0), max_id + 1, 1)
+    except FileNotFoundError:
+        return
+    except Exception:
+        return
+
+
+load_messages()
+
+
 def public_channel(idx: Optional[int], name: str) -> bool:
     return idx == 0 or bool(name and name.startswith("#"))
 
@@ -65,6 +156,21 @@ def channel_name(idx: Optional[int]) -> str:
             if ch.get("idx") == idx:
                 return ch.get("name", "")
     return "Public" if idx == 0 else ""
+
+
+def resolve_contact(value: str) -> str:
+    needle = value.strip().lower()
+    if not needle:
+        raise ValueError("contact is required")
+    with state.lock:
+        for pubkey, contact in state.contacts.items():
+            pubkey_l = pubkey.lower()
+            name = str(contact.get("adv_name") or "").lower()
+            if pubkey_l == needle or pubkey_l.startswith(needle) or name == needle:
+                return pubkey
+    if all(c in "0123456789abcdef" for c in needle) and len(needle) >= 6:
+        return needle
+    raise ValueError(f"unknown contact: {value}")
 
 
 async def connect_meshcore() -> None:
@@ -115,39 +221,41 @@ async def wire_events(mc: MeshCore) -> None:
         payload = event.payload or {}
         idx = payload.get("channel_idx")
         name = channel_name(idx)
-        if not public_channel(idx, name):
-            return
-        with state.lock:
-            state.messages.insert(0, {
-                "id": len(state.messages) + 1,
-                "channel_idx": idx,
-                "channel_name": name,
-                "sender": payload.get("sender", "") or payload.get("pubkey_prefix", ""),
-                "sender_pubkey": payload.get("sender_pubkey", "") or payload.get("pubkey_prefix", ""),
-                "text": payload.get("text", ""),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "hops": payload.get("path_len", 0) or 0,
-                "path_hashes": payload.get("path_hashes") or [],
-                "path_names": payload.get("path_names") or [],
-            })
-            state.messages = state.messages[:1000]
+        append_message({
+            "direction": "incoming",
+            "status": "received",
+            "conversation_type": "channel",
+            "channel_idx": idx,
+            "channel_name": name,
+            "is_private": not public_channel(idx, name),
+            "sender": payload.get("sender", "") or payload.get("pubkey_prefix", ""),
+            "sender_pubkey": payload.get("sender_pubkey", "") or payload.get("pubkey_prefix", ""),
+            "text": payload.get("text", ""),
+            "timestamp": utcnow(),
+            "sender_timestamp": payload.get("sender_timestamp"),
+            "hops": payload.get("path_len", 0) or 0,
+            "path_hashes": payload.get("path_hashes") or [],
+            "path_names": payload.get("path_names") or [],
+        })
 
     async def on_contact_msg(event) -> None:
         payload = event.payload or {}
-        with state.lock:
-            state.messages.insert(0, {
-                "id": len(state.messages) + 1,
-                "channel_idx": None,
-                "channel_name": "Direct",
-                "sender": payload.get("sender", "") or payload.get("pubkey_prefix", ""),
-                "sender_pubkey": payload.get("pubkey_prefix", ""),
-                "text": payload.get("text", ""),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "hops": payload.get("path_len", 0) or 0,
-                "path_hashes": [],
-                "path_names": [],
-            })
-            state.messages = state.messages[:1000]
+        append_message({
+            "direction": "incoming",
+            "status": "received",
+            "conversation_type": "direct",
+            "channel_idx": None,
+            "channel_name": "Direct",
+            "sender": payload.get("sender", "") or payload.get("pubkey_prefix", ""),
+            "sender_pubkey": payload.get("pubkey_prefix", ""),
+            "contact": payload.get("pubkey_prefix", ""),
+            "text": payload.get("text", ""),
+            "timestamp": utcnow(),
+            "sender_timestamp": payload.get("sender_timestamp"),
+            "hops": payload.get("path_len", 0) or 0,
+            "path_hashes": [],
+            "path_names": [],
+        })
 
     async def on_disconnect(event) -> None:
         state.set_status(f"Disconnected: {(event.payload or {}).get('reason', 'unknown')}", False)
@@ -278,6 +386,7 @@ async def api_nodes() -> List[Dict[str, Any]]:
                 adv_lat = adv_lon = None
             nodes.append({
                 "name": contact.get("adv_name") or pubkey[:12],
+                "public_key": pubkey,
                 "pubkey_prefix": pubkey[:12],
                 "type": {2: "repeater", 3: "room_server"}.get(raw_type, "client"),
                 "last_seen": contact.get("last_seen") or contact.get("last_advert"),
@@ -292,14 +401,148 @@ async def api_nodes() -> List[Dict[str, Any]]:
 async def api_messages(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    scope: str = Query(default="all", pattern="^(all|public|channel|direct)$"),
 ) -> Dict[str, Any]:
     with state.lock:
-        public = [
-            m for m in state.messages
-            if public_channel(m.get("channel_idx"), m.get("channel_name", ""))
-        ]
-        page = public[offset:offset + limit]
-        return {"total": len(public), "limit": limit, "offset": offset, "items": page}
+        messages = list(state.messages)
+        if scope == "public":
+            messages = [
+                m for m in messages
+                if m.get("conversation_type", "channel") == "channel"
+                and public_channel(m.get("channel_idx"), m.get("channel_name", ""))
+            ]
+        elif scope in {"channel", "direct"}:
+            messages = [m for m in messages if m.get("conversation_type", "channel") == scope]
+        page = messages[offset:offset + limit]
+        return {"total": len(messages), "limit": limit, "offset": offset, "scope": scope, "items": page}
+
+
+@app.get("/api/v1/conversations")
+async def api_conversations() -> List[Dict[str, Any]]:
+    conversations: Dict[str, Dict[str, Any]] = {}
+    with state.lock:
+        for channel in state.channels:
+            key = f"channel:{channel.get('idx')}"
+            conversations[key] = {
+                "id": key,
+                "type": "channel",
+                "label": channel.get("name") or f"Channel {channel.get('idx')}",
+                "channel_idx": channel.get("idx"),
+                "is_private": channel.get("is_private", False),
+                "last_message": "",
+                "last_timestamp": None,
+                "unread": 0,
+            }
+        for pubkey, contact in state.contacts.items():
+            key = f"direct:{pubkey}"
+            conversations[key] = {
+                "id": key,
+                "type": "direct",
+                "label": contact.get("adv_name") or pubkey[:12],
+                "contact": pubkey,
+                "pubkey_prefix": pubkey[:12],
+                "last_message": "",
+                "last_timestamp": None,
+                "unread": 0,
+            }
+        for message in reversed(state.messages):
+            if message.get("conversation_type") == "direct":
+                contact = message.get("contact") or message.get("sender_pubkey") or message.get("sender")
+                key = f"direct:{contact}"
+                if key not in conversations:
+                    conversations[key] = {
+                        "id": key,
+                        "type": "direct",
+                        "label": str(contact or "Direct")[:12],
+                        "contact": contact,
+                        "pubkey_prefix": str(contact or "")[:12],
+                        "last_message": "",
+                        "last_timestamp": None,
+                        "unread": 0,
+                    }
+            else:
+                key = f"channel:{message.get('channel_idx', 0)}"
+                if key not in conversations:
+                    conversations[key] = {
+                        "id": key,
+                        "type": "channel",
+                        "label": message.get("channel_name") or "Public",
+                        "channel_idx": message.get("channel_idx", 0),
+                        "is_private": message.get("is_private", False),
+                        "last_message": "",
+                        "last_timestamp": None,
+                        "unread": 0,
+                    }
+            conv = conversations[key]
+            conv["last_message"] = message.get("text", "")
+            conv["last_timestamp"] = message.get("timestamp")
+            if message.get("direction") == "incoming":
+                conv["unread"] += 1
+        return sorted(conversations.values(), key=lambda c: c.get("last_timestamp") or "", reverse=True)
+
+
+@app.post("/api/v1/messages")
+async def api_send_message(request: SendMessageRequest) -> Dict[str, Any]:
+    if not state.connected or not meshcore_client or not worker_loop:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+
+    text = request.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="message text is required")
+
+    async def send() -> Any:
+        if request.target_type == "channel":
+            if request.channel_idx is None:
+                raise ValueError("channel_idx is required")
+            return await meshcore_client.commands.send_chan_msg(request.channel_idx, text)
+        contact = resolve_contact(request.contact or "")
+        if request.retry:
+            return await meshcore_client.commands.send_msg_with_retry(contact, text, min_timeout=3)
+        return await meshcore_client.commands.send_msg(contact, text)
+
+    future = asyncio.run_coroutine_threadsafe(send(), worker_loop)
+    try:
+        result = future.result(timeout=45)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except concurrent.futures.TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="message send timed out") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"message send failed: {exc}") from exc
+
+    if result is None:
+        status = "ack_timeout"
+        payload = {}
+        result_type = "ack_timeout"
+    else:
+        result_type = event_type_value(result)
+        payload = event_payload(result)
+        status = "sent" if result_type in {EventType.OK.value, EventType.MSG_SENT.value} else "failed"
+        if result_type == EventType.ERROR.value:
+            raise HTTPException(status_code=502, detail={"status": status, "event": result_type, "payload": payload})
+
+    message: Dict[str, Any] = {
+        "direction": "outgoing",
+        "status": status,
+        "conversation_type": request.target_type,
+        "text": text,
+        "timestamp": utcnow(),
+        "hops": 0,
+        "send_result": {"event": result_type, "payload": payload},
+    }
+    if request.target_type == "channel":
+        message["channel_idx"] = request.channel_idx
+        message["channel_name"] = channel_name(request.channel_idx)
+        message["is_private"] = not public_channel(request.channel_idx, message["channel_name"])
+    else:
+        contact_key = resolve_contact(request.contact or "")
+        message["channel_idx"] = None
+        message["channel_name"] = "Direct"
+        message["contact"] = contact_key
+        message["recipient"] = contact_key[:12]
+
+    append_message(message)
+    return {"ok": status != "failed", "status": status, "message": message}
 
 
 @app.get("/api/v1/channels")

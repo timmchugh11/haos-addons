@@ -9,7 +9,7 @@ Assistant host by USB serial or Bluetooth LE.
 
 - Real-time MeshCore dashboard
 - Contacts and node management
-- Channel messages and direct messages
+- Channel messages and direct messages with send support
 - Channel management, backup and restore
 - Read-only public REST API at `/api/v1/*`
 - USB serial and BLE transports
@@ -54,6 +54,11 @@ permanent Home Assistant install.
 - Companion Protocol: https://docs.meshcore.io/companion_protocol/
 - MeshCore Python protocol library: https://github.com/meshcore-dev/meshcore_py
 
+## Roadmap
+
+See [TODO.md](TODO.md) for the remaining work toward a full-featured MeshCore
+companion GUI.
+
 ## Version
 
-Current add-on version: `0.3.1`
+Current add-on version: `0.4.0`
