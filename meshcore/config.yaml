@@ -1,0 +1,53 @@
+name: "MeshCore GUI"
+description: "Full web GUI for MeshCore companion radios with dashboard, contacts, messages, channels, archive, BBS, bot, map, REST API, serial and BLE support"
+version: "0.1.0"
+slug: "meshcore"
+init: false
+stage: "experimental"
+url: "https://github.com/timmchugh11/haos-addons"
+
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+
+startup: services
+boot: manual
+
+ingress: true
+ingress_port: 8081
+panel_icon: mdi:radio-tower
+panel_title: MeshCore
+
+ports:
+  8081/tcp: null
+ports_description:
+  8081/tcp: "MeshCore GUI web interface (optional direct access)"
+
+uart: true
+usb: true
+udev: true
+host_dbus: true
+privileged:
+  - NET_ADMIN
+  - NET_RAW
+
+options:
+  transport: "serial"
+  serial_port: "/dev/ttyACM0"
+  baudrate: 115200
+  serial_cx_delay: 0.1
+  ble_address: "literal:AA:BB:CC:DD:EE:FF"
+  ble_pin: "123456"
+  debug: false
+
+schema:
+  transport: "list(serial|ble)"
+  serial_port: "str"
+  baudrate: "int(1200,921600)"
+  serial_cx_delay: "float(0,10)"
+  ble_address: "str"
+  ble_pin: "password"
+  debug: "bool"
