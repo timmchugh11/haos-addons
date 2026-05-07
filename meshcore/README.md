@@ -61,4 +61,4 @@ companion GUI.
 
 ## Version
 
-Current add-on version: `0.4.0`
+Current add-on version: `0.6.0`

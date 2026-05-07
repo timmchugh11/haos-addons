@@ -59,6 +59,7 @@ main{flex:1;overflow:auto;padding:30px}
 .conversation span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .composer{display:grid;gap:12px}
 .composer-row{display:grid;gap:12px;grid-template-columns:160px 1fr}
+.form-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
 .field{display:grid;gap:6px}
 .field label{color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
 .field select,.field input,.field textarea{width:100%;background:#090909;color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:9px 10px;font:inherit}
@@ -68,6 +69,13 @@ main{flex:1;overflow:auto;padding:30px}
 .send-status{color:var(--muted);font-size:12px}
 .msg-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .pill{display:inline-flex;align-items:center;border:1px solid var(--border2);border-radius:999px;padding:2px 7px;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.toolbar{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.toolbar .field{min-width:135px}
+.toolbar .field.search{min-width:220px;flex:1}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;color:var(--muted);font-size:12px}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.mini-btn{padding:4px 7px;border-radius:5px;border:1px solid var(--border2);background:#090909;color:var(--text2);font-size:11px;font-weight:700}
+.mini-btn:hover{color:var(--text);border-color:#444}
 .map-grid{display:grid;gap:16px;grid-template-columns:1fr 320px}
 .box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;min-width:0}
 .box-title{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;font-weight:650;margin-bottom:16px}
@@ -125,6 +133,7 @@ main{flex:1;overflow:auto;padding:30px}
       <a href="#nodes" data-page="nodes">Nodes</a>
       <a href="#channels" data-page="channels">Channels</a>
       <a href="#map" data-page="map">Map</a>
+      <a href="#identity" data-page="identity">Identity</a>
     </nav>
     <main>
       <section id="dashboard" class="page active">
@@ -193,21 +202,93 @@ main{flex:1;overflow:auto;padding:30px}
                   <div>
                     <span id="sendStatus" class="send-status"></span>
                     <button id="sendBtn" class="btn" type="submit">Send</button>
+                    <button id="notifyBtn" class="btn" type="button">Notifications</button>
                   </div>
                 </div>
               </form>
             </div>
             <div class="box">
               <div class="box-title">Message History <span id="messageScope">All</span></div>
+              <div class="toolbar">
+                <div class="field search">
+                  <label for="messageSearch">Search</label>
+                  <input id="messageSearch" placeholder="Search message, sender, target, status">
+                </div>
+                <div class="field">
+                  <label for="scopeFilter">Scope</label>
+                  <select id="scopeFilter">
+                    <option value="all">All</option>
+                    <option value="public">Public</option>
+                    <option value="channel">Channels</option>
+                    <option value="direct">Direct</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="statusFilter">Status</label>
+                  <select id="statusFilter">
+                    <option value="all">All</option>
+                    <option value="queued">Queued</option>
+                    <option value="sending">Sending</option>
+                    <option value="sent">Sent</option>
+                    <option value="acknowledged">Acknowledged</option>
+                    <option value="ack_timeout">ACK Timeout</option>
+                    <option value="failed">Failed</option>
+                    <option value="received">Received</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="directionFilter">Direction</label>
+                  <select id="directionFilter">
+                    <option value="all">All</option>
+                    <option value="incoming">Incoming</option>
+                    <option value="outgoing">Outgoing</option>
+                  </select>
+                </div>
+                <button id="exportJson" class="btn" type="button">JSON</button>
+                <button id="exportCsv" class="btn" type="button">CSV</button>
+              </div>
               <table class="tbl"><thead><tr><th>From</th><th>Target</th><th>Message</th><th>Status</th><th>Time</th></tr></thead><tbody id="messagesTable"></tbody></table>
+              <div class="pager">
+                <button id="prevPage" class="btn" type="button">Prev</button>
+                <span id="pageInfo">0 messages</span>
+                <button id="nextPage" class="btn" type="button">Next</button>
+              </div>
             </div>
           </div>
         </div>
       </section>
       <section id="nodes" class="page">
         <h1 class="page-title">Nodes</h1>
-        <div class="page-sub">Known contacts from the live MeshCore contact list.</div>
-        <div class="box"><table class="tbl"><thead><tr><th>Name</th><th>Type</th><th>Public Key</th><th>Location</th><th>Last Seen</th></tr></thead><tbody id="nodesTable"></tbody></table></div>
+        <div class="page-sub">Known contacts, local metadata, and contact-card tools.</div>
+        <div class="box">
+          <div class="box-title">Add Contact <span>manual public-key add</span></div>
+          <form id="contactForm" class="composer">
+            <div class="form-grid">
+              <div class="field"><label for="contactName">Name</label><input id="contactName" maxlength="32"></div>
+              <div class="field"><label for="contactKey">Public Key</label><input id="contactKey" maxlength="64"></div>
+              <div class="field"><label for="contactType">Type</label><select id="contactType"><option value="0">Companion</option><option value="2">Repeater</option><option value="3">Room Server</option><option value="4">Sensor</option></select></div>
+              <div class="field"><label for="contactAlias">Alias</label><input id="contactAlias" maxlength="64"></div>
+              <div class="field"><label for="contactLat">Latitude</label><input id="contactLat" type="number" step="0.000001" value="0"></div>
+              <div class="field"><label for="contactLon">Longitude</label><input id="contactLon" type="number" step="0.000001" value="0"></div>
+            </div>
+            <div class="field"><label for="contactNotes">Notes</label><textarea id="contactNotes" maxlength="500"></textarea></div>
+            <div class="composer-actions">
+              <label class="check"><input id="contactTrusted" type="checkbox"> Trusted</label>
+              <div><span id="contactStatus" class="send-status"></span><button class="btn" type="submit">Add Contact</button></div>
+            </div>
+          </form>
+        </div>
+        <div class="box">
+          <div class="box-title">Import Contact <span>meshcore:// card URI</span></div>
+          <form id="importForm" class="composer">
+            <div class="field"><label for="importUri">Contact URI</label><input id="importUri" placeholder="meshcore://..."></div>
+            <div class="composer-actions">
+              <span id="importStatus" class="send-status"></span>
+              <button class="btn" type="submit">Import</button>
+            </div>
+          </form>
+        </div>
+        <div class="box"><table class="tbl"><thead><tr><th>Name</th><th>Type</th><th>Public Key</th><th>Location</th><th>Meta</th><th>Actions</th></tr></thead><tbody id="nodesTable"></tbody></table></div>
       </section>
       <section id="channels" class="page">
         <h1 class="page-title">Channels</h1>
@@ -241,6 +322,42 @@ main{flex:1;overflow:auto;padding:30px}
           </div>
         </div>
       </section>
+      <section id="identity" class="page">
+        <h1 class="page-title">Identity</h1>
+        <div class="page-sub">Local companion identity, device status, radio parameters, and contact-card export.</div>
+        <div class="grid">
+          <div class="box">
+            <div class="box-title">Device Identity <span id="identityStatus">-</span></div>
+            <form id="identityForm" class="composer">
+              <div class="form-grid">
+                <div class="field"><label for="identityName">Name</label><input id="identityName" maxlength="32"></div>
+                <div class="field"><label for="identityLat">Latitude</label><input id="identityLat" type="number" step="0.000001"></div>
+                <div class="field"><label for="identityLon">Longitude</label><input id="identityLon" type="number" step="0.000001"></div>
+              </div>
+              <div class="composer-actions">
+                <span id="identitySaveStatus" class="send-status"></span>
+                <div>
+                  <button id="exportSelf" class="btn" type="button">Export Card</button>
+                  <button class="btn" type="submit">Save</button>
+                </div>
+              </div>
+            </form>
+            <div id="selfCard" class="status-line"></div>
+          </div>
+          <div class="box">
+            <div class="box-title">Status</div>
+            <div class="kv">
+              <div>Public Key</div><div id="identityKey">-</div>
+              <div>Role</div><div id="identityRole">-</div>
+              <div>Battery</div><div id="identityBattery">-</div>
+              <div>Storage</div><div id="identityStorage">-</div>
+              <div>Radio</div><div id="identityRadio">-</div>
+              <div>Telemetry</div><div id="identityTelemetry">-</div>
+              <div>Packet Stats</div><div id="identityPackets">-</div>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 </div>
@@ -248,8 +365,10 @@ main{flex:1;overflow:auto;padding:30px}
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
 const state = {
-  stats:null, messages:[], conversations:[], nodes:[], channels:[], error:null,
+  stats:null, identity:null, messages:[], messageTotal:0, messageLimit:50, messageOffset:0,
+  conversations:[], nodes:[], channels:[], error:null,
   selectedConversation:null,
+  seenMessageIds:new Set(), loadedOnce:false,
   mapReady:false, map:null, tileLayer:null, heatLayer:null, markerLayer:null,
   labelsVisible:false,
 };
@@ -257,6 +376,7 @@ const $ = (id) => document.getElementById(id);
 const fmt = (value, fallback='-') => value === null || value === undefined || value === '' ? fallback : String(value);
 const basePath = window.location.pathname.replace(/\/$/, '');
 const api = (path) => `${basePath}/api/v1/${path}`;
+const exportUrl = (format) => `${api('messages/export')}?${messageParams({ format }).toString()}`;
 
 function setBadge(mode, text) {
   const el = $('connBadge');
@@ -281,23 +401,46 @@ async function postJson(path, payload) {
   return data;
 }
 
+async function patchJson(path, payload) {
+  const res = await fetch(api(path), {
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : `${path}: HTTP ${res.status}`);
+  return data;
+}
+
+async function deleteJson(path) {
+  const res = await fetch(api(path), { method:'DELETE' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : `${path}: HTTP ${res.status}`);
+  return data;
+}
+
 async function refresh() {
   setBadge('warn', 'Refreshing');
   try {
-    const [stats, messages, conversations, nodes, channels] = await Promise.all([
+    const conversationFilter = state.selectedConversation ? state.selectedConversation.id : '';
+    const [stats, identity, messages, conversations, nodes, channels] = await Promise.all([
       getJson('stats'),
-      getJson('messages?limit=200&scope=all'),
+      getJson('identity'),
+      getJson(`messages?${messageParams({ conversation: conversationFilter }).toString()}`),
       getJson('conversations'),
       getJson('nodes'),
       getJson('channels'),
     ]);
     state.stats = stats;
+    state.identity = identity;
     state.messages = Array.isArray(messages) ? messages : (messages.items || []);
+    state.messageTotal = Array.isArray(messages) ? state.messages.length : (messages.total || 0);
     state.conversations = conversations;
     state.nodes = nodes;
     state.channels = channels;
     state.error = null;
     render();
+    maybeNotify(state.messages);
     await ensureMap();
     renderMap();
     setBadge('ok', 'Connected');
@@ -306,6 +449,21 @@ async function refresh() {
     $('statusLine').textContent = err.message;
     setBadge('err', 'API Error');
   }
+}
+
+function messageParams(extra={}) {
+  const params = new URLSearchParams();
+  params.set('limit', String(state.messageLimit));
+  params.set('offset', String(state.messageOffset));
+  params.set('scope', $('scopeFilter') ? $('scopeFilter').value : 'all');
+  params.set('status', $('statusFilter') ? $('statusFilter').value : 'all');
+  params.set('direction', $('directionFilter') ? $('directionFilter').value : 'all');
+  const q = $('messageSearch') ? $('messageSearch').value.trim() : '';
+  if (q) params.set('q', q);
+  Object.entries(extra).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') params.set(key, String(value));
+  });
+  return params;
 }
 
 function render() {
@@ -326,6 +484,7 @@ function render() {
   renderConversations();
   renderNodes();
   renderChannels();
+  renderIdentity();
 }
 
 function emptyRow(cols, text) {
@@ -333,9 +492,7 @@ function emptyRow(cols, text) {
 }
 
 function renderMessages() {
-  const selected = state.selectedConversation;
-  const visible = selected ? state.messages.filter((m) => conversationIdForMessage(m) === selected.id) : state.messages;
-  const fullRows = visible.map((m) => {
+  const fullRows = state.messages.map((m) => {
     const outgoing = m.direction === 'outgoing';
     const sender = outgoing ? 'You' : fmt(m.sender || m.sender_name || m.sender_pubkey || m.pubkey_prefix);
     const channel = m.conversation_type === 'direct'
@@ -344,8 +501,13 @@ function renderMessages() {
     const text = fmt(m.text || m.message);
     const status = fmt(m.status, 'received');
     const time = m.timestamp_utc || m.timestamp ? new Date(m.timestamp_utc || m.timestamp).toLocaleString() : '-';
-    const meta = `<div class="msg-meta"><span class="pill">${escapeHtml(fmt(m.direction, 'incoming'))}</span>${m.is_private ? '<span class="pill">private</span>' : ''}</div>`;
-    return `<tr><td>${escapeHtml(sender)}${meta}</td><td>${escapeHtml(channel)}</td><td>${escapeHtml(text)}</td><td>${escapeHtml(status)}</td><td>${escapeHtml(time)}</td></tr>`;
+    const ack = Number(m.ack_count || 0);
+    const ackLabel = ack ? `<span class="pill">${ack} ACK${ack === 1 ? '' : 'S'}</span>` : '';
+    const retry = outgoing && ['failed','ack_timeout','sent'].includes(status)
+      ? `<div class="row-actions"><button class="mini-btn" type="button" data-resend="${m.id}">Resend</button></div>`
+      : '';
+    const meta = `<div class="msg-meta"><span class="pill">${escapeHtml(fmt(m.direction, 'incoming'))}</span>${m.is_private ? '<span class="pill">private</span>' : ''}${ackLabel}</div>`;
+    return `<tr><td>${escapeHtml(sender)}${meta}${retry}</td><td>${escapeHtml(channel)}</td><td>${escapeHtml(text)}</td><td>${escapeHtml(status)}</td><td>${escapeHtml(time)}</td></tr>`;
   }).join('');
   const recentRows = state.messages.slice(0, 12).map((m) => {
     const outgoing = m.direction === 'outgoing';
@@ -359,7 +521,15 @@ function renderMessages() {
   }).join('');
   $('recentMessages').innerHTML = recentRows || emptyRow(4, 'No messages yet.');
   $('messagesTable').innerHTML = fullRows || emptyRow(5, 'No messages yet.');
-  $('messageScope').textContent = selected ? selected.label : 'All';
+  $('messagesTable').querySelectorAll('[data-resend]').forEach((button) => {
+    button.addEventListener('click', () => resendMessage(Number(button.dataset.resend)));
+  });
+  $('messageScope').textContent = state.selectedConversation ? state.selectedConversation.label : 'All';
+  const start = state.messageTotal ? state.messageOffset + 1 : 0;
+  const end = Math.min(state.messageOffset + state.messageLimit, state.messageTotal);
+  $('pageInfo').textContent = `${start}-${end} of ${state.messageTotal}`;
+  $('prevPage').disabled = state.messageOffset <= 0;
+  $('nextPage').disabled = state.messageOffset + state.messageLimit >= state.messageTotal;
 }
 
 function conversationIdForMessage(m) {
@@ -396,6 +566,7 @@ function renderComposerOptions() {
 
 function selectConversation(conv) {
   state.selectedConversation = conv;
+  state.messageOffset = 0;
   if (conv) {
     $('selectedConversation').textContent = conv.label;
     $('targetType').value = conv.type;
@@ -406,7 +577,7 @@ function selectConversation(conv) {
     $('selectedConversation').textContent = 'No target selected';
   }
   renderConversations();
-  renderMessages();
+  refresh();
 }
 
 function updateTargetFields() {
@@ -442,11 +613,189 @@ async function sendMessage(event) {
   }
 }
 
+async function resendMessage(id) {
+  $('sendStatus').textContent = 'Resending...';
+  try {
+    const result = await postJson(`messages/${id}/resend`, {});
+    $('sendStatus').textContent = result.status === 'ack_timeout' ? 'Resent, ACK not received' : 'Resent';
+    await refresh();
+  } catch (err) {
+    $('sendStatus').textContent = err.message;
+  }
+}
+
+function applyMessageFilters() {
+  state.messageOffset = 0;
+  refresh();
+}
+
+function changePage(delta) {
+  state.messageOffset = Math.max(0, state.messageOffset + delta);
+  refresh();
+}
+
+function openExport(format) {
+  window.open(exportUrl(format), '_blank');
+}
+
+async function enableNotifications() {
+  if (!('Notification' in window)) {
+    $('sendStatus').textContent = 'Browser notifications are not supported';
+    return;
+  }
+  const permission = await Notification.requestPermission();
+  $('sendStatus').textContent = permission === 'granted' ? 'Notifications enabled' : 'Notifications blocked';
+}
+
+function maybeNotify(messages) {
+  const freshIncoming = messages
+    .filter((m) => m.direction === 'incoming' && !state.seenMessageIds.has(m.id))
+    .sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
+  for (const message of messages) state.seenMessageIds.add(message.id);
+  if (!state.loadedOnce) {
+    state.loadedOnce = true;
+    return;
+  }
+  if (!freshIncoming.length || !('Notification' in window) || Notification.permission !== 'granted') return;
+  const latest = freshIncoming[freshIncoming.length - 1];
+  const title = latest.conversation_type === 'direct' ? 'MeshCore direct message' : `MeshCore ${fmt(latest.channel_name, 'channel')}`;
+  new Notification(title, { body: `${fmt(latest.sender || latest.sender_pubkey, 'Unknown')}: ${fmt(latest.text, '')}` });
+}
+
 function renderNodes() {
   $('nodesTable').innerHTML = state.nodes.map((n) => {
     const loc = n.adv_lat && n.adv_lon ? `${Number(n.adv_lat).toFixed(5)}, ${Number(n.adv_lon).toFixed(5)}` : '-';
-    return `<tr><td>${escapeHtml(fmt(n.name))}</td><td>${escapeHtml(fmt(n.type))}</td><td>${escapeHtml(fmt(n.pubkey_prefix))}</td><td>${escapeHtml(loc)}</td><td>${escapeHtml(fmt(n.last_seen))}</td></tr>`;
-  }).join('') || emptyRow(5, 'No nodes in the contact list yet.');
+    const meta = `${n.trusted ? '<span class="pill">trusted</span>' : ''}${n.alias ? `<div>${escapeHtml(n.alias)}</div>` : ''}${n.notes ? `<div>${escapeHtml(n.notes)}</div>` : ''}`;
+    return `<tr>
+      <td>${escapeHtml(fmt(n.name))}<div class="status-line">${escapeHtml(fmt(n.raw_name, ''))}</div></td>
+      <td>${escapeHtml(fmt(n.type))}</td>
+      <td>${escapeHtml(fmt(n.pubkey_prefix))}</td>
+      <td>${escapeHtml(loc)}</td>
+      <td>${meta || '-'}</td>
+      <td><div class="row-actions">
+        <button class="mini-btn" type="button" data-export-contact="${escapeHtml(n.public_key)}">Export</button>
+        <button class="mini-btn" type="button" data-edit-contact="${escapeHtml(n.public_key)}">Edit Meta</button>
+        <button class="mini-btn" type="button" data-trust-contact="${escapeHtml(n.public_key)}">${n.trusted ? 'Untrust' : 'Trust'}</button>
+        <button class="mini-btn" type="button" data-delete-contact="${escapeHtml(n.public_key)}">Remove</button>
+      </div></td>
+    </tr>`;
+  }).join('') || emptyRow(6, 'No nodes in the contact list yet.');
+  $('nodesTable').querySelectorAll('[data-export-contact]').forEach((button) => button.addEventListener('click', () => exportContact(button.dataset.exportContact)));
+  $('nodesTable').querySelectorAll('[data-edit-contact]').forEach((button) => button.addEventListener('click', () => editContactMeta(button.dataset.editContact)));
+  $('nodesTable').querySelectorAll('[data-trust-contact]').forEach((button) => button.addEventListener('click', () => toggleTrust(button.dataset.trustContact)));
+  $('nodesTable').querySelectorAll('[data-delete-contact]').forEach((button) => button.addEventListener('click', () => removeContact(button.dataset.deleteContact)));
+}
+
+function renderIdentity() {
+  const data = state.identity || {};
+  const self = data.self || {};
+  const device = data.device_info || {};
+  const bat = data.battery || {};
+  $('identityStatus').textContent = data.status || '-';
+  $('identityName').value = fmt(self.name, '');
+  $('identityLat').value = self.adv_lat ?? '';
+  $('identityLon').value = self.adv_lon ?? '';
+  $('identityKey').textContent = fmt(self.public_key || self.pubkey || self.key);
+  $('identityRole').textContent = fmt(self.type || device.role || device.type);
+  $('identityBattery').textContent = bat.battery_mv ? `${bat.battery_mv} mV` : fmt(bat.mv || bat.voltage);
+  $('identityStorage').textContent = bat.used_kb && bat.total_kb ? `${bat.used_kb}/${bat.total_kb} KB` : '-';
+  $('identityRadio').textContent = self.radio_freq ? `${self.radio_freq} MHz / ${self.radio_bw} kHz / SF${self.radio_sf} / CR${self.radio_cr}` : '-';
+  $('identityTelemetry').textContent = `base ${fmt(self.telemetry_mode_base, '0')}, loc ${fmt(self.telemetry_mode_loc, '0')}, env ${fmt(self.telemetry_mode_env, '0')}`;
+  const packets = data.packet_stats || {};
+  $('identityPackets').textContent = Object.keys(packets).length ? JSON.stringify(packets) : '-';
+}
+
+async function addContact(event) {
+  event.preventDefault();
+  $('contactStatus').textContent = 'Adding...';
+  try {
+    await postJson('contacts', {
+      name:$('contactName').value.trim(),
+      public_key:$('contactKey').value.trim(),
+      node_type:Number($('contactType').value),
+      alias:$('contactAlias').value.trim(),
+      notes:$('contactNotes').value.trim(),
+      trusted:$('contactTrusted').checked,
+      adv_lat:Number($('contactLat').value || 0),
+      adv_lon:Number($('contactLon').value || 0),
+    });
+    $('contactForm').reset();
+    $('contactStatus').textContent = 'Added';
+    await refresh();
+  } catch (err) {
+    $('contactStatus').textContent = err.message;
+  }
+}
+
+async function importContact(event) {
+  event.preventDefault();
+  $('importStatus').textContent = 'Importing...';
+  try {
+    await postJson('contacts/import', { uri:$('importUri').value.trim() });
+    $('importUri').value = '';
+    $('importStatus').textContent = 'Imported';
+    await refresh();
+  } catch (err) {
+    $('importStatus').textContent = err.message;
+  }
+}
+
+async function exportContact(key) {
+  try {
+    const data = await getJson(`contacts/${key}/export`);
+    $('contactStatus').textContent = data.uri || JSON.stringify(data);
+  } catch (err) {
+    $('contactStatus').textContent = err.message;
+  }
+}
+
+async function toggleTrust(key) {
+  const node = state.nodes.find((n) => n.public_key === key);
+  if (!node) return;
+  await patchJson(`contacts/${key}`, { alias:node.alias || '', notes:node.notes || '', trusted:!node.trusted });
+  await refresh();
+}
+
+async function editContactMeta(key) {
+  const node = state.nodes.find((n) => n.public_key === key);
+  if (!node) return;
+  const alias = prompt('Alias', node.alias || '');
+  if (alias === null) return;
+  const notes = prompt('Notes', node.notes || '');
+  if (notes === null) return;
+  await patchJson(`contacts/${key}`, { alias, notes, trusted:!!node.trusted });
+  await refresh();
+}
+
+async function removeContact(key) {
+  if (!confirm('Remove this contact from the MeshCore device?')) return;
+  await deleteJson(`contacts/${key}`);
+  await refresh();
+}
+
+async function saveIdentity(event) {
+  event.preventDefault();
+  $('identitySaveStatus').textContent = 'Saving...';
+  try {
+    await patchJson('identity', {
+      name:$('identityName').value.trim(),
+      adv_lat:$('identityLat').value === '' ? null : Number($('identityLat').value),
+      adv_lon:$('identityLon').value === '' ? null : Number($('identityLon').value),
+    });
+    $('identitySaveStatus').textContent = 'Saved';
+    await refresh();
+  } catch (err) {
+    $('identitySaveStatus').textContent = err.message;
+  }
+}
+
+async function exportSelfContact() {
+  try {
+    const data = await getJson('contact-card/self');
+    $('selfCard').textContent = data.uri || JSON.stringify(data);
+  } catch (err) {
+    $('selfCard').textContent = err.message;
+  }
 }
 
 function renderChannels() {
@@ -574,7 +923,23 @@ document.querySelectorAll('nav a[data-page]').forEach((link) => {
 
 $('refreshBtn').addEventListener('click', refresh);
 $('composerForm').addEventListener('submit', sendMessage);
+$('contactForm').addEventListener('submit', addContact);
+$('importForm').addEventListener('submit', importContact);
+$('identityForm').addEventListener('submit', saveIdentity);
+$('exportSelf').addEventListener('click', exportSelfContact);
 $('targetType').addEventListener('change', updateTargetFields);
+$('messageSearch').addEventListener('input', () => {
+  clearTimeout(state.searchTimer);
+  state.searchTimer = setTimeout(applyMessageFilters, 250);
+});
+$('scopeFilter').addEventListener('change', applyMessageFilters);
+$('statusFilter').addEventListener('change', applyMessageFilters);
+$('directionFilter').addEventListener('change', applyMessageFilters);
+$('prevPage').addEventListener('click', () => changePage(-state.messageLimit));
+$('nextPage').addEventListener('click', () => changePage(state.messageLimit));
+$('exportJson').addEventListener('click', () => openExport('json'));
+$('exportCsv').addEventListener('click', () => openExport('csv'));
+$('notifyBtn').addEventListener('click', enableNotifications);
 $('mapType').addEventListener('change', (event) => setMapLayer(event.target.value));
 $('heatIntensity').addEventListener('input', renderMap);
 $('toggleLabels').addEventListener('click', () => {

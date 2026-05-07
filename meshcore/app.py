@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from meshcore import EventType, MeshCore
@@ -21,6 +21,7 @@ APP_DIR = Path("/app")
 UI_DIR = APP_DIR / "custom-ui"
 DATA_DIR = Path(os.environ.get("MESHCORE_DATA_DIR", "/data/.meshcore"))
 MESSAGE_ARCHIVE = DATA_DIR / "messages.json"
+CONTACT_META_FILE = DATA_DIR / "contacts_meta.json"
 
 DEVICE = os.environ.get("MESHCORE_DEVICE", "/dev/ttyACM0")
 TRANSPORT = os.environ.get("MESHCORE_TRANSPORT", "serial")
@@ -43,6 +44,7 @@ class MeshState:
         self.device_info: Dict[str, Any] = {}
         self.channels: List[Dict[str, Any]] = []
         self.contacts: Dict[str, Dict[str, Any]] = {}
+        self.contact_meta: Dict[str, Dict[str, Any]] = {}
         self.messages: List[Dict[str, Any]] = []
         self.next_message_id = 1
         self.started_at = datetime.now(timezone.utc)
@@ -67,6 +69,32 @@ class SendMessageRequest(BaseModel):
     channel_idx: Optional[int] = Field(default=None, ge=0, le=255)
     contact: Optional[str] = Field(default=None, min_length=6, max_length=128)
     retry: bool = True
+    resend_of: Optional[int] = None
+
+
+class ContactMetaRequest(BaseModel):
+    alias: str = Field(default="", max_length=64)
+    notes: str = Field(default="", max_length=500)
+    trusted: bool = False
+
+
+class ContactCreateRequest(ContactMetaRequest):
+    public_key: str = Field(min_length=64, max_length=64)
+    name: str = Field(min_length=1, max_length=32)
+    node_type: int = Field(default=0, ge=0, le=255)
+    flags: int = Field(default=0, ge=0, le=255)
+    adv_lat: float = 0.0
+    adv_lon: float = 0.0
+
+
+class ContactImportRequest(ContactMetaRequest):
+    uri: str = Field(min_length=16, max_length=512)
+
+
+class IdentityUpdateRequest(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=32)
+    adv_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    adv_lon: Optional[float] = Field(default=None, ge=-180, le=180)
 
 
 def utcnow() -> str:
@@ -114,6 +142,26 @@ def append_message(message: Dict[str, Any]) -> Dict[str, Any]:
     return message
 
 
+def update_message(message_id: int, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    with state.lock:
+        for message in state.messages:
+            if int(message.get("id", 0) or 0) == message_id:
+                message.update(updates)
+                message["updated_at"] = utcnow()
+                state.updated_at = datetime.now(timezone.utc)
+                save_messages()
+                return dict(message)
+    return None
+
+
+def find_message(message_id: int) -> Optional[Dict[str, Any]]:
+    with state.lock:
+        for message in state.messages:
+            if int(message.get("id", 0) or 0) == message_id:
+                return dict(message)
+    return None
+
+
 def save_messages() -> None:
     try:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -146,6 +194,31 @@ def load_messages() -> None:
 load_messages()
 
 
+def save_contact_meta() -> None:
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with state.lock:
+            payload = state.contact_meta
+        CONTACT_META_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def load_contact_meta() -> None:
+    try:
+        data = json.loads(CONTACT_META_FILE.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            with state.lock:
+                state.contact_meta = data
+    except FileNotFoundError:
+        return
+    except Exception:
+        return
+
+
+load_contact_meta()
+
+
 def public_channel(idx: Optional[int], name: str) -> bool:
     return idx == 0 or bool(name and name.startswith("#"))
 
@@ -171,6 +244,120 @@ def resolve_contact(value: str) -> str:
     if all(c in "0123456789abcdef" for c in needle) and len(needle) >= 6:
         return needle
     raise ValueError(f"unknown contact: {value}")
+
+
+def contact_display(pubkey: str, contact: Dict[str, Any]) -> Dict[str, Any]:
+    meta = state.contact_meta.get(pubkey, {})
+    raw_type = int(contact.get("type", 0) or contact.get("adv_type", 0) or 0)
+    adv_lat = contact.get("adv_lat") or None
+    adv_lon = contact.get("adv_lon") or None
+    if adv_lat == 0.0 and adv_lon == 0.0:
+        adv_lat = adv_lon = None
+    name = contact.get("adv_name") or pubkey[:12]
+    return {
+        "name": meta.get("alias") or name,
+        "raw_name": name,
+        "alias": meta.get("alias", ""),
+        "notes": meta.get("notes", ""),
+        "trusted": bool(meta.get("trusted", False)),
+        "public_key": pubkey,
+        "pubkey_prefix": pubkey[:12],
+        "type": {2: "repeater", 3: "room_server", 4: "sensor"}.get(raw_type, "companion" if raw_type in {0, 1} else "unknown"),
+        "raw_type": raw_type,
+        "flags": contact.get("flags"),
+        "out_path_len": contact.get("out_path_len"),
+        "out_path": contact.get("out_path"),
+        "last_seen": contact.get("last_seen") or contact.get("last_advert"),
+        "adv_lat": adv_lat,
+        "adv_lon": adv_lon,
+        "battery_mv": contact.get("battery_mv"),
+    }
+
+
+def contact_by_key(key: str) -> tuple[str, Dict[str, Any]]:
+    pubkey = resolve_contact(key)
+    with state.lock:
+        contact = state.contacts.get(pubkey)
+        if not contact:
+            raise ValueError(f"unknown contact: {key}")
+        return pubkey, dict(contact)
+
+
+async def run_device_command(coro) -> Any:
+    if not state.connected or not meshcore_client or not worker_loop:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    future = asyncio.run_coroutine_threadsafe(coro, worker_loop)
+    try:
+        result = future.result(timeout=30)
+    except concurrent.futures.TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="command timed out") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"command failed: {exc}") from exc
+    if result and event_type_value(result) == EventType.ERROR.value:
+        raise HTTPException(status_code=502, detail=event_payload(result))
+    return result
+
+
+async def refresh_contacts() -> None:
+    if not meshcore_client:
+        return
+    result = await meshcore_client.commands.get_contacts(timeout=10)
+    if result and result.type != EventType.ERROR and result.payload:
+        with state.lock:
+            state.contacts = dict(result.payload)
+
+
+def message_matches(
+    message: Dict[str, Any],
+    scope: str,
+    query: str,
+    status: str,
+    direction: str,
+    conversation: str,
+) -> bool:
+    if scope == "public":
+        if message.get("conversation_type", "channel") != "channel":
+            return False
+        if not public_channel(message.get("channel_idx"), message.get("channel_name", "")):
+            return False
+    elif scope in {"channel", "direct"}:
+        if message.get("conversation_type", "channel") != scope:
+            return False
+    if status != "all" and message.get("status", "received") != status:
+        return False
+    if direction != "all" and message.get("direction", "incoming") != direction:
+        return False
+    if conversation and conversation_id_for_message(message) != conversation:
+        return False
+    if query:
+        haystack = " ".join(str(message.get(key, "")) for key in (
+            "text", "sender", "sender_pubkey", "recipient", "contact", "channel_name", "status"
+        )).lower()
+        if query.lower() not in haystack:
+            return False
+    return True
+
+
+def conversation_id_for_message(message: Dict[str, Any]) -> str:
+    if message.get("conversation_type") == "direct":
+        contact = message.get("contact") or message.get("sender_pubkey") or message.get("sender") or message.get("recipient") or ""
+        return f"direct:{contact}"
+    return f"channel:{message.get('channel_idx', 0)}"
+
+
+def messages_for_filters(
+    scope: str,
+    query: str = "",
+    status: str = "all",
+    direction: str = "all",
+    conversation: str = "",
+) -> List[Dict[str, Any]]:
+    with state.lock:
+        return [
+            dict(message)
+            for message in state.messages
+            if message_matches(message, scope, query, status, direction, conversation)
+        ]
 
 
 async def connect_meshcore() -> None:
@@ -260,9 +447,39 @@ async def wire_events(mc: MeshCore) -> None:
     async def on_disconnect(event) -> None:
         state.set_status(f"Disconnected: {(event.payload or {}).get('reason', 'unknown')}", False)
 
+    async def on_new_contact(event) -> None:
+        payload = event.payload or {}
+        pubkey = payload.get("public_key")
+        if pubkey:
+            with state.lock:
+                state.contacts[pubkey] = dict(payload)
+                state.updated_at = datetime.now(timezone.utc)
+
+    async def on_ack(event) -> None:
+        payload = event.payload or {}
+        code = payload.get("code", "")
+        if not code:
+            return
+        with state.lock:
+            matched = []
+            for message in state.messages:
+                if message.get("expected_ack") == code:
+                    acks = message.setdefault("acks", [])
+                    acks.append({"code": code, "timestamp": utcnow(), "payload": json_safe(payload)})
+                    message["ack_count"] = len(acks)
+                    message["status"] = "acknowledged"
+                    message["updated_at"] = utcnow()
+                    matched.append(message.get("id"))
+            if matched:
+                state.updated_at = datetime.now(timezone.utc)
+        if matched:
+            save_messages()
+
     mc.subscribe(EventType.CHANNEL_MSG_RECV, on_channel_msg)
     mc.subscribe(EventType.CONTACT_MSG_RECV, on_contact_msg)
+    mc.subscribe(EventType.NEW_CONTACT, on_new_contact)
     mc.subscribe(EventType.DISCONNECTED, on_disconnect)
+    mc.subscribe(EventType.ACK, on_ack)
 
 
 async def load_initial_data(mc: MeshCore) -> None:
@@ -337,6 +554,64 @@ async def api_status() -> Dict[str, Any]:
         }
 
 
+@app.get("/api/v1/identity")
+async def api_identity() -> Dict[str, Any]:
+    battery = None
+    core_stats = radio_stats = packet_stats = None
+    if state.connected and meshcore_client and worker_loop:
+        for name, command_factory in [
+            ("battery", meshcore_client.commands.get_bat),
+            ("core_stats", meshcore_client.commands.get_stats_core),
+            ("radio_stats", meshcore_client.commands.get_stats_radio),
+            ("packet_stats", meshcore_client.commands.get_stats_packets),
+        ]:
+            try:
+                result = await run_device_command(command_factory())
+                if name == "battery":
+                    battery = event_payload(result)
+                elif name == "core_stats":
+                    core_stats = event_payload(result)
+                elif name == "radio_stats":
+                    radio_stats = event_payload(result)
+                elif name == "packet_stats":
+                    packet_stats = event_payload(result)
+            except HTTPException:
+                pass
+    with state.lock:
+        return {
+            "connected": state.connected,
+            "status": state.status,
+            "self": state.device,
+            "device_info": state.device_info,
+            "battery": battery,
+            "core_stats": core_stats,
+            "radio_stats": radio_stats,
+            "packet_stats": packet_stats,
+        }
+
+
+@app.patch("/api/v1/identity")
+async def api_update_identity(request: IdentityUpdateRequest) -> Dict[str, Any]:
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    if request.name is not None:
+        await run_device_command(meshcore_client.commands.set_name(request.name))
+    if request.adv_lat is not None or request.adv_lon is not None:
+        with state.lock:
+            current_lat = state.device.get("adv_lat", 0.0)
+            current_lon = state.device.get("adv_lon", 0.0)
+        await run_device_command(meshcore_client.commands.set_coords(
+            request.adv_lat if request.adv_lat is not None else current_lat,
+            request.adv_lon if request.adv_lon is not None else current_lon,
+        ))
+    if meshcore_client:
+        result = await run_device_command(meshcore_client.commands.send_appstart())
+        if result and result.payload:
+            with state.lock:
+                state.device = dict(result.payload)
+    return await api_identity()
+
+
 @app.get("/api/v1/stats")
 async def api_stats() -> Dict[str, Any]:
     now = datetime.now(timezone.utc)
@@ -379,22 +654,107 @@ async def api_nodes() -> List[Dict[str, Any]]:
     nodes = []
     with state.lock:
         for pubkey, contact in state.contacts.items():
-            raw_type = int(contact.get("type", 0) or 0)
-            adv_lat = contact.get("adv_lat") or None
-            adv_lon = contact.get("adv_lon") or None
-            if adv_lat == 0.0 and adv_lon == 0.0:
-                adv_lat = adv_lon = None
-            nodes.append({
-                "name": contact.get("adv_name") or pubkey[:12],
-                "public_key": pubkey,
-                "pubkey_prefix": pubkey[:12],
-                "type": {2: "repeater", 3: "room_server"}.get(raw_type, "client"),
-                "last_seen": contact.get("last_seen") or contact.get("last_advert"),
-                "adv_lat": adv_lat,
-                "adv_lon": adv_lon,
-                "battery_mv": contact.get("battery_mv"),
-            })
+            nodes.append(contact_display(pubkey, contact))
     return sorted(nodes, key=lambda n: (n["type"], n["name"]))
+
+
+@app.post("/api/v1/contacts")
+async def api_create_contact(request: ContactCreateRequest) -> Dict[str, Any]:
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    pubkey = request.public_key.lower()
+    if not all(c in "0123456789abcdef" for c in pubkey):
+        raise HTTPException(status_code=400, detail="public_key must be hex")
+    contact = {
+        "public_key": pubkey,
+        "type": request.node_type,
+        "flags": request.flags,
+        "out_path_len": -1,
+        "out_path": "",
+        "adv_name": request.name,
+        "last_advert": int(time.time()),
+        "adv_lat": request.adv_lat,
+        "adv_lon": request.adv_lon,
+    }
+    await run_device_command(meshcore_client.commands.add_contact(contact))
+    with state.lock:
+        state.contacts[pubkey] = contact
+        state.contact_meta[pubkey] = {
+            "alias": request.alias,
+            "notes": request.notes,
+            "trusted": request.trusted,
+        }
+    save_contact_meta()
+    return contact_display(pubkey, contact)
+
+
+@app.patch("/api/v1/contacts/{key}")
+async def api_update_contact_meta(key: str, request: ContactMetaRequest) -> Dict[str, Any]:
+    pubkey, contact = contact_by_key(key)
+    with state.lock:
+        state.contact_meta[pubkey] = {
+            "alias": request.alias,
+            "notes": request.notes,
+            "trusted": request.trusted,
+        }
+    save_contact_meta()
+    return contact_display(pubkey, contact)
+
+
+@app.delete("/api/v1/contacts/{key}")
+async def api_remove_contact(key: str) -> Dict[str, Any]:
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    pubkey, _ = contact_by_key(key)
+    await run_device_command(meshcore_client.commands.remove_contact(pubkey))
+    with state.lock:
+        state.contacts.pop(pubkey, None)
+        state.contact_meta.pop(pubkey, None)
+    save_contact_meta()
+    return {"ok": True, "removed": pubkey}
+
+
+@app.get("/api/v1/contacts/{key}/export")
+async def api_export_contact(key: str) -> Dict[str, Any]:
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    pubkey, _ = contact_by_key(key)
+    result = await run_device_command(meshcore_client.commands.export_contact(pubkey))
+    return event_payload(result)
+
+
+@app.get("/api/v1/contact-card/self")
+async def api_export_self_contact() -> Dict[str, Any]:
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    result = await run_device_command(meshcore_client.commands.export_contact())
+    return event_payload(result)
+
+
+@app.post("/api/v1/contacts/import")
+async def api_import_contact(request: ContactImportRequest) -> Dict[str, Any]:
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    uri = request.uri.strip()
+    hex_data = uri.removeprefix("meshcore://")
+    if not all(c in "0123456789abcdefABCDEF" for c in hex_data) or len(hex_data) % 2:
+        raise HTTPException(status_code=400, detail="contact URI must be meshcore:// hex data")
+    await run_device_command(meshcore_client.commands.import_contact(bytes.fromhex(hex_data)))
+    contacts_result = await run_device_command(meshcore_client.commands.get_contacts(timeout=10))
+    if contacts_result and contacts_result.payload:
+        with state.lock:
+            state.contacts = dict(contacts_result.payload)
+    if request.alias or request.notes or request.trusted:
+        with state.lock:
+            newest = max(state.contacts.keys(), key=lambda k: state.contacts[k].get("last_advert", 0), default="")
+            if newest:
+                state.contact_meta[newest] = {
+                    "alias": request.alias,
+                    "notes": request.notes,
+                    "trusted": request.trusted,
+                }
+        save_contact_meta()
+    return {"ok": True}
 
 
 @app.get("/api/v1/messages")
@@ -402,19 +762,51 @@ async def api_messages(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     scope: str = Query(default="all", pattern="^(all|public|channel|direct)$"),
+    q: str = Query(default="", max_length=128),
+    status: str = Query(default="all", pattern="^(all|queued|sending|sent|acknowledged|ack_timeout|failed|received)$"),
+    direction: str = Query(default="all", pattern="^(all|incoming|outgoing)$"),
+    conversation: str = Query(default="", max_length=160),
 ) -> Dict[str, Any]:
-    with state.lock:
-        messages = list(state.messages)
-        if scope == "public":
-            messages = [
-                m for m in messages
-                if m.get("conversation_type", "channel") == "channel"
-                and public_channel(m.get("channel_idx"), m.get("channel_name", ""))
-            ]
-        elif scope in {"channel", "direct"}:
-            messages = [m for m in messages if m.get("conversation_type", "channel") == scope]
-        page = messages[offset:offset + limit]
-        return {"total": len(messages), "limit": limit, "offset": offset, "scope": scope, "items": page}
+    messages = messages_for_filters(scope, q, status, direction, conversation)
+    page = messages[offset:offset + limit]
+    return {
+        "total": len(messages),
+        "limit": limit,
+        "offset": offset,
+        "scope": scope,
+        "q": q,
+        "status": status,
+        "direction": direction,
+        "conversation": conversation,
+        "items": page,
+    }
+
+
+@app.get("/api/v1/messages/export")
+async def api_export_messages(
+    format: str = Query(default="json", pattern="^(json|csv)$"),
+    scope: str = Query(default="all", pattern="^(all|public|channel|direct)$"),
+    q: str = Query(default="", max_length=128),
+    status: str = Query(default="all", pattern="^(all|queued|sending|sent|acknowledged|ack_timeout|failed|received)$"),
+    direction: str = Query(default="all", pattern="^(all|incoming|outgoing)$"),
+    conversation: str = Query(default="", max_length=160),
+) -> Response:
+    messages = messages_for_filters(scope, q, status, direction, conversation)
+    if format == "json":
+        return Response(
+            json.dumps({"exported_at": utcnow(), "total": len(messages), "items": messages}, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=meshcore-messages.json"},
+        )
+    columns = ["id", "timestamp", "direction", "conversation_type", "channel_name", "sender", "recipient", "status", "ack_count", "text"]
+    rows = [",".join(csv_cell(col) for col in columns)]
+    for message in messages:
+        rows.append(",".join(csv_cell(message.get(col, "")) for col in columns))
+    return Response(
+        "\n".join(rows) + "\n",
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=meshcore-messages.csv"},
+    )
 
 
 @app.get("/api/v1/conversations")
@@ -490,24 +882,53 @@ async def api_send_message(request: SendMessageRequest) -> Dict[str, Any]:
     if not text:
         raise HTTPException(status_code=400, detail="message text is required")
 
+    message: Dict[str, Any] = {
+        "direction": "outgoing",
+        "status": "queued",
+        "conversation_type": request.target_type,
+        "text": text,
+        "timestamp": utcnow(),
+        "hops": 0,
+        "retry_enabled": request.retry,
+        "resend_of": request.resend_of,
+    }
+    if request.target_type == "channel":
+        if request.channel_idx is None:
+            raise HTTPException(status_code=400, detail="channel_idx is required")
+        message["channel_idx"] = request.channel_idx
+        message["channel_name"] = channel_name(request.channel_idx)
+        message["is_private"] = not public_channel(request.channel_idx, message["channel_name"])
+    else:
+        try:
+            contact_key = resolve_contact(request.contact or "")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        message["channel_idx"] = None
+        message["channel_name"] = "Direct"
+        message["contact"] = contact_key
+        message["recipient"] = contact_key[:12]
+
+    append_message(message)
+    update_message(int(message["id"]), {"status": "sending", "send_started_at": utcnow()})
+
     async def send() -> Any:
         if request.target_type == "channel":
-            if request.channel_idx is None:
-                raise ValueError("channel_idx is required")
             return await meshcore_client.commands.send_chan_msg(request.channel_idx, text)
-        contact = resolve_contact(request.contact or "")
         if request.retry:
-            return await meshcore_client.commands.send_msg_with_retry(contact, text, min_timeout=3)
-        return await meshcore_client.commands.send_msg(contact, text)
+            return await meshcore_client.commands.send_msg_with_retry(message["contact"], text, min_timeout=3)
+        return await meshcore_client.commands.send_msg(message["contact"], text)
 
     future = asyncio.run_coroutine_threadsafe(send(), worker_loop)
     try:
         result = future.result(timeout=45)
     except ValueError as exc:
+        update_message(int(message["id"]), {"status": "failed", "error": str(exc)})
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except concurrent.futures.TimeoutError as exc:
+        update_message(int(message["id"]), {"status": "failed", "error": "message send timed out"})
         raise HTTPException(status_code=504, detail="message send timed out") from exc
     except Exception as exc:
+        update_message(int(message["id"]), {"status": "failed", "error": str(exc)})
         raise HTTPException(status_code=500, detail=f"message send failed: {exc}") from exc
 
     if result is None:
@@ -517,32 +938,43 @@ async def api_send_message(request: SendMessageRequest) -> Dict[str, Any]:
     else:
         result_type = event_type_value(result)
         payload = event_payload(result)
-        status = "sent" if result_type in {EventType.OK.value, EventType.MSG_SENT.value} else "failed"
+        status = "acknowledged" if request.target_type == "direct" and request.retry and result_type == EventType.MSG_SENT.value else "sent"
+        if result_type not in {EventType.OK.value, EventType.MSG_SENT.value}:
+            status = "failed"
         if result_type == EventType.ERROR.value:
+            update_message(int(message["id"]), {"status": status, "send_result": {"event": result_type, "payload": payload}})
             raise HTTPException(status_code=502, detail={"status": status, "event": result_type, "payload": payload})
 
-    message: Dict[str, Any] = {
-        "direction": "outgoing",
+    updates = {
         "status": status,
-        "conversation_type": request.target_type,
-        "text": text,
-        "timestamp": utcnow(),
-        "hops": 0,
+        "sent_at": utcnow(),
         "send_result": {"event": result_type, "payload": payload},
+        "expected_ack": payload.get("expected_ack") if isinstance(payload, dict) else None,
+        "suggested_timeout_ms": payload.get("suggested_timeout") if isinstance(payload, dict) else None,
+        "ack_count": 1 if status == "acknowledged" else 0,
     }
-    if request.target_type == "channel":
-        message["channel_idx"] = request.channel_idx
-        message["channel_name"] = channel_name(request.channel_idx)
-        message["is_private"] = not public_channel(request.channel_idx, message["channel_name"])
-    else:
-        contact_key = resolve_contact(request.contact or "")
-        message["channel_idx"] = None
-        message["channel_name"] = "Direct"
-        message["contact"] = contact_key
-        message["recipient"] = contact_key[:12]
+    if status == "acknowledged":
+        updates["acks"] = [{"code": updates["expected_ack"], "timestamp": utcnow(), "source": "send_msg_with_retry"}]
+    updated = update_message(int(message["id"]), updates) or message
+    return {"ok": status != "failed", "status": status, "message": updated}
 
-    append_message(message)
-    return {"ok": status != "failed", "status": status, "message": message}
+
+@app.post("/api/v1/messages/{message_id}/resend")
+async def api_resend_message(message_id: int) -> Dict[str, Any]:
+    original = find_message(message_id)
+    if not original:
+        raise HTTPException(status_code=404, detail="message not found")
+    if original.get("direction") != "outgoing":
+        raise HTTPException(status_code=400, detail="only outgoing messages can be resent")
+    request = SendMessageRequest(
+        target_type=original.get("conversation_type", "channel"),
+        text=original.get("text", ""),
+        channel_idx=original.get("channel_idx"),
+        contact=original.get("contact"),
+        retry=bool(original.get("retry_enabled", True)),
+        resend_of=message_id,
+    )
+    return await api_send_message(request)
 
 
 @app.get("/api/v1/channels")
@@ -559,3 +991,8 @@ def parse_time(value: Any) -> datetime:
         return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
     except ValueError:
         return datetime.fromtimestamp(0, timezone.utc)
+
+
+def csv_cell(value: Any) -> str:
+    text = "" if value is None else str(value)
+    return '"' + text.replace('"', '""') + '"'

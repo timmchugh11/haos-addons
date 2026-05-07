@@ -25,24 +25,25 @@ dashboard.
 - [x] Conversation view grouped by channel/contact
 - [x] Message composer with channel/contact selector
 - [x] Message delivery state: sent, failed, ACK timed out
-- [ ] Message queue state before radio handoff
-- [ ] Multi-ACK display when supported by firmware
-- [ ] Message retry/resend controls
+- [x] Message queue state before radio handoff
+- [x] Multi-ACK display when supported by firmware
+- [x] Message retry/resend controls
 - [x] Local persistent message archive under `/data/.meshcore`
-- [ ] Message search, filters, and pagination
-- [ ] Export messages as JSON/CSV
-- [ ] Notification hooks for new direct messages and selected channels
+- [x] Message search, filters, and pagination
+- [x] Export messages as JSON/CSV
+- [x] Notification hooks for new direct messages and selected channels
 
 ## Priority 2 - Contacts, Nodes, and Identity
 
-- [ ] Add, edit, and remove contacts
-- [ ] Manual add-contact flow by public key
-- [ ] Contact discovery/advert handling
-- [ ] Contact aliases and notes stored locally
-- [ ] Contact trust/verification indicators
-- [ ] Node type display for companion, repeater, room server, sensor, and unknown
-- [ ] Device identity page: name, public key, role, owner info, firmware info
-- [ ] Device battery, storage, radio parameters, and telemetry status
+- [x] Add, edit, and remove contacts
+- [x] Manual add-contact flow by public key
+- [x] Contact discovery/advert handling
+- [x] Contact aliases and notes stored locally
+- [x] Contact trust/verification indicators
+- [x] Node type display for companion, repeater, room server, sensor, and unknown
+- [x] Device identity page: name, public key, role, and firmware/device info
+- [ ] Owner info editor/display
+- [x] Device battery, storage, radio parameters, and telemetry status
 - [ ] Admin-safe private key backup/export flow
 - [ ] Admin-safe identity restore/import flow
 

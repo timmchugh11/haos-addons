@@ -1,6 +1,6 @@
 name: "MeshCore GUI"
 description: "Custom Home Assistant web GUI for MeshCore companion radios with dashboard, full messages, nodes, channels, map, REST API, serial and BLE support"
-version: "0.4.0"
+version: "0.6.0"
 slug: "meshcore"
 init: false
 stage: "experimental"
