@@ -22,6 +22,8 @@ UI_DIR = APP_DIR / "custom-ui"
 DATA_DIR = Path(os.environ.get("MESHCORE_DATA_DIR", "/data/.meshcore"))
 MESSAGE_ARCHIVE = DATA_DIR / "messages.json"
 CONTACT_META_FILE = DATA_DIR / "contacts_meta.json"
+CHANNEL_META_FILE = DATA_DIR / "channels_meta.json"
+ADMIN_SETTINGS_FILE = DATA_DIR / "admin_settings.json"
 LOCATION_STALE_SECONDS = int(os.environ.get("MESHCORE_LOCATION_STALE_SECONDS", str(7 * 24 * 60 * 60)))
 
 DEVICE = os.environ.get("MESHCORE_DEVICE", "/dev/ttyACM0")
@@ -44,8 +46,10 @@ class MeshState:
         self.device: Dict[str, Any] = {}
         self.device_info: Dict[str, Any] = {}
         self.channels: List[Dict[str, Any]] = []
+        self.channel_meta: Dict[str, Dict[str, Any]] = {}
         self.contacts: Dict[str, Dict[str, Any]] = {}
         self.contact_meta: Dict[str, Dict[str, Any]] = {}
+        self.admin_settings: Dict[str, Any] = {}
         self.messages: List[Dict[str, Any]] = []
         self.next_message_id = 1
         self.started_at = datetime.now(timezone.utc)
@@ -96,6 +100,51 @@ class IdentityUpdateRequest(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=32)
     adv_lat: Optional[float] = Field(default=None, ge=-90, le=90)
     adv_lon: Optional[float] = Field(default=None, ge=-180, le=180)
+
+
+class ChannelUpdateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=32)
+    secret_hex: str = Field(default="", max_length=32)
+    password: str = Field(default="", max_length=128)
+    pinned: bool = False
+    muted: bool = False
+    sort_order: int = 0
+
+
+class ChannelMetaRequest(BaseModel):
+    pinned: bool = False
+    muted: bool = False
+    sort_order: int = 0
+
+
+class ChannelBackupRestoreRequest(BaseModel):
+    channels: List[Dict[str, Any]]
+
+
+class RoomSyncRequest(BaseModel):
+    start: int = Field(default=0, ge=0)
+    end: int = Field(default_factory=lambda: int(time.time()), ge=0)
+    password: str = Field(default="", max_length=128)
+
+
+class RoomPostRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=512)
+    password: str = Field(default="", max_length=128)
+
+
+class AdminSettingsRequest(BaseModel):
+    allow_channel_messages: bool = True
+    allow_direct_messages: bool = True
+    allow_room_posts: bool = False
+    allow_channel_config_writes: bool = True
+    allow_contact_writes: bool = True
+    allow_identity_writes: bool = True
+    allow_room_sync: bool = True
+    allow_channel_restore: bool = False
+    allow_contact_import: bool = False
+    require_confirm_for_writes: bool = True
+    maintenance_mode: bool = False
+    admin_note: str = Field(default="", max_length=500)
 
 
 def utcnow() -> str:
@@ -220,6 +269,88 @@ def load_contact_meta() -> None:
 load_contact_meta()
 
 
+def save_channel_meta() -> None:
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with state.lock:
+            payload = state.channel_meta
+        CHANNEL_META_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def load_channel_meta() -> None:
+    try:
+        data = json.loads(CHANNEL_META_FILE.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            with state.lock:
+                state.channel_meta = data
+    except FileNotFoundError:
+        return
+    except Exception:
+        return
+
+
+load_channel_meta()
+
+
+DEFAULT_ADMIN_SETTINGS: Dict[str, Any] = {
+    "allow_channel_messages": True,
+    "allow_direct_messages": True,
+    "allow_room_posts": False,
+    "allow_channel_config_writes": True,
+    "allow_contact_writes": True,
+    "allow_identity_writes": True,
+    "allow_room_sync": True,
+    "allow_channel_restore": False,
+    "allow_contact_import": False,
+    "require_confirm_for_writes": True,
+    "maintenance_mode": False,
+    "admin_note": "",
+}
+
+
+def save_admin_settings() -> None:
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with state.lock:
+            payload = {**DEFAULT_ADMIN_SETTINGS, **state.admin_settings}
+        ADMIN_SETTINGS_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def load_admin_settings() -> None:
+    try:
+        data = json.loads(ADMIN_SETTINGS_FILE.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            with state.lock:
+                state.admin_settings = {**DEFAULT_ADMIN_SETTINGS, **data}
+                return
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    with state.lock:
+        state.admin_settings = dict(DEFAULT_ADMIN_SETTINGS)
+
+
+def admin_settings() -> Dict[str, Any]:
+    with state.lock:
+        return {**DEFAULT_ADMIN_SETTINGS, **state.admin_settings}
+
+
+def enforce_write(setting: str, action: str) -> None:
+    settings = admin_settings()
+    if settings.get("maintenance_mode") and setting != "maintenance_mode":
+        raise HTTPException(status_code=423, detail=f"{action} blocked: maintenance mode is enabled")
+    if not settings.get(setting, False):
+        raise HTTPException(status_code=403, detail=f"{action} blocked by admin safety setting: {setting}")
+
+
+load_admin_settings()
+
+
 def public_channel(idx: Optional[int], name: str) -> bool:
     return idx == 0 or bool(name and name.startswith("#"))
 
@@ -230,6 +361,30 @@ def channel_name(idx: Optional[int]) -> str:
             if ch.get("idx") == idx:
                 return ch.get("name", "")
     return "Public" if idx == 0 else ""
+
+
+def channel_display(channel: Dict[str, Any]) -> Dict[str, Any]:
+    idx = int(channel.get("idx", channel.get("index", 0)) or 0)
+    meta = state.channel_meta.get(str(idx), {})
+    secret = channel.get("channel_secret")
+    secret_hex = secret.hex() if isinstance(secret, (bytes, bytearray)) else str(secret or "")
+    name = channel.get("name") or channel.get("channel_name") or f"Channel {idx}"
+    return {
+        "idx": idx,
+        "name": name,
+        "is_private": not public_channel(idx, name),
+        "secret_hex": secret_hex,
+        "has_secret": bool(secret_hex),
+        "pinned": bool(meta.get("pinned", False)),
+        "muted": bool(meta.get("muted", False)),
+        "sort_order": int(meta.get("sort_order", 0) or 0),
+    }
+
+
+def sorted_channels() -> List[Dict[str, Any]]:
+    with state.lock:
+        channels = [channel_display(channel) for channel in state.channels]
+    return sorted(channels, key=lambda c: (-int(c["pinned"]), int(c["sort_order"]), int(c["idx"])))
 
 
 def resolve_contact(value: str) -> str:
@@ -607,7 +762,12 @@ async def load_initial_data(mc: MeshCore) -> None:
         empty_count = 0
         payload = result.payload or {}
         name = payload.get("channel_name") or payload.get("name") or f"Channel {idx}"
-        channels.append({"idx": idx, "name": name, "is_private": not public_channel(idx, name)})
+        channels.append({
+            "idx": idx,
+            "name": name,
+            "is_private": not public_channel(idx, name),
+            "channel_secret": payload.get("channel_secret", b""),
+        })
 
     if not channels:
         channels = [{"idx": 0, "name": "Public", "is_private": False}]
@@ -655,6 +815,35 @@ async def api_status() -> Dict[str, Any]:
         }
 
 
+@app.get("/api/v1/admin/settings")
+async def api_admin_settings() -> Dict[str, Any]:
+    return {
+        "settings": admin_settings(),
+        "storage": str(ADMIN_SETTINGS_FILE),
+        "write_categories": {
+            "allow_channel_messages": "Send messages to public/private channels",
+            "allow_direct_messages": "Send direct messages to contacts",
+            "allow_room_posts": "Send posts/messages into room servers",
+            "allow_channel_config_writes": "Change channel names, secrets, pin/mute/sort metadata",
+            "allow_contact_writes": "Add, remove, import, or edit contacts",
+            "allow_identity_writes": "Change local node name or advertised coordinates",
+            "allow_room_sync": "Login/sync room server history and ACL/status",
+            "allow_channel_restore": "Bulk restore channel configuration from backup JSON",
+            "allow_contact_import": "Import meshcore:// contact cards",
+            "maintenance_mode": "Block all write operations except changing admin settings",
+        },
+    }
+
+
+@app.put("/api/v1/admin/settings")
+async def api_update_admin_settings(request: AdminSettingsRequest) -> Dict[str, Any]:
+    with state.lock:
+        state.admin_settings = request.model_dump() if hasattr(request, "model_dump") else request.dict()
+        state.updated_at = datetime.now(timezone.utc)
+    save_admin_settings()
+    return await api_admin_settings()
+
+
 @app.get("/api/v1/identity")
 async def api_identity() -> Dict[str, Any]:
     battery = None
@@ -693,6 +882,7 @@ async def api_identity() -> Dict[str, Any]:
 
 @app.patch("/api/v1/identity")
 async def api_update_identity(request: IdentityUpdateRequest) -> Dict[str, Any]:
+    enforce_write("allow_identity_writes", "identity update")
     if not state.connected or not meshcore_client:
         raise HTTPException(status_code=503, detail="MeshCore device is not connected")
     if request.name is not None:
@@ -786,6 +976,7 @@ async def api_map() -> Dict[str, Any]:
 
 @app.post("/api/v1/contacts")
 async def api_create_contact(request: ContactCreateRequest) -> Dict[str, Any]:
+    enforce_write("allow_contact_writes", "contact add")
     if not state.connected or not meshcore_client:
         raise HTTPException(status_code=503, detail="MeshCore device is not connected")
     pubkey = request.public_key.lower()
@@ -816,6 +1007,7 @@ async def api_create_contact(request: ContactCreateRequest) -> Dict[str, Any]:
 
 @app.patch("/api/v1/contacts/{key}")
 async def api_update_contact_meta(key: str, request: ContactMetaRequest) -> Dict[str, Any]:
+    enforce_write("allow_contact_writes", "contact metadata update")
     pubkey, contact = contact_by_key(key)
     with state.lock:
         state.contact_meta[pubkey] = {
@@ -829,6 +1021,7 @@ async def api_update_contact_meta(key: str, request: ContactMetaRequest) -> Dict
 
 @app.delete("/api/v1/contacts/{key}")
 async def api_remove_contact(key: str) -> Dict[str, Any]:
+    enforce_write("allow_contact_writes", "contact remove")
     if not state.connected or not meshcore_client:
         raise HTTPException(status_code=503, detail="MeshCore device is not connected")
     pubkey, _ = contact_by_key(key)
@@ -859,6 +1052,8 @@ async def api_export_self_contact() -> Dict[str, Any]:
 
 @app.post("/api/v1/contacts/import")
 async def api_import_contact(request: ContactImportRequest) -> Dict[str, Any]:
+    enforce_write("allow_contact_import", "contact import")
+    enforce_write("allow_contact_writes", "contact import")
     if not state.connected or not meshcore_client:
         raise HTTPException(status_code=503, detail="MeshCore device is not connected")
     uri = request.uri.strip()
@@ -939,7 +1134,7 @@ async def api_export_messages(
 async def api_conversations() -> List[Dict[str, Any]]:
     conversations: Dict[str, Dict[str, Any]] = {}
     with state.lock:
-        for channel in state.channels:
+        for channel in sorted_channels():
             key = f"channel:{channel.get('idx')}"
             conversations[key] = {
                 "id": key,
@@ -1001,6 +1196,10 @@ async def api_conversations() -> List[Dict[str, Any]]:
 
 @app.post("/api/v1/messages")
 async def api_send_message(request: SendMessageRequest) -> Dict[str, Any]:
+    if request.target_type == "channel":
+        enforce_write("allow_channel_messages", "channel message send")
+    else:
+        enforce_write("allow_direct_messages", "direct message send")
     if not state.connected or not meshcore_client or not worker_loop:
         raise HTTPException(status_code=503, detail="MeshCore device is not connected")
 
@@ -1105,8 +1304,139 @@ async def api_resend_message(message_id: int) -> Dict[str, Any]:
 
 @app.get("/api/v1/channels")
 async def api_channels() -> List[Dict[str, Any]]:
+    return sorted_channels()
+
+
+@app.patch("/api/v1/channels/{idx:int}")
+async def api_update_channel(idx: int, request: ChannelUpdateRequest) -> Dict[str, Any]:
+    enforce_write("allow_channel_config_writes", "channel update")
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    secret = None
+    if request.secret_hex:
+        if len(request.secret_hex) != 32 or not all(c in "0123456789abcdefABCDEF" for c in request.secret_hex):
+            raise HTTPException(status_code=400, detail="secret_hex must be 16 bytes / 32 hex characters")
+        secret = bytes.fromhex(request.secret_hex)
+    elif request.password:
+        import hashlib
+        secret = hashlib.sha256(request.password.encode("utf-8")).digest()[:16]
+    await run_device_command(meshcore_client.commands.set_channel(idx, request.name, secret))
+    result = await run_device_command(meshcore_client.commands.get_channel(idx))
+    payload = result.payload or {}
+    name = payload.get("channel_name") or payload.get("name") or request.name
     with state.lock:
-        return list(state.channels)
+        updated = {
+            "idx": idx,
+            "name": name,
+            "is_private": not public_channel(idx, name),
+            "channel_secret": payload.get("channel_secret", secret or b""),
+        }
+        state.channels = [ch for ch in state.channels if int(ch.get("idx", -1)) != idx]
+        state.channels.append(updated)
+        state.channel_meta[str(idx)] = {
+            "pinned": request.pinned,
+            "muted": request.muted,
+            "sort_order": request.sort_order,
+        }
+    save_channel_meta()
+    return channel_display(updated)
+
+
+@app.patch("/api/v1/channels/{idx:int}/meta")
+async def api_update_channel_meta(idx: int, request: ChannelMetaRequest) -> Dict[str, Any]:
+    enforce_write("allow_channel_config_writes", "channel metadata update")
+    with state.lock:
+        state.channel_meta[str(idx)] = {
+            "pinned": request.pinned,
+            "muted": request.muted,
+            "sort_order": request.sort_order,
+        }
+        channel = next((ch for ch in state.channels if int(ch.get("idx", -1)) == idx), {"idx": idx, "name": f"Channel {idx}"})
+    save_channel_meta()
+    return channel_display(channel)
+
+
+@app.get("/api/v1/channels/backup")
+async def api_channel_backup() -> Dict[str, Any]:
+    return {"exported_at": utcnow(), "channels": sorted_channels()}
+
+
+@app.post("/api/v1/channels/restore")
+async def api_channel_restore(request: ChannelBackupRestoreRequest) -> Dict[str, Any]:
+    enforce_write("allow_channel_restore", "channel restore")
+    enforce_write("allow_channel_config_writes", "channel restore")
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    restored = []
+    for item in request.channels:
+        idx = int(item.get("idx", 0))
+        name = str(item.get("name") or f"Channel {idx}")[:32]
+        secret_hex = str(item.get("secret_hex") or "")
+        secret = bytes.fromhex(secret_hex) if len(secret_hex) == 32 and all(c in "0123456789abcdefABCDEF" for c in secret_hex) else None
+        await run_device_command(meshcore_client.commands.set_channel(idx, name, secret))
+        with state.lock:
+            state.channel_meta[str(idx)] = {
+                "pinned": bool(item.get("pinned", False)),
+                "muted": bool(item.get("muted", False)),
+                "sort_order": int(item.get("sort_order", 0) or 0),
+            }
+        restored.append(idx)
+    save_channel_meta()
+    await load_initial_data(meshcore_client)
+    return {"ok": True, "restored": restored}
+
+
+@app.get("/api/v1/rooms")
+async def api_rooms() -> List[Dict[str, Any]]:
+    with state.lock:
+        rooms = [
+            contact_display(pubkey, contact)
+            for pubkey, contact in state.contacts.items()
+            if int(contact.get("type", 0) or contact.get("adv_type", 0) or 0) == 3
+        ]
+    return sorted(rooms, key=lambda r: r["name"])
+
+
+@app.post("/api/v1/rooms/{key}/sync")
+async def api_room_sync(key: str, request: RoomSyncRequest) -> Dict[str, Any]:
+    enforce_write("allow_room_sync", "room sync")
+    if not state.connected or not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    pubkey, contact = contact_by_key(key)
+    if request.password:
+        await run_device_command(meshcore_client.commands.send_login(pubkey, request.password))
+    mma = await run_device_command(meshcore_client.commands.req_mma_sync(contact, request.start, request.end, min_timeout=5))
+    acl = None
+    try:
+        acl = await run_device_command(meshcore_client.commands.req_acl_sync(contact, min_timeout=5))
+    except HTTPException:
+        acl = None
+    return {
+        "room": contact_display(pubkey, contact),
+        "history": mma,
+        "acl": acl,
+        "read_only": infer_room_read_only(acl),
+        "synced_at": utcnow(),
+        "note": "Room history support depends on room-server firmware and meshcore_py binary responses.",
+    }
+
+
+@app.post("/api/v1/rooms/{key}/posts")
+async def api_room_post(key: str, request: RoomPostRequest) -> Dict[str, Any]:
+    enforce_write("allow_room_posts", "room post")
+    pubkey, _ = contact_by_key(key)
+    if request.password:
+        await run_device_command(meshcore_client.commands.send_login(pubkey, request.password))
+    send_request = SendMessageRequest(target_type="direct", contact=pubkey, text=request.text, retry=True)
+    return await api_send_message(send_request)
+
+
+def infer_room_read_only(acl: Any) -> Optional[bool]:
+    if isinstance(acl, dict):
+        value = acl.get("read_only") or acl.get("allow_read_only")
+        if isinstance(value, bool):
+            return value
+    return None
 
 
 def parse_time(value: Any) -> datetime:

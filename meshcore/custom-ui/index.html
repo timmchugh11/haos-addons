@@ -69,6 +69,11 @@ main{flex:1;overflow:auto;padding:30px}
 .composer-actions{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap}
 .check{display:inline-flex;align-items:center;gap:8px;color:var(--text2);font-size:12px;font-weight:700}
 .send-status{color:var(--muted);font-size:12px}
+.admin-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.toggle-row{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);padding:12px}
+.toggle-row input{margin-top:3px;flex-shrink:0}
+.toggle-row strong{display:block;color:var(--text);font-size:13px}
+.toggle-row span{display:block;color:var(--muted);font-size:12px}
 .msg-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .pill{display:inline-flex;align-items:center;border:1px solid var(--border2);border-radius:999px;padding:2px 7px;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
 .toolbar{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:14px}
@@ -138,8 +143,10 @@ main{flex:1;overflow:auto;padding:30px}
       <a href="#messages" data-page="messages">Messages</a>
       <a href="#nodes" data-page="nodes">Nodes</a>
       <a href="#channels" data-page="channels">Channels</a>
+      <a href="#rooms" data-page="rooms">Room Servers</a>
       <a href="#map" data-page="map">Map</a>
       <a href="#identity" data-page="identity">Identity</a>
+      <a href="#admin" data-page="admin">Admin</a>
     </nav>
     <main>
       <section id="dashboard" class="page active">
@@ -298,8 +305,65 @@ main{flex:1;overflow:auto;padding:30px}
       </section>
       <section id="channels" class="page">
         <h1 class="page-title">Channels</h1>
-        <div class="page-sub">Discovered channel table with public/private classification.</div>
-        <div class="box"><table class="tbl"><thead><tr><th>Index</th><th>Name</th><th>Type</th></tr></thead><tbody id="channelsTable"></tbody></table></div>
+        <div class="page-sub">Channel names, private keys/passwords, sort/pin/mute metadata, and backup/restore.</div>
+        <div class="box">
+          <div class="box-title">Channel Editor <span id="channelEditStatus">Select a channel</span></div>
+          <form id="channelForm" class="composer">
+            <div class="form-grid">
+              <div class="field"><label for="channelIdx">Index</label><input id="channelIdx" type="number" min="0" max="255" value="0"></div>
+              <div class="field"><label for="channelName">Name</label><input id="channelName" maxlength="32" placeholder="Public or #private"></div>
+              <div class="field"><label for="channelPassword">Password</label><input id="channelPassword" type="password" placeholder="Optional, not stored"></div>
+              <div class="field"><label for="channelSecret">Secret Hex</label><input id="channelSecret" maxlength="32" placeholder="16-byte hex, optional"></div>
+              <div class="field"><label for="channelSort">Sort</label><input id="channelSort" type="number" value="0"></div>
+            </div>
+            <div class="composer-actions">
+              <div>
+                <label class="check"><input id="channelPinned" type="checkbox"> Pinned</label>
+                <label class="check"><input id="channelMuted" type="checkbox"> Muted</label>
+              </div>
+              <button class="btn" type="submit">Save Channel</button>
+            </div>
+          </form>
+        </div>
+        <div class="box">
+          <div class="box-title">Backup / Restore <span id="channelBackupStatus"></span></div>
+          <div class="composer">
+            <div class="field"><label for="channelBackupText">Channel Backup JSON</label><textarea id="channelBackupText" placeholder="Export or paste backup JSON"></textarea></div>
+            <div class="composer-actions">
+              <span class="send-status">Secrets are only included if the device exposes them.</span>
+              <div>
+                <button id="exportChannels" class="btn" type="button">Export</button>
+                <button id="restoreChannels" class="btn" type="button">Restore</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="box"><table class="tbl"><thead><tr><th>Index</th><th>Name</th><th>Type</th><th>Flags</th><th>Actions</th></tr></thead><tbody id="channelsTable"></tbody></table></div>
+      </section>
+      <section id="rooms" class="page">
+        <h1 class="page-title">Room Servers</h1>
+        <div class="page-sub">Discovered room servers with history/status sync where the firmware exposes compatible binary responses.</div>
+        <div class="box">
+          <div class="box-title">Room Sync <span id="roomStatus">Select a room server</span></div>
+          <form id="roomForm" class="composer">
+            <div class="form-grid">
+              <div class="field"><label for="roomTarget">Room Server</label><select id="roomTarget"></select></div>
+              <div class="field"><label for="roomPassword">Password</label><input id="roomPassword" type="password" placeholder="Optional login password"></div>
+              <div class="field"><label for="roomStart">Start Epoch</label><input id="roomStart" type="number" value="0"></div>
+              <div class="field"><label for="roomEnd">End Epoch</label><input id="roomEnd" type="number"></div>
+            </div>
+            <div class="field"><label for="roomPostText">Post</label><textarea id="roomPostText" maxlength="512" placeholder="Optional post text"></textarea></div>
+            <div class="composer-actions">
+              <span id="roomActionStatus" class="send-status"></span>
+              <div>
+                <button id="syncRoom" class="btn" type="button">Sync</button>
+                <button class="btn" type="submit">Post</button>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="box"><table class="tbl"><thead><tr><th>Name</th><th>Public Key</th><th>Last Seen</th><th>Status</th></tr></thead><tbody id="roomsTable"></tbody></table></div>
+        <div class="box"><div class="box-title">Room Response</div><pre id="roomOutput" class="status-line"></pre></div>
       </section>
       <section id="map" class="page">
         <h1 class="page-title">Live Map</h1>
@@ -368,6 +432,36 @@ main{flex:1;overflow:auto;padding:30px}
           </div>
         </div>
       </section>
+      <section id="admin" class="page">
+        <h1 class="page-title">Admin</h1>
+        <div class="page-sub">Write safety controls for message sending, room servers, contacts, identity, and channel configuration.</div>
+        <div class="box">
+          <div class="box-title">Write Safety <span id="adminStatus">Not loaded</span></div>
+          <form id="adminForm" class="composer">
+            <div class="admin-grid">
+              <label class="toggle-row"><input id="adminMaintenance" type="checkbox"><div><strong>Maintenance mode</strong><span>Block every write-capable API action until disabled.</span></div></label>
+              <label class="toggle-row"><input id="adminConfirmWrites" type="checkbox"><div><strong>Confirm writes</strong><span>Ask before the browser sends write requests.</span></div></label>
+              <label class="toggle-row"><input id="adminChannelMessages" type="checkbox"><div><strong>Channel messages</strong><span>Allow sends into public and private channels.</span></div></label>
+              <label class="toggle-row"><input id="adminDirectMessages" type="checkbox"><div><strong>Direct messages</strong><span>Allow sends to contacts and public keys.</span></div></label>
+              <label class="toggle-row"><input id="adminRoomPosts" type="checkbox"><div><strong>Room posts</strong><span>Allow posting messages into room servers.</span></div></label>
+              <label class="toggle-row"><input id="adminRoomSync" type="checkbox"><div><strong>Room sync</strong><span>Allow room login/history/status sync commands.</span></div></label>
+              <label class="toggle-row"><input id="adminChannelConfig" type="checkbox"><div><strong>Channel config</strong><span>Allow channel names, secrets, pin/mute, and sort changes.</span></div></label>
+              <label class="toggle-row"><input id="adminChannelRestore" type="checkbox"><div><strong>Channel restore</strong><span>Allow bulk restore from channel backup JSON.</span></div></label>
+              <label class="toggle-row"><input id="adminContactWrites" type="checkbox"><div><strong>Contact writes</strong><span>Allow add, remove, trust, and metadata changes.</span></div></label>
+              <label class="toggle-row"><input id="adminContactImport" type="checkbox"><div><strong>Contact import</strong><span>Allow importing meshcore:// contact cards.</span></div></label>
+              <label class="toggle-row"><input id="adminIdentityWrites" type="checkbox"><div><strong>Identity writes</strong><span>Allow local name and advertised coordinate changes.</span></div></label>
+            </div>
+            <div class="field">
+              <label for="adminNote">Admin Note</label>
+              <textarea id="adminNote" maxlength="500" placeholder="Optional local note"></textarea>
+            </div>
+            <div class="composer-actions">
+              <span id="adminSaveStatus" class="send-status"></span>
+              <button class="btn" type="submit">Save Safety Settings</button>
+            </div>
+          </form>
+        </div>
+      </section>
     </main>
   </div>
 </div>
@@ -377,7 +471,7 @@ main{flex:1;overflow:auto;padding:30px}
 <script>
 const state = {
   stats:null, identity:null, messages:[], messageTotal:0, messageLimit:50, messageOffset:0,
-  conversations:[], nodes:[], channels:[], mapData:null, error:null,
+  conversations:[], nodes:[], channels:[], rooms:[], mapData:null, admin:null, error:null,
   selectedConversation:null,
   seenMessageIds:new Set(), loadedOnce:false,
   mapReady:false, map:null, tileLayer:null, heatLayer:null, markerLayer:null,
@@ -423,6 +517,17 @@ async function patchJson(path, payload) {
   return data;
 }
 
+async function putJson(path, payload) {
+  const res = await fetch(api(path), {
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : `${path}: HTTP ${res.status}`);
+  return data;
+}
+
 async function deleteJson(path) {
   const res = await fetch(api(path), { method:'DELETE' });
   const data = await res.json().catch(() => ({}));
@@ -434,14 +539,16 @@ async function refresh() {
   setBadge('warn', 'Refreshing');
   try {
     const conversationFilter = state.selectedConversation ? state.selectedConversation.id : '';
-    const [stats, identity, messages, conversations, nodes, channels, mapData] = await Promise.all([
+    const [stats, identity, messages, conversations, nodes, channels, rooms, mapData, admin] = await Promise.all([
       getJson('stats'),
       getJson('identity'),
       getJson(`messages?${messageParams({ conversation: conversationFilter }).toString()}`),
       getJson('conversations'),
       getJson('nodes'),
       getJson('channels'),
+      getJson('rooms'),
       getJson('map'),
+      getJson('admin/settings'),
     ]);
     state.stats = stats;
     state.identity = identity;
@@ -450,7 +557,9 @@ async function refresh() {
     state.conversations = conversations;
     state.nodes = nodes;
     state.channels = channels;
+    state.rooms = rooms;
     state.mapData = mapData;
+    state.admin = admin;
     state.error = null;
     render();
     maybeNotify(state.messages);
@@ -497,7 +606,9 @@ function render() {
   renderConversations();
   renderNodes();
   renderChannels();
+  renderRooms();
   renderIdentity();
+  renderAdmin();
 }
 
 function emptyRow(cols, text) {
@@ -600,11 +711,26 @@ function updateTargetFields() {
   $('retryDirect').disabled = !direct;
 }
 
+function adminSettings() {
+  return (state.admin && state.admin.settings) || {};
+}
+
+function guardWrite(action) {
+  const settings = adminSettings();
+  if (settings.maintenance_mode) {
+    alert('Maintenance mode is enabled. Write actions are blocked.');
+    return false;
+  }
+  if (settings.require_confirm_for_writes === false) return true;
+  return confirm(`${action}?`);
+}
+
 async function sendMessage(event) {
   event.preventDefault();
   const text = $('messageText').value.trim();
   if (!text) return;
   const targetType = $('targetType').value;
+  if (!guardWrite(targetType === 'direct' ? 'Send direct message' : 'Send channel message')) return;
   const payload = {
     target_type: targetType,
     text,
@@ -627,6 +753,7 @@ async function sendMessage(event) {
 }
 
 async function resendMessage(id) {
+  if (!guardWrite('Resend this message')) return;
   $('sendStatus').textContent = 'Resending...';
   try {
     const result = await postJson(`messages/${id}/resend`, {});
@@ -718,8 +845,53 @@ function renderIdentity() {
   $('identityPackets').textContent = Object.keys(packets).length ? JSON.stringify(packets) : '-';
 }
 
+function renderAdmin() {
+  const settings = adminSettings();
+  if (!$('adminStatus')) return;
+  $('adminMaintenance').checked = !!settings.maintenance_mode;
+  $('adminConfirmWrites').checked = settings.require_confirm_for_writes !== false;
+  $('adminChannelMessages').checked = settings.allow_channel_messages !== false;
+  $('adminDirectMessages').checked = settings.allow_direct_messages !== false;
+  $('adminRoomPosts').checked = !!settings.allow_room_posts;
+  $('adminRoomSync').checked = settings.allow_room_sync !== false;
+  $('adminChannelConfig').checked = settings.allow_channel_config_writes !== false;
+  $('adminChannelRestore').checked = !!settings.allow_channel_restore;
+  $('adminContactWrites').checked = settings.allow_contact_writes !== false;
+  $('adminContactImport').checked = !!settings.allow_contact_import;
+  $('adminIdentityWrites').checked = settings.allow_identity_writes !== false;
+  $('adminNote').value = settings.admin_note || '';
+  $('adminStatus').textContent = settings.maintenance_mode ? 'Maintenance mode' : 'Active';
+}
+
+async function saveAdmin(event) {
+  event.preventDefault();
+  const payload = {
+    maintenance_mode:$('adminMaintenance').checked,
+    require_confirm_for_writes:$('adminConfirmWrites').checked,
+    allow_channel_messages:$('adminChannelMessages').checked,
+    allow_direct_messages:$('adminDirectMessages').checked,
+    allow_room_posts:$('adminRoomPosts').checked,
+    allow_room_sync:$('adminRoomSync').checked,
+    allow_channel_config_writes:$('adminChannelConfig').checked,
+    allow_channel_restore:$('adminChannelRestore').checked,
+    allow_contact_writes:$('adminContactWrites').checked,
+    allow_contact_import:$('adminContactImport').checked,
+    allow_identity_writes:$('adminIdentityWrites').checked,
+    admin_note:$('adminNote').value.trim(),
+  };
+  $('adminSaveStatus').textContent = 'Saving...';
+  try {
+    state.admin = await putJson('admin/settings', payload);
+    $('adminSaveStatus').textContent = 'Saved';
+    renderAdmin();
+  } catch (err) {
+    $('adminSaveStatus').textContent = err.message;
+  }
+}
+
 async function addContact(event) {
   event.preventDefault();
+  if (!guardWrite('Add this contact')) return;
   $('contactStatus').textContent = 'Adding...';
   try {
     await postJson('contacts', {
@@ -742,6 +914,7 @@ async function addContact(event) {
 
 async function importContact(event) {
   event.preventDefault();
+  if (!guardWrite('Import this contact card')) return;
   $('importStatus').textContent = 'Importing...';
   try {
     await postJson('contacts/import', { uri:$('importUri').value.trim() });
@@ -765,6 +938,7 @@ async function exportContact(key) {
 async function toggleTrust(key) {
   const node = state.nodes.find((n) => n.public_key === key);
   if (!node) return;
+  if (!guardWrite(`${node.trusted ? 'Remove trust from' : 'Trust'} this contact`)) return;
   await patchJson(`contacts/${key}`, { alias:node.alias || '', notes:node.notes || '', trusted:!node.trusted });
   await refresh();
 }
@@ -776,18 +950,21 @@ async function editContactMeta(key) {
   if (alias === null) return;
   const notes = prompt('Notes', node.notes || '');
   if (notes === null) return;
+  if (!guardWrite('Save contact metadata')) return;
   await patchJson(`contacts/${key}`, { alias, notes, trusted:!!node.trusted });
   await refresh();
 }
 
 async function removeContact(key) {
   if (!confirm('Remove this contact from the MeshCore device?')) return;
+  if (!guardWrite('Remove this contact')) return;
   await deleteJson(`contacts/${key}`);
   await refresh();
 }
 
 async function saveIdentity(event) {
   event.preventDefault();
+  if (!guardWrite('Save local identity changes')) return;
   $('identitySaveStatus').textContent = 'Saving...';
   try {
     await patchJson('identity', {
@@ -814,8 +991,109 @@ async function exportSelfContact() {
 function renderChannels() {
   $('channelsTable').innerHTML = state.channels.map((c) => {
     const type = c.private || c.is_private ? 'Private' : 'Public';
-    return `<tr><td>${escapeHtml(fmt(c.idx ?? c.index))}</td><td>${escapeHtml(fmt(c.name))}</td><td>${escapeHtml(type)}</td></tr>`;
-  }).join('') || emptyRow(3, 'No channels discovered yet.');
+    const flags = `${c.pinned ? '<span class="pill">pinned</span>' : ''}${c.muted ? '<span class="pill">muted</span>' : ''}${c.has_secret ? '<span class="pill">key</span>' : ''}`;
+    return `<tr><td>${escapeHtml(fmt(c.idx ?? c.index))}</td><td>${escapeHtml(fmt(c.name))}</td><td>${escapeHtml(type)}</td><td>${flags || '-'}</td><td><button class="mini-btn" type="button" data-edit-channel="${c.idx}">Edit</button></td></tr>`;
+  }).join('') || emptyRow(5, 'No channels discovered yet.');
+  $('channelsTable').querySelectorAll('[data-edit-channel]').forEach((button) => button.addEventListener('click', () => editChannel(Number(button.dataset.editChannel))));
+}
+
+function renderRooms() {
+  $('roomEnd').value ||= Math.floor(Date.now() / 1000);
+  $('roomTarget').innerHTML = state.rooms.map((r) => `<option value="${escapeHtml(r.public_key)}">${escapeHtml(fmt(r.name))}</option>`).join('') || '<option value="">No room servers</option>';
+  $('roomsTable').innerHTML = state.rooms.map((r) => `<tr><td>${escapeHtml(fmt(r.name))}</td><td>${escapeHtml(fmt(r.pubkey_prefix))}</td><td>${escapeHtml(fmt(r.last_seen))}</td><td>${r.trusted ? '<span class="pill">trusted</span>' : '-'}</td></tr>`).join('') || emptyRow(4, 'No room servers discovered yet.');
+}
+
+function editChannel(idx) {
+  const ch = state.channels.find((c) => Number(c.idx) === idx);
+  if (!ch) return;
+  $('channelIdx').value = ch.idx;
+  $('channelName').value = ch.name || '';
+  $('channelSecret').value = ch.secret_hex || '';
+  $('channelPassword').value = '';
+  $('channelSort').value = ch.sort_order || 0;
+  $('channelPinned').checked = !!ch.pinned;
+  $('channelMuted').checked = !!ch.muted;
+  $('channelEditStatus').textContent = `Editing channel ${idx}`;
+}
+
+async function saveChannel(event) {
+  event.preventDefault();
+  const idx = Number($('channelIdx').value || 0);
+  if (!guardWrite(`Save channel ${idx}`)) return;
+  $('channelEditStatus').textContent = 'Saving...';
+  try {
+    await patchJson(`channels/${idx}`, {
+      name:$('channelName').value.trim(),
+      secret_hex:$('channelSecret').value.trim(),
+      password:$('channelPassword').value,
+      pinned:$('channelPinned').checked,
+      muted:$('channelMuted').checked,
+      sort_order:Number($('channelSort').value || 0),
+    });
+    $('channelPassword').value = '';
+    $('channelEditStatus').textContent = 'Saved';
+    await refresh();
+  } catch (err) {
+    $('channelEditStatus').textContent = err.message;
+  }
+}
+
+async function exportChannels() {
+  try {
+    const data = await getJson('channels/backup');
+    $('channelBackupText').value = JSON.stringify(data, null, 2);
+    $('channelBackupStatus').textContent = 'Exported';
+  } catch (err) {
+    $('channelBackupStatus').textContent = err.message;
+  }
+}
+
+async function restoreChannels() {
+  try {
+    if (!guardWrite('Restore channel configuration from backup JSON')) return;
+    const data = JSON.parse($('channelBackupText').value);
+    await postJson('channels/restore', { channels:data.channels || [] });
+    $('channelBackupStatus').textContent = 'Restored';
+    await refresh();
+  } catch (err) {
+    $('channelBackupStatus').textContent = err.message;
+  }
+}
+
+async function syncRoom() {
+  const key = $('roomTarget').value;
+  if (!key) return;
+  if (!guardWrite('Sync this room server')) return;
+  $('roomActionStatus').textContent = 'Syncing...';
+  try {
+    const data = await postJson(`rooms/${key}/sync`, {
+      start:Number($('roomStart').value || 0),
+      end:Number($('roomEnd').value || Math.floor(Date.now() / 1000)),
+      password:$('roomPassword').value,
+    });
+    $('roomOutput').textContent = JSON.stringify(data, null, 2);
+    $('roomActionStatus').textContent = 'Synced';
+  } catch (err) {
+    $('roomActionStatus').textContent = err.message;
+  }
+}
+
+async function postRoom(event) {
+  event.preventDefault();
+  const key = $('roomTarget').value;
+  const text = $('roomPostText').value.trim();
+  if (!key || !text) return;
+  if (!guardWrite('Post this message into the room server')) return;
+  $('roomActionStatus').textContent = 'Posting...';
+  try {
+    const data = await postJson(`rooms/${key}/posts`, { text, password:$('roomPassword').value });
+    $('roomPostText').value = '';
+    $('roomOutput').textContent = JSON.stringify(data, null, 2);
+    $('roomActionStatus').textContent = 'Posted';
+    await refresh();
+  } catch (err) {
+    $('roomActionStatus').textContent = err.message;
+  }
 }
 
 async function ensureMap() {
@@ -980,6 +1258,12 @@ $('contactForm').addEventListener('submit', addContact);
 $('importForm').addEventListener('submit', importContact);
 $('identityForm').addEventListener('submit', saveIdentity);
 $('exportSelf').addEventListener('click', exportSelfContact);
+$('adminForm').addEventListener('submit', saveAdmin);
+$('channelForm').addEventListener('submit', saveChannel);
+$('exportChannels').addEventListener('click', exportChannels);
+$('restoreChannels').addEventListener('click', restoreChannels);
+$('roomForm').addEventListener('submit', postRoom);
+$('syncRoom').addEventListener('click', syncRoom);
 $('targetType').addEventListener('change', updateTargetFields);
 $('messageSearch').addEventListener('input', () => {
   clearTimeout(state.searchTimer);

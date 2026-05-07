@@ -65,20 +65,24 @@ dashboard.
 
 ## Priority 4 - Channels and Room Servers
 
-- [ ] Full channel management UI
-- [ ] Create/update channel names
-- [ ] Configure private channel passwords/keys securely
-- [ ] Channel backup and restore
-- [ ] Per-channel mute/pin/sort settings
-- [ ] Room server discovery and connection flow
-- [ ] Room/BBS message list with history sync
-- [ ] Create room posts
+- [x] Full channel management UI
+- [x] Create/update channel names
+- [x] Configure private channel passwords/keys securely
+- [x] Channel backup and restore
+- [x] Per-channel mute/pin/sort settings
+- [x] Room server discovery and connection flow
+- [x] Room/BBS message list with history sync where firmware exposes compatible binary responses
+- [x] Create room posts
 - [ ] Reply/delete/moderate room posts where permissions allow
-- [ ] Room server read-only/admin permission display
+- [x] Room server read-only/admin permission display where ACL responses are available
 - [ ] Room server ACL management where supported
 
 ## Priority 5 - Radio, Routing, and Admin
 
+- [x] Admin write-safety page with persisted local policy toggles
+- [x] Disable room-server posting by default
+- [x] Disable high-risk bulk restores/contact imports by default
+- [x] Maintenance mode to block write-capable API actions
 - [ ] Radio parameter viewer: frequency, bandwidth, spreading factor, coding rate, TX power
 - [ ] Safe radio parameter editor with validation and confirmation
 - [ ] Repeater/admin login flow for managed nodes
