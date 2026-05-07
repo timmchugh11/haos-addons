@@ -26,6 +26,8 @@ ENV PATH="/opt/meshcore-venv/bin:${PATH}" \
 COPY requirements.txt /tmp/requirements.txt
 COPY patch_meshcore_serial.py /tmp/patch_meshcore_serial.py
 COPY patch_nicegui_ingress.py /tmp/patch_nicegui_ingress.py
+COPY patch_meshcore_custom_ui.py /tmp/patch_meshcore_custom_ui.py
+COPY custom-ui/ /opt/meshcore-custom-ui/
 RUN pip install --upgrade pip setuptools wheel \
     && pip install -r /tmp/requirements.txt \
     && python /tmp/patch_meshcore_serial.py \
@@ -33,7 +35,8 @@ RUN pip install --upgrade pip setuptools wheel \
     && git clone --depth 1 https://github.com/pe1hvh/meshcore-gui.git /opt/meshcore-gui \
     && cd /opt/meshcore-gui \
     && git fetch --depth 1 origin "${MESHCORE_GUI_REF}" \
-    && git checkout "${MESHCORE_GUI_REF}"
+    && git checkout "${MESHCORE_GUI_REF}" \
+    && python /tmp/patch_meshcore_custom_ui.py
 
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh

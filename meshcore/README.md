@@ -35,8 +35,12 @@ Assistant host by USB serial or Bluetooth LE.
 
 ## Access
 
-Use the Home Assistant sidebar entry named **MeshCore**. Optional direct access
-can be enabled by mapping port `8081/tcp` in the add-on network settings.
+Use the Home Assistant sidebar entry named **MeshCore**. It opens the custom
+Starlink-style dashboard at `/custom`. The upstream DOMCA/NiceGUI interface is
+still available at `/` when using direct access.
+
+Optional direct access can be enabled by mapping port `8081/tcp` in the add-on
+network settings.
 
 ## Persistent Data
 
@@ -62,4 +66,4 @@ permanent Home Assistant install.
 
 ## Version
 
-Current add-on version: `0.1.5`
+Current add-on version: `0.2.2`
