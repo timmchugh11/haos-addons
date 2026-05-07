@@ -14,26 +14,28 @@ BLE_ADDRESS="$(bashio::config 'ble_address')"
 BLE_PIN="$(bashio::config 'ble_pin')"
 DEBUG="$(bashio::config 'debug')"
 
-mkdir -p /data/.meshcore-gui
+mkdir -p /data/.meshcore
 
-ARGS=()
 if [ "${TRANSPORT}" = "ble" ]; then
-  ARGS+=("${BLE_ADDRESS}" "--ble-pin" "${BLE_PIN}")
+  export MESHCORE_DEVICE="${BLE_ADDRESS}"
   bashio::log.info "Starting MeshCore GUI over BLE: ${BLE_ADDRESS}"
 else
-  ARGS+=("${SERIAL_PORT}" "--baud=${BAUDRATE}" "--serial-cx-dly=${SERIAL_CX_DELAY}")
+  export MESHCORE_DEVICE="${SERIAL_PORT}"
   bashio::log.info "Starting MeshCore GUI over serial: ${SERIAL_PORT} @ ${BAUDRATE}"
 fi
 
-ARGS+=("--port=8081")
+export MESHCORE_TRANSPORT="${TRANSPORT}"
+export MESHCORE_BAUDRATE="${BAUDRATE}"
+export MESHCORE_SERIAL_CX_DELAY="${SERIAL_CX_DELAY}"
+export MESHCORE_BLE_PIN="${BLE_PIN}"
+export MESHCORE_DEBUG="${DEBUG}"
 
 if bashio::var.true "${DEBUG}"; then
-  ARGS+=("--debug-on")
   bashio::log.info "Debug logging is enabled"
 fi
 
 bashio::log.info "Listening on port 8081"
-bashio::log.info "Persistent MeshCore GUI data is stored under /data/.meshcore-gui"
+bashio::log.info "Persistent MeshCore data is stored under /data/.meshcore"
 
-cd /opt/meshcore-gui
-exec python3 meshcore_gui.py "${ARGS[@]}"
+cd /app
+exec uvicorn app:app --host 0.0.0.0 --port 8081

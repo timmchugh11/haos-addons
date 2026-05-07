@@ -1,4 +1,4 @@
-nicegui==2.24.2
-meshcoredecoder
+fastapi
+uvicorn[standard]
 dbus-fast
 meshcore @ git+https://github.com/PE1HVH/meshcore_py.git@fix/event-race-condition

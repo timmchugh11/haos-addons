@@ -98,7 +98,6 @@ main{flex:1;overflow:auto;padding:30px}
     <div class="top-actions">
       <div id="connBadge" class="badge warn">Loading</div>
       <button id="refreshBtn" class="btn" type="button">Refresh</button>
-      <a id="domcaLink" class="btn" href="./">DOMCA</a>
     </div>
   </header>
   <div class="layout">
@@ -165,7 +164,6 @@ main{flex:1;overflow:auto;padding:30px}
                   <option value="street">Street</option>
                   <option value="terrain">Terrain</option>
                   <option value="satellite">Satellite</option>
-                  <option value="hybrid">Hybrid</option>
                 </select>
               </label>
               <label class="map-control">Heat
@@ -194,10 +192,7 @@ const state = {
 };
 const $ = (id) => document.getElementById(id);
 const fmt = (value, fallback='-') => value === null || value === undefined || value === '' ? fallback : String(value);
-const basePath = (() => {
-  const path = window.location.pathname.replace(/\/custom\/?$/, '').replace(/\/$/, '');
-  return path === '/' ? '' : path;
-})();
+const basePath = window.location.pathname.replace(/\/$/, '');
 const api = (path) => `${basePath}/api/v1/${path}`;
 
 function setBadge(mode, text) {
@@ -318,12 +313,8 @@ function setMapLayer(type) {
       opts: { maxZoom:17, attribution:'Map data &copy; OpenStreetMap contributors, SRTM | OpenTopoMap' },
     },
     satellite: {
-      url: 'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-      opts: { maxZoom:20, subdomains:['mt0','mt1','mt2','mt3'], attribution:'Imagery &copy; Google' },
-    },
-    hybrid: {
-      url: 'https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',
-      opts: { maxZoom:20, subdomains:['mt0','mt1','mt2','mt3'], attribution:'Imagery &copy; Google' },
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      opts: { maxZoom:19, attribution:'Tiles &copy; Esri' },
     },
   };
   const cfg = layers[type] || layers.street;

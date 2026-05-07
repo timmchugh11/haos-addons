@@ -22,4 +22,4 @@ nodes, messages and channels. These are provided by the upstream application.
 
 - MeshCore Companion Protocol, firmware v1.12.0+: https://docs.meshcore.io/companion_protocol/
 - Home Assistant add-on configuration reference: https://developers.home-assistant.io/docs/apps/configuration/
-- Upstream MeshCore GUI README: https://github.com/pe1hvh/meshcore-gui
+- MeshCore Python protocol library: https://github.com/meshcore-dev/meshcore_py

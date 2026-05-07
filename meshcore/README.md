@@ -1,7 +1,6 @@
 # MeshCore GUI
 
-MeshCore GUI packages the upstream all-in-one MeshCore web interface as a Home
-Assistant add-on with ingress support.
+MeshCore GUI is a custom Home Assistant add-on for MeshCore companion radios.
 
 It is intended for MeshCore Companion firmware devices connected to the Home
 Assistant host by USB serial or Bluetooth LE.
@@ -12,12 +11,6 @@ Assistant host by USB serial or Bluetooth LE.
 - Contacts and node management
 - Channel messages and direct messages
 - Channel management, backup and restore
-- Message archive and RX log
-- Route visualization and map views
-- Room Server support
-- Offline BBS
-- Keyword bot
-- Cross-frequency bridge support in the bundled upstream application
 - Read-only public REST API at `/api/v1/*`
 - USB serial and BLE transports
 
@@ -35,18 +28,16 @@ Assistant host by USB serial or Bluetooth LE.
 
 ## Access
 
-Use the Home Assistant sidebar entry named **MeshCore**. It opens the custom
-Starlink-style dashboard at `/custom`. The upstream DOMCA/NiceGUI interface is
-still available at `/` when using direct access.
+Use the Home Assistant sidebar entry named **MeshCore**. The custom dashboard is
+served at `/`.
 
 Optional direct access can be enabled by mapping port `8081/tcp` in the add-on
 network settings.
 
 ## Persistent Data
 
-The upstream GUI normally stores state under `~/.meshcore-gui`. This add-on sets
-`HOME=/data`, so archives, caches, pins, BBS data, bot configuration, channel
-backups and logs persist in the add-on data volume.
+The add-on sets `HOME=/data`, so runtime state persists in the add-on data
+volume.
 
 ## Transport Notes
 
@@ -61,9 +52,8 @@ permanent Home Assistant install.
 
 - MeshCore docs: https://docs.meshcore.io/
 - Companion Protocol: https://docs.meshcore.io/companion_protocol/
-- MeshCore GUI: https://github.com/pe1hvh/meshcore-gui
 - MeshCore Python protocol library: https://github.com/meshcore-dev/meshcore_py
 
 ## Version
 
-Current add-on version: `0.2.2`
+Current add-on version: `0.3.0`
