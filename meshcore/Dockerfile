@@ -24,8 +24,10 @@ ENV PATH="/opt/meshcore-venv/bin:${PATH}" \
     PIP_NO_CACHE_DIR=1
 
 COPY requirements.txt /tmp/requirements.txt
+COPY patch_meshcore_serial.py /tmp/patch_meshcore_serial.py
 RUN pip install --upgrade pip setuptools wheel \
     && pip install -r /tmp/requirements.txt \
+    && python /tmp/patch_meshcore_serial.py \
     && git clone --depth 1 https://github.com/pe1hvh/meshcore-gui.git /opt/meshcore-gui \
     && cd /opt/meshcore-gui \
     && git fetch --depth 1 origin "${MESHCORE_GUI_REF}" \

@@ -1,6 +1,6 @@
 name: "MeshCore GUI"
 description: "Full web GUI for MeshCore companion radios with dashboard, contacts, messages, channels, archive, BBS, bot, map, REST API, serial and BLE support"
-version: "0.1.1"
+version: "0.1.2"
 slug: "meshcore"
 init: false
 stage: "experimental"
