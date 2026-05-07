@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>MeshCore</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -98,6 +100,10 @@ main{flex:1;overflow:auto;padding:30px}
 .map-node{border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2)}
 .map-node strong{display:block;color:var(--text);font-size:13px;margin-bottom:4px}
 .map-node span{display:block;color:var(--muted);font-size:12px;word-break:break-word}
+.map-marker{width:16px;height:16px;border-radius:50%;border:2px solid #07120d;box-shadow:0 0 10px rgba(255,255,255,.35)}
+.map-marker.self{background:#4da3ff}.map-marker.companion{background:#00d47e}.map-marker.repeater{background:#ff9500}.map-marker.room_server{background:#d76bff}.map-marker.sensor{background:#a5ff4d}.map-marker.unknown{background:#aaa}
+.map-marker.stale{opacity:.48;filter:saturate(.35)}.map-marker.invalid{background:#444;opacity:.35}
+.meshcore-map-label{background:#090909;border:1px solid var(--border2);border-radius:5px;color:var(--text);font-size:11px;font-weight:700}
 .kv{display:grid;grid-template-columns:130px 1fr;gap:8px 14px;font-size:13px}
 .kv div:nth-child(odd){color:var(--muted)}.kv div:nth-child(even){color:var(--text2);word-break:break-word}
 .status-line{color:var(--muted);font-size:12px;margin-top:8px}
@@ -312,9 +318,13 @@ main{flex:1;overflow:auto;padding:30px}
               <label class="map-control">Heat
                 <input id="heatIntensity" type="range" min="10" max="100" value="45">
               </label>
+              <label class="map-control"><input id="showStale" type="checkbox" checked> Stale</label>
               <button id="toggleLabels" class="btn" type="button">Show Labels</button>
+              <button id="fitLive" class="btn" type="button">Fit Live</button>
+              <button id="fitAll" class="btn" type="button">Fit All</button>
             </div>
             <div id="mapCanvas"></div>
+            <div id="mapTileStatus" class="status-line"></div>
           </div>
           <div class="box">
             <div class="box-title">Located Nodes <span id="locatedCount">0</span></div>
@@ -362,11 +372,12 @@ main{flex:1;overflow:auto;padding:30px}
   </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
 const state = {
   stats:null, identity:null, messages:[], messageTotal:0, messageLimit:50, messageOffset:0,
-  conversations:[], nodes:[], channels:[], error:null,
+  conversations:[], nodes:[], channels:[], mapData:null, error:null,
   selectedConversation:null,
   seenMessageIds:new Set(), loadedOnce:false,
   mapReady:false, map:null, tileLayer:null, heatLayer:null, markerLayer:null,
@@ -423,13 +434,14 @@ async function refresh() {
   setBadge('warn', 'Refreshing');
   try {
     const conversationFilter = state.selectedConversation ? state.selectedConversation.id : '';
-    const [stats, identity, messages, conversations, nodes, channels] = await Promise.all([
+    const [stats, identity, messages, conversations, nodes, channels, mapData] = await Promise.all([
       getJson('stats'),
       getJson('identity'),
       getJson(`messages?${messageParams({ conversation: conversationFilter }).toString()}`),
       getJson('conversations'),
       getJson('nodes'),
       getJson('channels'),
+      getJson('map'),
     ]);
     state.stats = stats;
     state.identity = identity;
@@ -438,6 +450,7 @@ async function refresh() {
     state.conversations = conversations;
     state.nodes = nodes;
     state.channels = channels;
+    state.mapData = mapData;
     state.error = null;
     render();
     maybeNotify(state.messages);
@@ -818,7 +831,7 @@ async function ensureMap() {
   const bounds = L.latLngBounds(southWest, northEast);
   state.map = L.map('mapCanvas', { maxBounds: bounds, maxBoundsViscosity: 1.0 }).setView([53.81, -2.53], 6);
   state.map.on('drag', () => state.map.panInsideBounds(bounds, { animate:false }));
-  state.markerLayer = L.layerGroup();
+  state.markerLayer = window.L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover:false, maxClusterRadius:42 }) : L.layerGroup();
   setMapLayer($('mapType').value);
   state.mapReady = true;
   $('mapStatus').textContent = 'Live';
@@ -847,18 +860,22 @@ function setMapLayer(type) {
 }
 
 async function renderMap() {
-  const located = state.nodes.filter((n) => Number.isFinite(Number(n.adv_lat)) && Number.isFinite(Number(n.adv_lon)));
+  const mapData = state.mapData || { markers:[], counts:{valid:0, live:0, stale:0, invalid:0}, tile_requirement:'' };
+  const showStale = $('showStale').checked;
+  const located = mapData.markers.filter((m) => m.location && m.location.valid && (showStale || m.location.freshness !== 'stale'));
   $('locatedCount').textContent = String(located.length);
-  $('mapNodeList').innerHTML = located.map((n) => `
-    <div class="map-node">
-      <strong>${escapeHtml(fmt(n.name))}</strong>
-      <span>${escapeHtml(fmt(n.type))}</span>
-      <span>${Number(n.adv_lat).toFixed(5)}, ${Number(n.adv_lon).toFixed(5)}</span>
+  $('mapTileStatus').textContent = `${mapData.counts.live || 0} live / ${mapData.counts.stale || 0} stale / ${mapData.counts.invalid || 0} invalid. ${mapData.tile_requirement || ''}`;
+  $('mapNodeList').innerHTML = located.map((m) => `
+    <div class="map-node" data-map-node="${escapeHtml(m.id)}">
+      <strong>${escapeHtml(fmt(m.name))}</strong>
+      <span>${escapeHtml(fmt(m.node_type))} / ${escapeHtml(fmt(m.location.freshness))} / ${escapeHtml(fmt(m.location.source))}</span>
+      <span>${Number(m.location.lat).toFixed(5)}, ${Number(m.location.lon).toFixed(5)}</span>
+      <span>${escapeHtml(locationAge(m.location))}</span>
     </div>
   `).join('') || '<div class="empty">No contacts have advertised coordinates yet.</div>';
 
   if (!state.mapReady || !state.map) return;
-  const points = located.map((node) => [Number(node.adv_lat), Number(node.adv_lon), 1]);
+  const points = located.map((marker) => [Number(marker.location.lat), Number(marker.location.lon), marker.location.freshness === 'live' ? 1 : .35]);
   if (state.heatLayer) state.map.removeLayer(state.heatLayer);
   if (window.L.heatLayer && points.length) {
     state.heatLayer = L.heatLayer(points, {
@@ -871,30 +888,66 @@ async function renderMap() {
 
   state.markerLayer.clearLayers();
   const bounds = [];
-  const icon = L.divIcon({
-    className: '',
-    html: '<div style="width:10px;height:10px;border-radius:50%;background:#00d47e;border:2px solid #07120d;box-shadow:0 0 10px rgba(0,212,126,.75)"></div>',
-    iconSize: [10, 10],
-    iconAnchor: [5, 5],
-  });
-  for (const node of located) {
-    const lat = Number(node.adv_lat);
-    const lng = Number(node.adv_lon);
+  for (const markerData of located) {
+    const lat = Number(markerData.location.lat);
+    const lng = Number(markerData.location.lon);
     bounds.push([lat, lng]);
-    const marker = L.marker([lat, lng], { icon, opacity: state.labelsVisible ? 1 : 0.35 })
-      .bindPopup(`<strong>${escapeHtml(fmt(node.name))}</strong><br>${escapeHtml(fmt(node.type))}<br>${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+    const marker = L.marker([lat, lng], { icon: markerIcon(markerData), opacity: state.labelsVisible ? 1 : 0.72 })
+      .bindPopup(markerPopup(markerData));
+    if (state.labelsVisible) {
+      marker.bindTooltip(fmt(markerData.name), { permanent:true, direction:'top', offset:[0,-10], className:'meshcore-map-label' });
+    }
     state.markerLayer.addLayer(marker);
   }
-  if (state.labelsVisible && !state.map.hasLayer(state.markerLayer)) {
+  if (!state.map.hasLayer(state.markerLayer)) {
     state.markerLayer.addTo(state.map);
-  } else if (!state.labelsVisible && state.map.hasLayer(state.markerLayer)) {
-    state.map.removeLayer(state.markerLayer);
   }
+  document.querySelectorAll('.map-node[data-map-node]').forEach((el) => {
+    el.addEventListener('click', () => focusMapMarker(el.dataset.mapNode));
+  });
+}
 
-  if (bounds.length === 1) {
-    state.map.setView(bounds[0], 12);
-  } else if (bounds.length > 1) {
-    state.map.fitBounds(bounds, { padding:[64,64] });
+function markerIcon(marker) {
+  const role = marker.kind === 'self' ? 'self' : String(marker.node_type || 'unknown').replace(/[^a-z0-9_]/g, '_');
+  const freshness = marker.location && marker.location.freshness === 'stale' ? ' stale' : '';
+  return L.divIcon({
+    className: '',
+    html: `<div class="map-marker ${escapeHtml(role)}${freshness}"></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+}
+
+function markerPopup(marker) {
+  const loc = marker.location || {};
+  return `<strong>${escapeHtml(fmt(marker.name))}</strong><br>
+    ${escapeHtml(fmt(marker.node_type))} / ${escapeHtml(fmt(loc.freshness))}<br>
+    ${Number(loc.lat).toFixed(5)}, ${Number(loc.lon).toFixed(5)}<br>
+    ${escapeHtml(locationAge(loc))}<br>
+    ${marker.kind === 'self' ? `Policy ${escapeHtml(fmt(marker.adv_loc_policy))}` : escapeHtml(fmt(marker.pubkey_prefix))}`;
+}
+
+function locationAge(location) {
+  if (!location || location.age_seconds === null || location.age_seconds === undefined) return 'age unknown';
+  const mins = Math.floor(location.age_seconds / 60);
+  if (mins < 60) return `${mins} min old`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 48) return `${hours} hours old`;
+  return `${Math.floor(hours / 24)} days old`;
+}
+
+function fitMap(mode='all') {
+  if (!state.map || !state.mapData) return;
+  const markers = state.mapData.markers.filter((m) => m.location && m.location.valid && (mode !== 'live' || m.location.freshness === 'live'));
+  const bounds = markers.map((m) => [Number(m.location.lat), Number(m.location.lon)]);
+  if (bounds.length === 1) state.map.setView(bounds[0], 12);
+  if (bounds.length > 1) state.map.fitBounds(bounds, { padding:[64,64] });
+}
+
+function focusMapMarker(id) {
+  const marker = (state.mapData && state.mapData.markers || []).find((m) => m.id === id);
+  if (marker && marker.location && marker.location.valid && state.map) {
+    state.map.setView([Number(marker.location.lat), Number(marker.location.lon)], 13);
   }
 }
 
@@ -942,6 +995,9 @@ $('exportCsv').addEventListener('click', () => openExport('csv'));
 $('notifyBtn').addEventListener('click', enableNotifications);
 $('mapType').addEventListener('change', (event) => setMapLayer(event.target.value));
 $('heatIntensity').addEventListener('input', renderMap);
+$('showStale').addEventListener('change', renderMap);
+$('fitLive').addEventListener('click', () => fitMap('live'));
+$('fitAll').addEventListener('click', () => fitMap('all'));
 $('toggleLabels').addEventListener('click', () => {
   state.labelsVisible = !state.labelsVisible;
   $('toggleLabels').textContent = state.labelsVisible ? 'Hide Labels' : 'Show Labels';

@@ -49,19 +49,19 @@ dashboard.
 
 ## Priority 3 - Accurate Map and Location
 
-- [ ] Normalize all position sources: self info, contact adverts, GPS fields, telemetry
-- [ ] Distinguish stale coordinates from live/recent coordinates
-- [ ] Show marker age and last-seen timestamp
-- [ ] Marker icons by node role/type
-- [ ] Marker clustering for dense networks
-- [ ] Optional heatmap layer
-- [ ] Fit-to-live-nodes and fit-to-all-known-nodes controls
-- [ ] Click marker to open node/contact details
-- [ ] Show own node position and advertised location policy
-- [ ] Set own node latitude/longitude when supported
-- [ ] GPS status panel when GPS support is compiled into firmware
-- [ ] Offline tile/cache strategy or documented internet requirement
-- [ ] Coordinate validation to prevent `0,0` and malformed advert markers
+- [x] Normalize all position sources: self info, contact adverts, GPS fields, telemetry
+- [x] Distinguish stale coordinates from live/recent coordinates
+- [x] Show marker age and last-seen timestamp
+- [x] Marker icons by node role/type
+- [x] Marker clustering for dense networks
+- [x] Optional heatmap layer
+- [x] Fit-to-live-nodes and fit-to-all-known-nodes controls
+- [x] Click marker to open node/contact details
+- [x] Show own node position and advertised location policy
+- [x] Set own node latitude/longitude when supported
+- [x] GPS status panel when GPS support is compiled into firmware
+- [x] Offline tile/cache strategy or documented internet requirement
+- [x] Coordinate validation to prevent `0,0` and malformed advert markers
 
 ## Priority 4 - Channels and Room Servers
 

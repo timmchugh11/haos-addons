@@ -22,6 +22,7 @@ UI_DIR = APP_DIR / "custom-ui"
 DATA_DIR = Path(os.environ.get("MESHCORE_DATA_DIR", "/data/.meshcore"))
 MESSAGE_ARCHIVE = DATA_DIR / "messages.json"
 CONTACT_META_FILE = DATA_DIR / "contacts_meta.json"
+LOCATION_STALE_SECONDS = int(os.environ.get("MESHCORE_LOCATION_STALE_SECONDS", str(7 * 24 * 60 * 60)))
 
 DEVICE = os.environ.get("MESHCORE_DEVICE", "/dev/ttyACM0")
 TRANSPORT = os.environ.get("MESHCORE_TRANSPORT", "serial")
@@ -249,10 +250,7 @@ def resolve_contact(value: str) -> str:
 def contact_display(pubkey: str, contact: Dict[str, Any]) -> Dict[str, Any]:
     meta = state.contact_meta.get(pubkey, {})
     raw_type = int(contact.get("type", 0) or contact.get("adv_type", 0) or 0)
-    adv_lat = contact.get("adv_lat") or None
-    adv_lon = contact.get("adv_lon") or None
-    if adv_lat == 0.0 and adv_lon == 0.0:
-        adv_lat = adv_lon = None
+    location = extract_location(contact, "contact_advert")
     name = contact.get("adv_name") or pubkey[:12]
     return {
         "name": meta.get("alias") or name,
@@ -268,9 +266,112 @@ def contact_display(pubkey: str, contact: Dict[str, Any]) -> Dict[str, Any]:
         "out_path_len": contact.get("out_path_len"),
         "out_path": contact.get("out_path"),
         "last_seen": contact.get("last_seen") or contact.get("last_advert"),
-        "adv_lat": adv_lat,
-        "adv_lon": adv_lon,
+        "adv_lat": location["lat"],
+        "adv_lon": location["lon"],
         "battery_mv": contact.get("battery_mv"),
+        "location": location,
+    }
+
+
+def valid_coord(lat: Any, lon: Any) -> bool:
+    try:
+        lat_f = float(lat)
+        lon_f = float(lon)
+    except (TypeError, ValueError):
+        return False
+    if lat_f == 0.0 and lon_f == 0.0:
+        return False
+    return -90 <= lat_f <= 90 and -180 <= lon_f <= 180
+
+
+def parse_timestamp(value: Any) -> Optional[datetime]:
+    if value in {None, ""}:
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(float(value), timezone.utc)
+        except (OSError, ValueError):
+            return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def normalize_location(lat: Any, lon: Any, updated: Any, source: str) -> Dict[str, Any]:
+    valid = valid_coord(lat, lon)
+    updated_at = parse_timestamp(updated)
+    age_seconds = None
+    freshness = "unknown"
+    if updated_at:
+        age_seconds = max(0, int((datetime.now(timezone.utc) - updated_at).total_seconds()))
+        freshness = "stale" if age_seconds > LOCATION_STALE_SECONDS else "live"
+    return {
+        "valid": valid,
+        "lat": float(lat) if valid else None,
+        "lon": float(lon) if valid else None,
+        "source": source,
+        "updated_at": updated_at.isoformat() if updated_at else None,
+        "age_seconds": age_seconds,
+        "freshness": freshness if valid else "invalid",
+        "stale_after_seconds": LOCATION_STALE_SECONDS,
+    }
+
+
+def extract_location(entity: Dict[str, Any], default_source: str) -> Dict[str, Any]:
+    candidates = [
+        ("telemetry", "telemetry_lat", "telemetry_lon", "telemetry_time"),
+        ("telemetry", "lat", "lon", "timestamp"),
+        ("gps", "gps_lat", "gps_lon", "gps_time"),
+        ("gps", "latitude", "longitude", "timestamp"),
+        (default_source, "adv_lat", "adv_lon", "last_advert"),
+    ]
+    fallback_time = entity.get("last_seen") or entity.get("last_advert") or entity.get("timestamp")
+    for source, lat_key, lon_key, time_key in candidates:
+        lat = entity.get(lat_key)
+        lon = entity.get(lon_key)
+        if valid_coord(lat, lon):
+            return normalize_location(lat, lon, entity.get(time_key) or fallback_time, source)
+    return normalize_location(None, None, fallback_time, default_source)
+
+
+def map_marker_for_contact(pubkey: str, contact: Dict[str, Any]) -> Dict[str, Any]:
+    display = contact_display(pubkey, contact)
+    location = display["location"]
+    return {
+        "id": f"contact:{pubkey}",
+        "kind": "contact",
+        "name": display["name"],
+        "raw_name": display["raw_name"],
+        "public_key": pubkey,
+        "pubkey_prefix": display["pubkey_prefix"],
+        "node_type": display["type"],
+        "trusted": display["trusted"],
+        "notes": display["notes"],
+        "location": location,
+        "last_seen": display["last_seen"],
+        "battery_mv": display["battery_mv"],
+    }
+
+
+def map_marker_for_self() -> Dict[str, Any]:
+    with state.lock:
+        self_info = dict(state.device)
+    location = extract_location({**self_info, "timestamp": state.updated_at}, "self_info")
+    return {
+        "id": "self",
+        "kind": "self",
+        "name": self_info.get("name") or "This node",
+        "public_key": self_info.get("public_key") or self_info.get("pubkey") or self_info.get("key"),
+        "pubkey_prefix": str(self_info.get("public_key") or self_info.get("pubkey") or "")[:12],
+        "node_type": "self",
+        "trusted": True,
+        "location": location,
+        "adv_loc_policy": self_info.get("adv_loc_policy"),
+        "telemetry_mode_loc": self_info.get("telemetry_mode_loc"),
+        "radio_freq": self_info.get("radio_freq"),
+        "radio_bw": self_info.get("radio_bw"),
     }
 
 
@@ -656,6 +757,31 @@ async def api_nodes() -> List[Dict[str, Any]]:
         for pubkey, contact in state.contacts.items():
             nodes.append(contact_display(pubkey, contact))
     return sorted(nodes, key=lambda n: (n["type"], n["name"]))
+
+
+@app.get("/api/v1/map")
+async def api_map() -> Dict[str, Any]:
+    with state.lock:
+        contact_markers = [map_marker_for_contact(pubkey, contact) for pubkey, contact in state.contacts.items()]
+    self_marker = map_marker_for_self()
+    markers = [self_marker, *contact_markers]
+    valid_markers = [m for m in markers if m["location"]["valid"]]
+    live_markers = [m for m in valid_markers if m["location"]["freshness"] == "live"]
+    stale_markers = [m for m in valid_markers if m["location"]["freshness"] == "stale"]
+    invalid_markers = [m for m in markers if not m["location"]["valid"]]
+    return {
+        "generated_at": utcnow(),
+        "stale_after_seconds": LOCATION_STALE_SECONDS,
+        "tile_requirement": "Internet access is required for the default OpenStreetMap, OpenTopoMap, and Esri tile layers.",
+        "markers": markers,
+        "counts": {
+            "total": len(markers),
+            "valid": len(valid_markers),
+            "live": len(live_markers),
+            "stale": len(stale_markers),
+            "invalid": len(invalid_markers),
+        },
+    }
 
 
 @app.post("/api/v1/contacts")
