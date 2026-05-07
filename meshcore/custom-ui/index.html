@@ -61,8 +61,8 @@ main{flex:1;overflow:auto;padding:30px}
 .tbl td:first-child{color:var(--text);font-weight:600}
 .tbl tr:last-child td{border-bottom:none}
 .empty{color:var(--muted);padding:24px;text-align:center;border:1px dashed var(--border2);border-radius:8px;background:rgba(255,255,255,.02)}
-#mapCanvas{height:min(62vh,680px);min-height:420px;border:1px solid var(--border);border-radius:8px;background:#090909;overflow:hidden}
-.leaflet-container{background:#090909;color:#111}
+#mapCanvas{position:relative;width:100%;height:min(62vh,680px);min-height:420px;border:1px solid var(--border);border-radius:8px;background:#090909;overflow:hidden}
+.leaflet-container{width:100%;height:100%;background:#090909;color:#111}
 .leaflet-control-attribution{font-size:10px}
 .map-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
 .map-control{display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text2);font-size:12px;font-weight:700}
@@ -284,6 +284,7 @@ function renderChannels() {
 
 async function ensureMap() {
   if (state.mapReady || !document.getElementById('mapCanvas')) return;
+  if (!$('map').classList.contains('active')) return;
   if (!window.L) {
     $('mapCanvas').outerHTML = '<div id="mapCanvas" class="map-fallback">Leaflet assets failed to load. Check internet access from the browser.</div>';
     $('mapStatus').textContent = 'Map library unavailable';
@@ -298,6 +299,7 @@ async function ensureMap() {
   setMapLayer($('mapType').value);
   state.mapReady = true;
   $('mapStatus').textContent = 'Live';
+  setTimeout(() => state.map.invalidateSize(), 0);
 }
 
 function setMapLayer(type) {
@@ -335,10 +337,14 @@ async function renderMap() {
   if (!state.mapReady || !state.map) return;
   const points = located.map((node) => [Number(node.adv_lat), Number(node.adv_lon), 1]);
   if (state.heatLayer) state.map.removeLayer(state.heatLayer);
-  state.heatLayer = L.heatLayer(points, {
-    radius: 35,
-    minOpacity: Number($('heatIntensity').value) / 100,
-  }).addTo(state.map);
+  if (window.L.heatLayer && points.length) {
+    state.heatLayer = L.heatLayer(points, {
+      radius: 35,
+      minOpacity: Number($('heatIntensity').value) / 100,
+    }).addTo(state.map);
+  } else {
+    state.heatLayer = null;
+  }
 
   state.markerLayer.clearLayers();
   const bounds = [];
@@ -381,6 +387,14 @@ document.querySelectorAll('nav a[data-page]').forEach((link) => {
     link.classList.add('active');
     $(link.dataset.page).classList.add('active');
     history.replaceState(null, '', `#${link.dataset.page}`);
+    if (link.dataset.page === 'map') {
+      ensureMap().then(() => {
+        if (state.map) {
+          state.map.invalidateSize();
+          renderMap();
+        }
+      });
+    }
   });
 });
 
@@ -392,6 +406,13 @@ $('toggleLabels').addEventListener('click', () => {
   $('toggleLabels').textContent = state.labelsVisible ? 'Hide Labels' : 'Show Labels';
   renderMap();
 });
+
+const initialPage = window.location.hash.replace('#', '');
+if (/^[a-z-]+$/.test(initialPage)) {
+  const initialLink = document.querySelector(`nav a[data-page="${initialPage}"]`);
+  if (initialLink) initialLink.click();
+}
+
 refresh();
 setInterval(refresh, 20000);
 </script>
