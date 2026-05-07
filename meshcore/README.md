@@ -28,7 +28,7 @@ Assistant host by USB serial or Bluetooth LE.
 | `transport` | `serial` | `serial` or `ble` |
 | `serial_port` | `/dev/ttyACM0` | MeshCore USB serial device |
 | `baudrate` | `115200` | Serial baud rate |
-| `serial_cx_delay` | `0.1` | Serial connection delay in seconds |
+| `serial_cx_delay` | `2.0` | Delay after opening the serial port before sending the first MeshCore command |
 | `ble_address` | `literal:AA:BB:CC:DD:EE:FF` | BLE device address. Keep the `literal:` prefix for a fixed MAC address. |
 | `ble_pin` | `123456` | BLE pairing PIN |
 | `debug` | `false` | Enables verbose MeshCore GUI and protocol logging |
@@ -62,4 +62,4 @@ permanent Home Assistant install.
 
 ## Version
 
-Current add-on version: `0.1.2`
+Current add-on version: `0.1.4`

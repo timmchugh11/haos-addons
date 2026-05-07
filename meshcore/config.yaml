@@ -1,6 +1,6 @@
 name: "MeshCore GUI"
 description: "Full web GUI for MeshCore companion radios with dashboard, contacts, messages, channels, archive, BBS, bot, map, REST API, serial and BLE support"
-version: "0.1.2"
+version: "0.1.4"
 slug: "meshcore"
 init: false
 stage: "experimental"
@@ -38,14 +38,14 @@ options:
   transport: "serial"
   serial_port: "/dev/ttyACM0"
   baudrate: 115200
-  serial_cx_delay: 0.1
+  serial_cx_delay: 2.0
   ble_address: "literal:AA:BB:CC:DD:EE:FF"
   ble_pin: "123456"
   debug: false
 
 schema:
   transport: "list(serial|ble)"
-  serial_port: "str"
+  serial_port: "device(subsystem=tty)"
   baudrate: "int(1200,921600)"
   serial_cx_delay: "float(0,10)"
   ble_address: "str"

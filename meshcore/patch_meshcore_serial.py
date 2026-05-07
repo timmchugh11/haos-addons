@@ -16,4 +16,17 @@ if old not in text:
     raise SystemExit(f"Expected RTS assignment not found in {path}")
 
 path.write_text(text.replace(old, new))
-print(f"Patched MeshCore serial RTS handling in {path}")
+text = path.read_text()
+old = "            self.cx._connected_event.set()\n"
+new = """            delay = max(0.0, float(getattr(self.cx, "cx_dly", 0.0) or 0.0))
+            if delay:
+                asyncio.get_running_loop().call_later(delay, self.cx._connected_event.set)
+            else:
+                self.cx._connected_event.set()
+"""
+
+if old not in text:
+    raise SystemExit(f"Expected connected-event assignment not found in {path}")
+
+path.write_text(text.replace(old, new))
+print(f"Patched MeshCore serial RTS handling and connection delay in {path}")
