@@ -159,6 +159,8 @@ class RadioUpdateRequest(BaseModel):
     radio_sf: Optional[int] = None
     radio_cr: Optional[int] = None
     tx_power: Optional[int] = None
+    duty_cycle: Optional[float] = None
+    airtime_factor: Optional[float] = None
     rx_delay: Optional[int] = None
     af: Optional[int] = None
 
@@ -408,6 +410,40 @@ def enforce_write(setting: str, action: str) -> None:
 
 
 load_admin_settings()
+
+
+def get_command_by_names(commands: Any, *names: str) -> Optional[Any]:
+    for name in names:
+        command = getattr(commands, name, None)
+        if command:
+            return command
+    return None
+
+
+def call_command_compat(command: Any, *args: Any, **kwargs: Any) -> Any:
+    try:
+        return command(*args, **kwargs)
+    except TypeError:
+        if "min_timeout" not in kwargs:
+            raise
+        alt_kwargs = dict(kwargs)
+        alt_kwargs["timeout"] = alt_kwargs.pop("min_timeout")
+        try:
+            return command(*args, **alt_kwargs)
+        except TypeError:
+            alt_kwargs.pop("timeout", None)
+            return command(*args, **alt_kwargs)
+
+
+async def run_named_command(commands: Any, names: tuple[str, ...], *args: Any, **kwargs: Any) -> Any:
+    command = get_command_by_names(commands, *names)
+    if not command:
+        raise HTTPException(status_code=501, detail=f"command not supported: {'/'.join(names)}")
+    return await run_device_command(call_command_compat(command, *args, **kwargs))
+
+
+def event_type_or_none(name: str) -> Optional[EventType]:
+    return getattr(EventType, name, None)
 
 
 def public_channel(idx: Optional[int], name: str) -> bool:
@@ -806,22 +842,32 @@ async def wire_events(mc: MeshCore) -> None:
     async def on_diagnostic_event(event) -> None:
         append_event_log(event)
 
-    mc.subscribe(EventType.CHANNEL_MSG_RECV, on_channel_msg)
-    mc.subscribe(EventType.CONTACT_MSG_RECV, on_contact_msg)
-    mc.subscribe(EventType.NEW_CONTACT, on_new_contact)
-    mc.subscribe(EventType.DISCONNECTED, on_disconnect)
-    mc.subscribe(EventType.ACK, on_ack)
-    mc.subscribe(EventType.CONNECTED, on_connect)
-    mc.subscribe(EventType.LOG_DATA, on_diagnostic_event)
-    mc.subscribe(EventType.RAW_DATA, on_diagnostic_event)
-    mc.subscribe(EventType.TELEMETRY_RESPONSE, on_diagnostic_event)
-    mc.subscribe(EventType.STATUS_RESPONSE, on_diagnostic_event)
-    mc.subscribe(EventType.ACL_RESPONSE, on_diagnostic_event)
-    mc.subscribe(EventType.MMA_RESPONSE, on_diagnostic_event)
-    mc.subscribe(EventType.ADVERTISEMENT, on_diagnostic_event)
-    mc.subscribe(EventType.PATH_UPDATE, on_diagnostic_event)
-    mc.subscribe(EventType.PATH_RESPONSE, on_diagnostic_event)
-    mc.subscribe(EventType.TRACE_DATA, on_diagnostic_event)
+    def subscribe_if_present(name: str, callback: Any) -> None:
+        event_type = event_type_or_none(name)
+        if event_type is not None:
+            mc.subscribe(event_type, callback)
+
+    subscribe_if_present("CHANNEL_MSG_RECV", on_channel_msg)
+    subscribe_if_present("CONTACT_MSG_RECV", on_contact_msg)
+    subscribe_if_present("NEW_CONTACT", on_new_contact)
+    subscribe_if_present("DISCONNECTED", on_disconnect)
+    subscribe_if_present("ACK", on_ack)
+    subscribe_if_present("CONNECTED", on_connect)
+    for event_name in (
+        "LOG_DATA",
+        "RAW_DATA",
+        "RX_LOG_DATA",
+        "TELEMETRY_RESPONSE",
+        "STATUS_RESPONSE",
+        "ACL_RESPONSE",
+        "MMA_RESPONSE",
+        "ADVERTISEMENT",
+        "PATH_UPDATE",
+        "PATH_RESPONSE",
+        "TRACE_DATA",
+        "BINARY_RESPONSE",
+    ):
+        subscribe_if_present(event_name, on_diagnostic_event)
 
 
 async def load_initial_data(mc: MeshCore) -> None:
@@ -990,8 +1036,8 @@ async def api_diagnostics() -> Dict[str, Any]:
             "last_disconnect_at": state.last_disconnect_at.isoformat() if state.last_disconnect_at else None,
             "last_disconnect_reason": state.last_disconnect_reason,
             "log_count": len(state.event_logs),
-            "connect_count": event_counts.get("CONNECTED", 0),
-            "disconnect_count": event_counts.get("DISCONNECTED", 0),
+            "connect_count": event_counts.get("connected", 0) + event_counts.get("CONNECTED", 0),
+            "disconnect_count": event_counts.get("disconnected", 0) + event_counts.get("DISCONNECTED", 0),
             "transport": transport_info,
             "event_counts": event_counts,
         }
@@ -1192,7 +1238,7 @@ async def api_contact_acl(key: str) -> Dict[str, Any]:
     if not state.connected or not meshcore_client:
         raise HTTPException(status_code=503, detail="MeshCore device is not connected")
     pubkey, contact = contact_by_key(key)
-    acl_event = await run_device_command(meshcore_client.commands.req_acl_sync(contact, min_timeout=5))
+    acl_event = await run_named_command(meshcore_client.commands, ("req_acl_sync", "req_acl"), contact, min_timeout=5)
     payload = event_payload(acl_event)
     return {"acl": payload, "read_only": infer_room_read_only(payload)}
 
@@ -1558,7 +1604,11 @@ async def api_send_message(request: SendMessageRequest) -> Dict[str, Any]:
         result_type = event_type_value(result)
         payload = event_payload(result)
         status = "acknowledged" if request.target_type == "direct" and request.retry and result_type == EventType.MSG_SENT.value else "sent"
-        if result_type not in {EventType.OK.value, EventType.MSG_SENT.value}:
+        success_types = {EventType.OK.value, EventType.MSG_SENT.value, "message_ok", "msg_ok", "channel_msg_sent"}
+        msg_ok = event_type_or_none("MSG_OK")
+        if msg_ok is not None:
+            success_types.add(msg_ok.value)
+        if result_type not in success_types:
             status = "failed"
         if result_type == EventType.ERROR.value:
             update_message(int(message["id"]), {"status": status, "send_result": {"event": result_type, "payload": payload}})
@@ -1699,10 +1749,12 @@ async def api_room_sync(key: str, request: RoomSyncRequest) -> Dict[str, Any]:
     pubkey, contact = contact_by_key(key)
     if request.password:
         await run_device_command(meshcore_client.commands.send_login(pubkey, request.password))
-    mma = await run_device_command(meshcore_client.commands.req_mma_sync(contact, request.start, request.end, min_timeout=5))
+    mma_event = await run_named_command(meshcore_client.commands, ("req_mma_sync", "req_mma"), contact, request.start, request.end, min_timeout=5)
+    mma = event_payload(mma_event)
     acl = None
     try:
-        acl = await run_device_command(meshcore_client.commands.req_acl_sync(contact, min_timeout=5))
+        acl_event = await run_named_command(meshcore_client.commands, ("req_acl_sync", "req_acl"), contact, min_timeout=5)
+        acl = event_payload(acl_event)
     except HTTPException:
         acl = None
     return {
