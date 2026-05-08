@@ -90,6 +90,13 @@ def discover_serial_ports() -> List[Dict[str, str]]:
         return []
 
 
+def serial_ports_safe() -> List[Dict[str, str]]:
+    try:
+        return discover_serial_ports()
+    except Exception:
+        return []
+
+
 class SendMessageRequest(BaseModel):
     target_type: Literal["channel", "direct"]
     text: str = Field(min_length=1, max_length=512)
@@ -1081,7 +1088,7 @@ async def api_diagnostics() -> Dict[str, Any]:
             event_counts[entry["type"]] = event_counts.get(entry["type"], 0) + 1
         transport_info: Dict[str, Any] = {"type": TRANSPORT, "device": DEVICE}
         if TRANSPORT == "serial":
-            transport_info["serial_ports"] = discover_serial_ports()
+            transport_info["serial_ports"] = serial_ports_safe()
         elif TRANSPORT == "ble":
             transport_info["ble_pin"] = BLE_PIN
         return {
@@ -1126,12 +1133,20 @@ async def api_sensors() -> Dict[str, Any]:
     custom_vars = None
     if state.connected and meshcore_client and worker_loop:
         try:
-            result = await run_device_command(meshcore_client.commands.get_self_telemetry())
+            command = get_command_by_names(meshcore_client.commands, "get_self_telemetry", "get_telemetry", "get_status")
+            if command:
+                result = await run_device_command(command())
+            else:
+                result = None
             self_telemetry = event_payload(result)
         except HTTPException:
             pass
         try:
-            result = await run_device_command(meshcore_client.commands.get_custom_vars())
+            command = get_command_by_names(meshcore_client.commands, "get_custom_vars", "get_custom_vars_query")
+            if command:
+                result = await run_device_command(command())
+            else:
+                result = None
             custom_vars = event_payload(result)
         except HTTPException:
             pass

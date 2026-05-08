@@ -570,6 +570,14 @@ async function getJson(path) {
   return res.json();
 }
 
+async function getJsonOptional(path, fallback) {
+  try {
+    return await getJson(path);
+  } catch (err) {
+    return { __error:path, __message:err.message, fallback };
+  }
+}
+
 async function postJson(path, payload) {
   const res = await fetch(api(path), {
     method:'POST',
@@ -614,20 +622,28 @@ async function refresh() {
   setBadge('warn', 'Refreshing');
   try {
     const conversationFilter = state.selectedConversation ? state.selectedConversation.id : '';
-    const [stats, identity, messages, conversations, nodes, channels, rooms, mapData, admin, diagnostics, sensors, diagnosticLogs] = await Promise.all([
+    const optionalErrors = [];
+    let [stats, identity, messages, conversations, nodes, channels, rooms, mapData, admin, diagnostics, sensors, diagnosticLogs] = await Promise.all([
       getJson('stats'),
-      getJson('identity'),
+      getJsonOptional('identity', { connected:false, status:'Unavailable', self:{}, device_info:{}, battery:null, packet_stats:null }),
       getJson(`messages?${messageParams({ conversation: conversationFilter }).toString()}`),
       getJson('conversations'),
       getJson('nodes'),
       getJson('channels'),
-      getJson('rooms'),
-      getJson('map'),
-      getJson('admin/settings'),
-      getJson('diagnostics'),
-      getJson('sensors'),
-      getJson('diagnostics/logs?limit=100'),
+      getJsonOptional('rooms', []),
+      getJsonOptional('map', { markers:[], counts:{valid:0, live:0, stale:0, invalid:0}, tile_requirement:'' }),
+      getJsonOptional('admin/settings', { settings:{} }),
+      getJsonOptional('diagnostics', { connected:false, status:'Unavailable', transport:{}, log_count:0 }),
+      getJsonOptional('sensors', { sensors:[], self_telemetry:null, custom_vars:null }),
+      getJsonOptional('diagnostics/logs?limit=100', { total:0, items:[] }),
     ]);
+    [identity, rooms, mapData, admin, diagnostics, sensors, diagnosticLogs] = [identity, rooms, mapData, admin, diagnostics, sensors, diagnosticLogs].map((result) => {
+      if (result && result.__error) {
+        optionalErrors.push(`${result.__error}: ${result.__message}`);
+        return result.fallback;
+      }
+      return result;
+    });
     state.stats = stats;
     state.identity = identity;
     state.diagnostics = diagnostics;
@@ -641,13 +657,15 @@ async function refresh() {
     state.rooms = rooms;
     state.mapData = mapData;
     state.admin = admin;
-    state.error = null;
+    state.error = optionalErrors.length ? new Error(optionalErrors.join(' | ')) : null;
     render();
     maybeNotify(state.messages);
     await ensureMap();
     renderMap();
     if (stats.connected) {
       setBadge('ok', 'Connected');
+    } else if (optionalErrors.length) {
+      setBadge('warn', 'Partial Data');
     } else {
       setBadge('warn', stats.status || 'Disconnected');
     }
