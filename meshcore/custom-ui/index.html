@@ -646,7 +646,11 @@ async function refresh() {
     maybeNotify(state.messages);
     await ensureMap();
     renderMap();
-    setBadge('ok', 'Connected');
+    if (stats.connected) {
+      setBadge('ok', 'Connected');
+    } else {
+      setBadge('warn', stats.status || 'Disconnected');
+    }
   } catch (err) {
     state.error = err;
     $('statusLine').textContent = err.message;

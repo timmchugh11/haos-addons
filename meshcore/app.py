@@ -62,6 +62,7 @@ class MeshState:
         self.last_connect_at: Optional[datetime] = None
         self.last_disconnect_at: Optional[datetime] = None
         self.last_disconnect_reason: Optional[str] = None
+        self.reconnect_attempts = 0
         self.updated_at = self.started_at
 
     def set_status(self, status: str, connected: Optional[bool] = None) -> None:
@@ -658,6 +659,42 @@ async def refresh_contacts() -> None:
             state.contacts = dict(result.payload)
 
 
+def client_reports_connected(mc: MeshCore) -> Optional[bool]:
+    for obj in (mc, getattr(mc, "connection", None)):
+        if obj is None:
+            continue
+        for attr in ("connected", "is_connected"):
+            value = getattr(obj, attr, None)
+            if isinstance(value, bool):
+                return value
+            if callable(value):
+                try:
+                    result = value()
+                except Exception:
+                    continue
+                if isinstance(result, bool):
+                    return result
+    return None
+
+
+async def mark_disconnected(reason: str) -> None:
+    global meshcore_client
+    with state.lock:
+        state.last_disconnect_at = datetime.now(timezone.utc)
+        state.last_disconnect_reason = reason
+    state.set_status(f"Disconnected: {reason}", False)
+    meshcore_client = None
+
+
+async def meshcore_health_check(mc: MeshCore) -> None:
+    command = get_command_by_names(mc.commands, "get_time", "get_bat")
+    if not command:
+        return
+    result = await asyncio.wait_for(command(), timeout=15)
+    if result and event_type_value(result) == EventType.ERROR.value:
+        raise ConnectionError(f"health check failed: {event_payload(result)}")
+
+
 def message_matches(
     message: Dict[str, Any],
     scope: str,
@@ -715,8 +752,12 @@ async def connect_meshcore() -> None:
     global meshcore_client
 
     while True:
+        mc: Optional[MeshCore] = None
         try:
-            state.set_status(f"Connecting to {DEVICE}", False)
+            with state.lock:
+                state.reconnect_attempts += 1
+                attempt = state.reconnect_attempts
+            state.set_status(f"Connecting to {DEVICE} (attempt {attempt})", False)
             if TRANSPORT == "ble":
                 mc = await MeshCore.create_ble(
                     DEVICE,
@@ -739,19 +780,36 @@ async def connect_meshcore() -> None:
             await wire_events(mc)
             await load_initial_data(mc)
             await mc.start_auto_message_fetching()
+            with state.lock:
+                state.last_connect_at = datetime.now(timezone.utc)
+                state.reconnect_attempts = 0
             state.set_status("Connected", True)
+            last_health_check = time.monotonic()
 
             while True:
                 await asyncio.sleep(5)
+                if not state.connected:
+                    raise ConnectionError(state.last_disconnect_reason or "device disconnected")
+                if meshcore_client is not mc:
+                    raise ConnectionError("MeshCore client was cleared")
+                connected = client_reports_connected(mc)
+                if connected is False:
+                    raise ConnectionError("transport reported disconnected")
+                if time.monotonic() - last_health_check >= 30:
+                    await meshcore_health_check(mc)
+                    last_health_check = time.monotonic()
         except Exception as exc:
-            state.set_status(f"Connection error: {exc}", False)
+            await mark_disconnected(str(exc))
             try:
-                if meshcore_client:
-                    await meshcore_client.disconnect()
+                if mc:
+                    await mc.disconnect()
             except Exception:
                 pass
-            meshcore_client = None
-            await asyncio.sleep(15)
+            with state.lock:
+                attempts = state.reconnect_attempts
+            delay = min(30, 5 + attempts * 5)
+            state.set_status(f"Reconnecting in {delay}s: {exc}", False)
+            await asyncio.sleep(delay)
 
 
 async def wire_events(mc: MeshCore) -> None:
@@ -797,10 +855,7 @@ async def wire_events(mc: MeshCore) -> None:
 
     async def on_disconnect(event) -> None:
         reason = (event.payload or {}).get('reason', 'unknown')
-        with state.lock:
-            state.last_disconnect_at = datetime.now(timezone.utc)
-            state.last_disconnect_reason = str(reason)
-        state.set_status(f"Disconnected: {reason}", False)
+        await mark_disconnected(str(reason))
         append_event_log(event)
 
     async def on_connect(event) -> None:
@@ -943,6 +998,10 @@ async def api_status() -> Dict[str, Any]:
             "status": state.status,
             "device": state.device,
             "device_info": state.device_info,
+            "last_connect_at": state.last_connect_at.isoformat() if state.last_connect_at else None,
+            "last_disconnect_at": state.last_disconnect_at.isoformat() if state.last_disconnect_at else None,
+            "last_disconnect_reason": state.last_disconnect_reason,
+            "reconnect_attempts": state.reconnect_attempts,
             "updated_at": state.updated_at.isoformat(),
         }
 
@@ -1035,6 +1094,7 @@ async def api_diagnostics() -> Dict[str, Any]:
             "last_connect_at": state.last_connect_at.isoformat() if state.last_connect_at else None,
             "last_disconnect_at": state.last_disconnect_at.isoformat() if state.last_disconnect_at else None,
             "last_disconnect_reason": state.last_disconnect_reason,
+            "reconnect_attempts": state.reconnect_attempts,
             "log_count": len(state.event_logs),
             "connect_count": event_counts.get("connected", 0) + event_counts.get("CONNECTED", 0),
             "disconnect_count": event_counts.get("disconnected", 0) + event_counts.get("DISCONNECTED", 0),
