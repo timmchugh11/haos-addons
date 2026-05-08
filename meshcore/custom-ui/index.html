@@ -620,10 +620,11 @@ async function deleteJson(path) {
 
 async function refresh() {
   setBadge('warn', 'Refreshing');
+  const optionalErrors = [];
+  let stats = null;
   try {
     const conversationFilter = state.selectedConversation ? state.selectedConversation.id : '';
-    const optionalErrors = [];
-    let [stats, identity, messages, conversations, nodes, channels, rooms, mapData, admin, diagnostics, sensors, diagnosticLogs] = await Promise.all([
+    let [statsResult, identity, messages, conversations, nodes, channels, rooms, mapData, admin, diagnostics, sensors, diagnosticLogs] = await Promise.all([
       getJson('stats'),
       getJsonOptional('identity', { connected:false, status:'Unavailable', self:{}, device_info:{}, battery:null, packet_stats:null }),
       getJson(`messages?${messageParams({ conversation: conversationFilter }).toString()}`),
@@ -637,6 +638,7 @@ async function refresh() {
       getJsonOptional('sensors', { sensors:[], self_telemetry:null, custom_vars:null }),
       getJsonOptional('diagnostics/logs?limit=100', { total:0, items:[] }),
     ]);
+    stats = statsResult;
     [identity, rooms, mapData, admin, diagnostics, sensors, diagnosticLogs] = [identity, rooms, mapData, admin, diagnostics, sensors, diagnosticLogs].map((result) => {
       if (result && result.__error) {
         optionalErrors.push(`${result.__error}: ${result.__message}`);
@@ -658,21 +660,42 @@ async function refresh() {
     state.mapData = mapData;
     state.admin = admin;
     state.error = optionalErrors.length ? new Error(optionalErrors.join(' | ')) : null;
+  } catch (err) {
+    state.error = err;
+    $('statusLine').textContent = `API fetch failed: ${err.message}`;
+    setBadge('err', 'API Error');
+    return;
+  }
+
+  try {
     render();
     maybeNotify(state.messages);
+  } catch (err) {
+    state.error = err;
+    $('statusLine').textContent = `UI render failed: ${err.message}`;
+    setBadge('err', 'UI Error');
+    return;
+  }
+
+  try {
     await ensureMap();
     renderMap();
+  } catch (err) {
+    state.error = err;
+    $('statusLine').textContent = `Map render failed: ${err.message}`;
+    setBadge('warn', 'Map Error');
+    return;
+  }
+
+  if (optionalErrors.length) {
+    $('statusLine').textContent = optionalErrors.join(' | ');
+  }
+  if (stats) {
     if (stats.connected) {
-      setBadge('ok', 'Connected');
-    } else if (optionalErrors.length) {
-      setBadge('warn', 'Partial Data');
+      setBadge(optionalErrors.length ? 'warn' : 'ok', optionalErrors.length ? 'Partial Data' : 'Connected');
     } else {
       setBadge('warn', stats.status || 'Disconnected');
     }
-  } catch (err) {
-    state.error = err;
-    $('statusLine').textContent = err.message;
-    setBadge('err', 'API Error');
   }
 }
 
