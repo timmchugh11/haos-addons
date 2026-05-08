@@ -1044,10 +1044,12 @@ function renderSensors() {
 
 function renderEventLogs() {
   const filter = $('logFilter') ? $('logFilter').value.trim().toLowerCase() : '';
-  const logs = state.diagnosticLogs || [];
+  const logs = Array.isArray(state.diagnosticLogs)
+    ? state.diagnosticLogs
+    : (state.diagnosticLogs && Array.isArray(state.diagnosticLogs.items) ? state.diagnosticLogs.items : []);
   const filtered = logs.filter((entry) => {
     if (!filter) return true;
-    return entry.type.toLowerCase().includes(filter) || JSON.stringify(entry.payload).toLowerCase().includes(filter);
+    return fmt(entry.type, '').toLowerCase().includes(filter) || JSON.stringify(entry.payload || {}).toLowerCase().includes(filter);
   });
   $('eventLogs').innerHTML = filtered.map((entry) => `<tr><td>${escapeHtml(entry.timestamp)}</td><td>${escapeHtml(entry.type)}</td><td>${escapeHtml(JSON.stringify(entry.payload))}</td></tr>`).join('') || emptyRow(3, 'No diagnostic events available.');
 }
