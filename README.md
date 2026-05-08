@@ -13,7 +13,7 @@ A collection of Home Assistant add-ons.
 
 ### MeshCore GUI
 
-[![version](https://img.shields.io/badge/version-0.9.1-blue.svg)](meshcore/config.yaml)
+[![version](https://img.shields.io/badge/version-0.9.2-blue.svg)](meshcore/config.yaml)
 
 Custom web GUI for MeshCore companion radios. Provides dashboard, contacts,
 channel/direct messages, channels, map, REST API, and serial/BLE connectivity through
