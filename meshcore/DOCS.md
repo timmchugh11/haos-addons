@@ -1,6 +1,8 @@
 # MeshCore GUI Add-on Documentation
 
-This add-on runs a custom MeshCore web GUI inside Home Assistant.
+This add-on runs a custom MeshCore web GUI inside Home Assistant. It provides a
+FastAPI backend, a custom browser UI, serial/BLE MeshCore connectivity, and a
+REST API under `/api/v1/*`.
 
 ## Quick Start
 
@@ -13,10 +15,41 @@ This add-on runs a custom MeshCore web GUI inside Home Assistant.
 For Bluetooth, set `transport` to `ble`, set `ble_address` to the paired device
 address, and confirm the host Bluetooth adapter is working.
 
+## Main Pages
+
+- **Dashboard**: public traffic stats and recent messages.
+- **Messages**: channel/direct conversations, composer, resend, filters, and
+  export.
+- **Nodes**: contacts, trust flags, metadata, contact-card import/export.
+- **Channels**: channel editor, private keys/passwords, backup and restore.
+- **Room Servers**: room discovery, history/status sync, ACL/read-only display,
+  and guarded posts.
+- **Diagnostics**: connection health, event logs, sensors, and connection test.
+- **Map**: Leaflet markers, clustering, heatmap, labels, stale/live locations.
+- **Identity**: local identity, radio status, radio/routing controls, reboot,
+  clock sync, and adverts.
+- **Admin**: write-safety toggles and maintenance mode.
+
+## Write Safety
+
+The Admin page controls write-capable features. Room posts, contact imports, and
+channel restore are disabled by default. Maintenance mode blocks write-capable
+API actions while still allowing admin settings to be changed.
+
 ## API
 
-The bundled GUI exposes read-only endpoints under `/api/v1/`, including stats,
-nodes, messages and channels.
+The bundled GUI uses endpoints under `/api/v1/`, including status, stats,
+identity, messages, conversations, nodes, contacts, channels, rooms, map,
+diagnostics, sensors, radio/routing, and admin settings.
+
+Write-capable endpoints are available for supported actions and are guarded by
+the Admin safety policy.
+
+## Persistent Data
+
+Runtime state is stored under `/data/.meshcore` in the add-on data volume. This
+includes message history, contact metadata, channel metadata, and admin safety
+settings.
 
 ## Roadmap
 
