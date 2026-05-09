@@ -131,7 +131,7 @@ main{flex:1;overflow:auto;padding:30px}
 .map-node strong{display:block;color:var(--text);font-size:13px;margin-bottom:4px}
 .map-node span{display:block;color:var(--muted);font-size:12px;word-break:break-word}
 .map-marker{width:16px;height:16px;border-radius:50%;border:2px solid #07120d;box-shadow:0 0 10px rgba(255,255,255,.35)}
-.map-marker.self{background:#4da3ff}.map-marker.companion{background:#00d47e}.map-marker.repeater{background:#ff9500}.map-marker.room_server{background:#d76bff}.map-marker.sensor{background:#a5ff4d}.map-marker.unknown{background:#aaa}
+.map-marker.self{background:#4da3ff}.map-marker.browser{background:#ffffff;box-shadow:0 0 0 4px rgba(77,163,255,.18),0 0 14px rgba(77,163,255,.8)}.map-marker.companion{background:#00d47e}.map-marker.repeater{background:#ff9500}.map-marker.room_server{background:#d76bff}.map-marker.sensor{background:#a5ff4d}.map-marker.unknown{background:#aaa}
 .map-marker.stale{opacity:.48;filter:saturate(.35)}.map-marker.invalid{background:#444;opacity:.35}
 .meshcore-map-label{background:#090909;border:1px solid var(--border2);border-radius:5px;color:var(--text);font-size:11px;font-weight:700}
 .kv{display:grid;grid-template-columns:130px 1fr;gap:8px 14px;font-size:13px}
@@ -419,6 +419,7 @@ main{flex:1;overflow:auto;padding:30px}
                 <input id="heatIntensity" type="range" min="10" max="100" value="45">
               </label>
               <label class="map-control"><input id="showStale" type="checkbox" checked> Stale</label>
+              <button id="locateBrowser" class="btn" type="button">My Location</button>
               <button id="toggleLabels" class="btn" type="button">Show Labels</button>
               <button id="fitLive" class="btn" type="button">Fit Live</button>
               <button id="fitAll" class="btn" type="button">Fit All</button>
@@ -555,7 +556,7 @@ const state = {
   selectedConversation:null,
   seenMessageIds:new Set(), loadedOnce:false,
   mapReady:false, map:null, tileLayer:null, heatLayer:null, markerLayer:null,
-  labelsVisible:false,
+  labelsVisible:false, browserLocation:null,
 };
 const $ = (id) => document.getElementById(id);
 const fmt = (value, fallback='-') => value === null || value === undefined || value === '' ? fallback : String(value);
@@ -1499,9 +1500,12 @@ function setMapLayer(type) {
 async function renderMap() {
   const mapData = state.mapData || { markers:[], counts:{valid:0, live:0, stale:0, invalid:0}, tile_requirement:'' };
   const showStale = $('showStale').checked;
-  const located = mapData.markers.filter((m) => m.location && m.location.valid && (showStale || m.location.freshness !== 'stale'));
+  const markers = [...mapData.markers];
+  if (state.browserLocation) markers.unshift(browserLocationMarker());
+  const located = markers.filter((m) => m.location && m.location.valid && (showStale || m.location.freshness !== 'stale'));
   $('locatedCount').textContent = String(located.length);
-  $('mapTileStatus').textContent = `${mapData.counts.live || 0} live / ${mapData.counts.stale || 0} stale / ${mapData.counts.invalid || 0} invalid. ${mapData.tile_requirement || ''}`;
+  const localStatus = state.browserLocation ? ' Browser location shown.' : '';
+  $('mapTileStatus').textContent = `${mapData.counts.live || 0} live / ${mapData.counts.stale || 0} stale / ${mapData.counts.invalid || 0} invalid.${localStatus} ${mapData.tile_requirement || ''}`;
   $('mapNodeList').innerHTML = located.map((m) => `
     <div class="map-node" data-map-node="${escapeHtml(m.id)}">
       <strong>${escapeHtml(fmt(m.name))}</strong>
@@ -1545,7 +1549,7 @@ async function renderMap() {
 }
 
 function markerIcon(marker) {
-  const role = marker.kind === 'self' ? 'self' : String(marker.node_type || 'unknown').replace(/[^a-z0-9_]/g, '_');
+  const role = marker.kind === 'self' ? 'self' : marker.kind === 'browser' ? 'browser' : String(marker.node_type || 'unknown').replace(/[^a-z0-9_]/g, '_');
   const freshness = marker.location && marker.location.freshness === 'stale' ? ' stale' : '';
   return L.divIcon({
     className: '',
@@ -1564,6 +1568,51 @@ function markerPopup(marker) {
     ${marker.kind === 'self' ? `Policy ${escapeHtml(fmt(marker.adv_loc_policy))}` : escapeHtml(fmt(marker.pubkey_prefix))}`;
 }
 
+function browserLocationMarker() {
+  const loc = state.browserLocation || {};
+  const updated = loc.updated_at || new Date().toISOString();
+  return {
+    id: 'browser-location',
+    kind: 'browser',
+    name: 'My location',
+    node_type: 'browser',
+    pubkey_prefix: 'local only',
+    location: {
+      valid: true,
+      lat: loc.lat,
+      lon: loc.lon,
+      source: 'browser_geolocation',
+      updated_at: updated,
+      age_seconds: Math.max(0, Math.floor((Date.now() - new Date(updated).getTime()) / 1000)),
+      freshness: 'live',
+    },
+  };
+}
+
+function updateBrowserLocation() {
+  if (!navigator.geolocation) {
+    $('mapTileStatus').textContent = 'Browser geolocation is not available.';
+    return;
+  }
+  $('mapTileStatus').textContent = 'Requesting browser location...';
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      state.browserLocation = {
+        lat: position.coords.latitude,
+        lon: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        updated_at: new Date().toISOString(),
+      };
+      renderMap();
+      if (state.map) state.map.setView([state.browserLocation.lat, state.browserLocation.lon], 13);
+    },
+    (error) => {
+      $('mapTileStatus').textContent = `Browser location unavailable: ${error.message}`;
+    },
+    { enableHighAccuracy:true, timeout:10000, maximumAge:60000 },
+  );
+}
+
 function locationAge(location) {
   if (!location || location.age_seconds === null || location.age_seconds === undefined) return 'age unknown';
   const mins = Math.floor(location.age_seconds / 60);
@@ -1575,14 +1624,15 @@ function locationAge(location) {
 
 function fitMap(mode='all') {
   if (!state.map || !state.mapData) return;
-  const markers = state.mapData.markers.filter((m) => m.location && m.location.valid && (mode !== 'live' || m.location.freshness === 'live'));
+  const markers = [...state.mapData.markers, ...(state.browserLocation ? [browserLocationMarker()] : [])]
+    .filter((m) => m.location && m.location.valid && (mode !== 'live' || m.location.freshness === 'live'));
   const bounds = markers.map((m) => [Number(m.location.lat), Number(m.location.lon)]);
   if (bounds.length === 1) state.map.setView(bounds[0], 12);
   if (bounds.length > 1) state.map.fitBounds(bounds, { padding:[64,64] });
 }
 
 function focusMapMarker(id) {
-  const marker = (state.mapData && state.mapData.markers || []).find((m) => m.id === id);
+  const marker = [...((state.mapData && state.mapData.markers) || []), ...(state.browserLocation ? [browserLocationMarker()] : [])].find((m) => m.id === id);
   if (marker && marker.location && marker.location.valid && state.map) {
     state.map.setView([Number(marker.location.lat), Number(marker.location.lon)], 13);
   }
@@ -1646,6 +1696,7 @@ $('notifyBtn').addEventListener('click', enableNotifications);
 $('mapType').addEventListener('change', (event) => setMapLayer(event.target.value));
 $('heatIntensity').addEventListener('input', renderMap);
 $('showStale').addEventListener('change', renderMap);
+$('locateBrowser').addEventListener('click', updateBrowserLocation);
 $('fitLive').addEventListener('click', () => fitMap('live'));
 $('fitAll').addEventListener('click', () => fitMap('all'));
 $('toggleLabels').addEventListener('click', () => {

@@ -29,8 +29,9 @@ firmware build, and the command support exposed by `meshcore_py`.
   local pin/mute/sort metadata, and backup/restore.
 - Room server discovery, login/history sync where supported, ACL/read-only
   display where supported, and guarded room posting.
-- Leaflet map with role-based markers, stale/live coordinate handling,
-  clustering, heat layer, labels, and own-node location display.
+- Leaflet map with role-based markers, browser-local location, stale/live
+  coordinate handling, clustering, heat layer, labels, and own-node location
+  display.
 - Identity page with local name/advertised coordinates, battery/storage/radio
   status, contact-card export, radio controls, GPS/power-saving toggles,
   routing controls, reboot, clock sync, and advert commands.
@@ -129,4 +130,4 @@ companion GUI.
 
 ## Version
 
-Current add-on version: `0.10.2`
+Current add-on version: `0.10.3`

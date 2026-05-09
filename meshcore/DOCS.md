@@ -21,7 +21,8 @@ REST API under `/api/v1/*`.
 - **Room Servers**: room discovery, history/status sync, ACL/read-only display,
   and guarded posts.
 - **Diagnostics**: connection health, event logs, sensors, and connection test.
-- **Map**: Leaflet markers, clustering, heatmap, labels, stale/live locations.
+- **Map**: Leaflet markers, browser-local location, clustering, heatmap,
+  labels, stale/live locations.
 - **Identity**: local identity, radio status, radio controls, GPS/power-saving
   toggles, routing controls, reboot, clock sync, and adverts.
 - **Admin**: write-safety toggles and maintenance mode.
