@@ -6,28 +6,19 @@ export HOME=/data
 export PYTHONUNBUFFERED=1
 export PATH="/opt/meshcore-venv/bin:${PATH}"
 
-TRANSPORT="$(bashio::config 'transport')"
 SERIAL_PORT="$(bashio::config 'serial_port')"
 BAUDRATE="$(bashio::config 'baudrate')"
 SERIAL_CX_DELAY="$(bashio::config 'serial_cx_delay')"
-BLE_ADDRESS="$(bashio::config 'ble_address')"
-BLE_PIN="$(bashio::config 'ble_pin')"
 DEBUG="$(bashio::config 'debug')"
 
 mkdir -p /data/.meshcore
 
-if [ "${TRANSPORT}" = "ble" ]; then
-  export MESHCORE_DEVICE="${BLE_ADDRESS}"
-  bashio::log.info "Starting MeshCore GUI over BLE: ${BLE_ADDRESS}"
-else
-  export MESHCORE_DEVICE="${SERIAL_PORT}"
-  bashio::log.info "Starting MeshCore GUI over serial: ${SERIAL_PORT} @ ${BAUDRATE}"
-fi
+export MESHCORE_DEVICE="${SERIAL_PORT}"
+bashio::log.info "Starting MeshCore GUI over serial: ${SERIAL_PORT} @ ${BAUDRATE}"
 
-export MESHCORE_TRANSPORT="${TRANSPORT}"
+export MESHCORE_TRANSPORT="serial"
 export MESHCORE_BAUDRATE="${BAUDRATE}"
 export MESHCORE_SERIAL_CX_DELAY="${SERIAL_CX_DELAY}"
-export MESHCORE_BLE_PIN="${BLE_PIN}"
 export MESHCORE_DEBUG="${DEBUG}"
 
 if bashio::var.true "${DEBUG}"; then

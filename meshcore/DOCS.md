@@ -1,19 +1,15 @@
 # MeshCore GUI Add-on Documentation
 
 This add-on runs a custom MeshCore web GUI inside Home Assistant. It provides a
-FastAPI backend, a custom browser UI, serial/BLE MeshCore connectivity, and a
+FastAPI backend, a custom browser UI, USB serial MeshCore connectivity, and a
 REST API under `/api/v1/*`.
 
 ## Quick Start
 
 1. Flash a supported MeshCore device with Companion firmware.
 2. Plug the device into the Home Assistant host by USB.
-3. Set `transport` to `serial`.
-4. Select the correct `serial_port`.
-5. Start the add-on and open **MeshCore** from the sidebar.
-
-For Bluetooth, set `transport` to `ble`, set `ble_address` to the paired device
-address, and confirm the host Bluetooth adapter is working.
+3. Select the correct `serial_port`.
+4. Start the add-on and open **MeshCore** from the sidebar.
 
 ## Main Pages
 
@@ -55,6 +51,9 @@ settings.
 
 See [TODO.md](TODO.md) for the remaining work toward full MeshCore companion
 feature coverage.
+
+Bluetooth transport is intentionally disabled for now while the serial GUI is
+stabilised.
 
 ## References Used
 

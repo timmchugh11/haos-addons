@@ -6,7 +6,7 @@ It runs a standalone FastAPI backend and a custom single-page web UI served at
 `8081`.
 
 The add-on is intended for MeshCore Companion firmware devices connected to the
-Home Assistant host by USB serial or Bluetooth LE.
+Home Assistant host by USB serial.
 
 ## Current Status
 
@@ -19,7 +19,7 @@ firmware build, and the command support exposed by `meshcore_py`.
 
 - Custom dark web UI with Dashboard, Messages, Nodes, Channels, Room Servers,
   Diagnostics, Map, Identity, and Admin pages.
-- USB serial and BLE transports.
+- USB serial transport.
 - Channel and direct message history with composer, retry/resend, delivery
   state, ACK tracking, filters, pagination, browser notifications, and
   JSON/CSV export.
@@ -44,12 +44,9 @@ firmware build, and the command support exposed by `meshcore_py`.
 
 | Option | Default | Description |
 |---|---:|---|
-| `transport` | `serial` | `serial` or `ble` |
 | `serial_port` | `/dev/ttyACM0` | MeshCore USB serial device |
 | `baudrate` | `115200` | Serial baud rate |
 | `serial_cx_delay` | `2.0` | Delay after opening the serial port before sending the first MeshCore command |
-| `ble_address` | `literal:AA:BB:CC:DD:EE:FF` | BLE device address. Keep the `literal:` prefix for a fixed MAC address. |
-| `ble_pin` | `123456` | BLE pairing PIN |
 | `debug` | `false` | Enables verbose MeshCore GUI and protocol logging |
 
 ## Access
@@ -108,9 +105,7 @@ the Admin page.
 Serial mode is the recommended default for a Home Assistant appliance. It uses
 the USB/UART devices exposed by the Supervisor.
 
-BLE mode requires the host Bluetooth stack, D-Bus and BlueZ to be available to
-the add-on. BLE support is included, but serial is usually more reliable for a
-permanent Home Assistant install.
+Bluetooth support is disabled for now while the serial GUI is stabilised.
 
 ## Known Limitations
 

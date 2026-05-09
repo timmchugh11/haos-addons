@@ -17,7 +17,7 @@ A collection of Home Assistant add-ons.
 
 Custom web GUI for MeshCore companion radios. Provides dashboard, full
 messaging, contacts, channels, room servers, diagnostics, map, admin safety
-controls, REST API, and serial/BLE connectivity through Home Assistant ingress.
+controls, REST API, and USB serial connectivity through Home Assistant ingress.
 
 **[Documentation](meshcore/README.md)** · Protocol library: [github.com/meshcore-dev/meshcore_py](https://github.com/meshcore-dev/meshcore_py)
 

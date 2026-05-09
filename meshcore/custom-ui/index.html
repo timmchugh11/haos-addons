@@ -53,6 +53,19 @@ main{flex:1;overflow:auto;padding:30px}
 .green .value{color:var(--green)}.yellow .value{color:var(--yellow)}.red .value{color:var(--red)}
 .grid{display:grid;gap:16px;grid-template-columns:1.25fr .75fr}
 .message-grid{display:grid;gap:16px;grid-template-columns:320px 1fr}
+.chat-shell{display:grid;grid-template-rows:auto minmax(360px,1fr) auto;min-height:calc(100vh - 220px);margin-bottom:0}
+.chat-toolbar{margin-bottom:0;border-bottom:1px solid var(--border);padding-bottom:14px}
+.chat-thread{display:flex;flex-direction:column-reverse;gap:12px;overflow:auto;padding:18px 4px 18px 0;min-height:360px}
+.chat-message{display:grid;gap:4px;max-width:min(76%,720px)}
+.chat-message.incoming{align-self:flex-start}.chat-message.outgoing{align-self:flex-end}
+.chat-sender{font-size:11px;font-weight:800;color:var(--muted);padding:0 4px}
+.chat-message.outgoing .chat-sender{text-align:right}
+.chat-bubble{border:1px solid var(--border2);border-radius:8px;padding:10px 12px;background:var(--surface2);color:var(--text);white-space:pre-wrap;word-break:break-word}
+.chat-message.outgoing .chat-bubble{background:rgba(0,212,126,.13);border-color:rgba(0,212,126,.32)}
+.chat-message.failed .chat-bubble,.chat-message.ack_timeout .chat-bubble{border-color:rgba(255,149,0,.42)}
+.chat-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:11px;padding:0 4px}
+.chat-message.outgoing .chat-meta{justify-content:flex-end}
+.chat-meta .mini-btn{margin-left:2px}
 .conversation-list{display:grid;gap:8px}
 .conversation{width:100%;text-align:left;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);padding:12px}
 .conversation:hover,.conversation.active{border-color:#444;background:var(--surface3)}
@@ -217,9 +230,9 @@ main{flex:1;overflow:auto;padding:30px}
                 </div>
               </form>
             </div>
-            <div class="box">
+            <div class="box chat-shell">
               <div class="box-title">Message History <span id="messageScope">All</span></div>
-              <div class="toolbar">
+              <div class="toolbar chat-toolbar">
                 <div class="field search">
                   <label for="messageSearch">Search</label>
                   <input id="messageSearch" placeholder="Search message, sender, target, status">
@@ -257,7 +270,7 @@ main{flex:1;overflow:auto;padding:30px}
                 <button id="exportJson" class="btn" type="button">JSON</button>
                 <button id="exportCsv" class="btn" type="button">CSV</button>
               </div>
-              <table class="tbl"><thead><tr><th>From</th><th>Target</th><th>Message</th><th>Status</th><th>Time</th></tr></thead><tbody id="messagesTable"></tbody></table>
+              <div id="messagesTable" class="chat-thread"></div>
               <div class="pager">
                 <button id="prevPage" class="btn" type="button">Prev</button>
                 <span id="pageInfo">0 messages</span>
@@ -743,22 +756,32 @@ function emptyRow(cols, text) {
 }
 
 function renderMessages() {
-  const fullRows = state.messages.map((m) => {
+  const chatRows = state.messages.map((m) => {
     const outgoing = m.direction === 'outgoing';
     const sender = outgoing ? 'You' : fmt(m.sender || m.sender_name || m.sender_pubkey || m.pubkey_prefix);
-    const channel = m.conversation_type === 'direct'
+    const target = m.conversation_type === 'direct'
       ? `Direct ${fmt(m.recipient || m.contact || m.sender_pubkey || m.pubkey_prefix, '')}`
       : fmt(m.channel_name || m.channel || 'Public');
     const text = fmt(m.text || m.message);
     const status = fmt(m.status, 'received');
-    const time = m.timestamp_utc || m.timestamp ? new Date(m.timestamp_utc || m.timestamp).toLocaleString() : '-';
+    const timestamp = m.timestamp_utc || m.timestamp;
+    const date = timestamp ? new Date(timestamp) : null;
+    const time = date ? date.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) : '-';
+    const day = date ? date.toLocaleDateString() : '-';
+    const hops = Number(m.hops || m.path_len || 0);
     const ack = Number(m.ack_count || 0);
-    const ackLabel = ack ? `<span class="pill">${ack} ACK${ack === 1 ? '' : 'S'}</span>` : '';
+    const ackLabel = ack ? `<span class="pill">${ack} ack${ack === 1 ? '' : 's'}</span>` : '';
+    const privateLabel = m.is_private ? '<span class="pill">private</span>' : '';
+    const hopLabel = `<span class="pill">${hops} hop${hops === 1 ? '' : 's'}</span>`;
+    const statusLabel = `<span class="pill">${escapeHtml(status)}</span>`;
     const retry = outgoing && ['failed','ack_timeout','sent'].includes(status)
-      ? `<div class="row-actions"><button class="mini-btn" type="button" data-resend="${m.id}">Resend</button></div>`
+      ? `<button class="mini-btn" type="button" data-resend="${m.id}">Resend</button>`
       : '';
-    const meta = `<div class="msg-meta"><span class="pill">${escapeHtml(fmt(m.direction, 'incoming'))}</span>${m.is_private ? '<span class="pill">private</span>' : ''}${ackLabel}</div>`;
-    return `<tr><td>${escapeHtml(sender)}${meta}${retry}</td><td>${escapeHtml(channel)}</td><td>${escapeHtml(text)}</td><td>${escapeHtml(status)}</td><td>${escapeHtml(time)}</td></tr>`;
+    return `<article class="chat-message ${outgoing ? 'outgoing' : 'incoming'} ${escapeHtml(status)}">
+      <div class="chat-sender">${escapeHtml(sender)} <span class="pill">${escapeHtml(target)}</span></div>
+      <div class="chat-bubble">${escapeHtml(text)}</div>
+      <div class="chat-meta"><span>${escapeHtml(day)}</span><span>${escapeHtml(time)}</span>${hopLabel}${statusLabel}${privateLabel}${ackLabel}${retry}</div>
+    </article>`;
   }).join('');
   const recentRows = state.messages.slice(0, 12).map((m) => {
     const outgoing = m.direction === 'outgoing';
@@ -771,7 +794,7 @@ function renderMessages() {
     return `<tr><td>${escapeHtml(sender)}</td><td>${escapeHtml(channel)}</td><td>${escapeHtml(text)}</td><td>${escapeHtml(time)}</td></tr>`;
   }).join('');
   $('recentMessages').innerHTML = recentRows || emptyRow(4, 'No messages yet.');
-  $('messagesTable').innerHTML = fullRows || emptyRow(5, 'No messages yet.');
+  $('messagesTable').innerHTML = chatRows || '<div class="empty">No messages yet.</div>';
   $('messagesTable').querySelectorAll('[data-resend]').forEach((button) => {
     button.addEventListener('click', () => resendMessage(Number(button.dataset.resend)));
   });
@@ -1013,7 +1036,7 @@ function renderDiagnostics() {
   $('diagLogCount').textContent = fmt(diag.log_count, '0');
   $('diagReconnects').textContent = fmt(diag.connect_count, '0');
   const transport = diag.transport || {};
-  $('diagTransport').textContent = transport.type ? `${fmt(transport.type, '')}${transport.ble_pin ? ` / PIN ${fmt(transport.ble_pin, '')}` : ''}` : '-';
+  $('diagTransport').textContent = fmt(transport.type, '-');
   $('diagDevice').textContent = fmt(transport.device, '-');
   renderSensors();
   renderEventLogs();

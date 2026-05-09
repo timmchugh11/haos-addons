@@ -35,7 +35,6 @@ DEVICE = os.environ.get("MESHCORE_DEVICE", "/dev/ttyACM0")
 TRANSPORT = os.environ.get("MESHCORE_TRANSPORT", "serial")
 BAUDRATE = int(os.environ.get("MESHCORE_BAUDRATE", "115200"))
 SERIAL_CX_DELAY = float(os.environ.get("MESHCORE_SERIAL_CX_DELAY", "2.0"))
-BLE_PIN = os.environ.get("MESHCORE_BLE_PIN", "123456")
 DEBUG = os.environ.get("MESHCORE_DEBUG", "false").lower() in {"1", "true", "yes", "on"}
 
 
@@ -765,23 +764,14 @@ async def connect_meshcore() -> None:
                 state.reconnect_attempts += 1
                 attempt = state.reconnect_attempts
             state.set_status(f"Connecting to {DEVICE} (attempt {attempt})", False)
-            if TRANSPORT == "ble":
-                mc = await MeshCore.create_ble(
-                    DEVICE,
-                    pin=BLE_PIN,
-                    debug=DEBUG,
-                    default_timeout=10,
-                    auto_reconnect=False,
-                )
-            else:
-                mc = await MeshCore.create_serial(
-                    DEVICE,
-                    baudrate=BAUDRATE,
-                    debug=DEBUG,
-                    default_timeout=10,
-                    auto_reconnect=False,
-                    cx_dly=SERIAL_CX_DELAY,
-                )
+            mc = await MeshCore.create_serial(
+                DEVICE,
+                baudrate=BAUDRATE,
+                debug=DEBUG,
+                default_timeout=10,
+                auto_reconnect=False,
+                cx_dly=SERIAL_CX_DELAY,
+            )
 
             meshcore_client = mc
             await wire_events(mc)
@@ -1089,8 +1079,6 @@ async def api_diagnostics() -> Dict[str, Any]:
         transport_info: Dict[str, Any] = {"type": TRANSPORT, "device": DEVICE}
         if TRANSPORT == "serial":
             transport_info["serial_ports"] = serial_ports_safe()
-        elif TRANSPORT == "ble":
-            transport_info["ble_pin"] = BLE_PIN
         return {
             "connected": state.connected,
             "status": state.status,

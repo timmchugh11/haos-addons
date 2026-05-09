@@ -1,5 +1,5 @@
 name: "MeshCore GUI"
-description: "Custom Home Assistant web GUI for MeshCore companion radios with dashboard, full messages, nodes, channels, map, REST API, serial and BLE support"
+description: "Custom Home Assistant web GUI for MeshCore companion radios with dashboard, full messages, nodes, channels, map, REST API, and USB serial support"
 version: "0.9.6"
 slug: "meshcore"
 init: false
@@ -29,25 +29,14 @@ ports_description:
 uart: true
 usb: true
 udev: true
-host_dbus: true
-privileged:
-  - NET_ADMIN
-  - NET_RAW
-
 options:
-  transport: "serial"
   serial_port: "/dev/ttyACM0"
   baudrate: 115200
   serial_cx_delay: 2.0
-  ble_address: "literal:AA:BB:CC:DD:EE:FF"
-  ble_pin: "123456"
   debug: false
 
 schema:
-  transport: "list(serial|ble)"
   serial_port: "device(subsystem=tty)"
   baudrate: "int(1200,921600)"
   serial_cx_delay: "float(0,10)"
-  ble_address: "str"
-  ble_pin: "password"
   debug: "bool"

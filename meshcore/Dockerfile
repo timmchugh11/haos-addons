@@ -5,9 +5,7 @@ ARG BUILD_VERSION
 
 RUN apk add --no-cache \
       bash \
-      bluez \
       build-base \
-      dbus \
       eudev-libs \
       git \
       linux-headers \

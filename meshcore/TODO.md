@@ -8,7 +8,7 @@ dashboard.
 
 - [x] Standalone custom web UI served at `/`
 - [x] Home Assistant ingress support
-- [x] Serial and BLE connection options
+- [x] Serial connection option
 - [x] Read-only dashboard
 - [x] Channel/direct message history and composer
 - [x] Read-only nodes/contacts table
@@ -105,7 +105,7 @@ dashboard.
 - [x] Packet/event log viewer
 - [x] Raw protocol event inspector for debugging
 - [x] Connection health panel with reconnect attempts and last error
-- [ ] BLE pairing/status diagnostics
+- [ ] Revisit BLE transport and pairing/status diagnostics after serial UI stabilises
 - [ ] Serial port scanner and connection test endpoint
 - [ ] Simulator coverage for messages, contacts, channels, and map coordinates
 
