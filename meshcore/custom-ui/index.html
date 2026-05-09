@@ -755,14 +755,28 @@ function emptyRow(cols, text) {
   return `<tr><td colspan="${cols}"><div class="empty">${text}</div></td></tr>`;
 }
 
+function messagePresentation(message) {
+  const outgoing = message.direction === 'outgoing';
+  const rawText = fmt(message.text || message.message, '');
+  let sender = outgoing ? 'You' : fmt(message.sender_name || message.sender || message.sender_pubkey || message.pubkey_prefix);
+  let text = rawText;
+  const colon = rawText.indexOf(':');
+  const embeddedSender = colon > 0 && colon <= 48 ? rawText.slice(0, colon).trim() : '';
+  const looksLikeName = embeddedSender && !/^https?$/i.test(embeddedSender) && /[A-Za-z0-9]/.test(embeddedSender);
+  if (!outgoing && looksLikeName && (sender === '-' || rawText.toLowerCase().startsWith(`${sender.toLowerCase()}:`))) {
+    sender = embeddedSender;
+    text = rawText.slice(colon + 1).trimStart();
+  }
+  return { sender, text };
+}
+
 function renderMessages() {
   const chatRows = state.messages.map((m) => {
     const outgoing = m.direction === 'outgoing';
-    const sender = outgoing ? 'You' : fmt(m.sender || m.sender_name || m.sender_pubkey || m.pubkey_prefix);
+    const { sender, text } = messagePresentation(m);
     const target = m.conversation_type === 'direct'
       ? `Direct ${fmt(m.recipient || m.contact || m.sender_pubkey || m.pubkey_prefix, '')}`
       : fmt(m.channel_name || m.channel || 'Public');
-    const text = fmt(m.text || m.message);
     const status = fmt(m.status, 'received');
     const timestamp = m.timestamp_utc || m.timestamp;
     const date = timestamp ? new Date(timestamp) : null;
@@ -777,19 +791,21 @@ function renderMessages() {
     const retry = outgoing && ['failed','ack_timeout','sent'].includes(status)
       ? `<button class="mini-btn" type="button" data-resend="${m.id}">Resend</button>`
       : '';
+    const reply = !outgoing && m.id !== undefined && m.id !== null
+      ? `<button class="mini-btn" type="button" data-reply="${escapeHtml(m.id)}">Reply</button>`
+      : '';
     return `<article class="chat-message ${outgoing ? 'outgoing' : 'incoming'} ${escapeHtml(status)}">
       <div class="chat-sender">${escapeHtml(sender)} <span class="pill">${escapeHtml(target)}</span></div>
       <div class="chat-bubble">${escapeHtml(text)}</div>
-      <div class="chat-meta"><span>${escapeHtml(day)}</span><span>${escapeHtml(time)}</span>${hopLabel}${statusLabel}${privateLabel}${ackLabel}${retry}</div>
+      <div class="chat-meta"><span>${escapeHtml(day)}</span><span>${escapeHtml(time)}</span>${hopLabel}${statusLabel}${privateLabel}${ackLabel}${reply}${retry}</div>
     </article>`;
   }).join('');
   const recentRows = state.messages.slice(0, 12).map((m) => {
     const outgoing = m.direction === 'outgoing';
-    const sender = outgoing ? 'You' : fmt(m.sender || m.sender_name || m.sender_pubkey || m.pubkey_prefix);
+    const { sender, text } = messagePresentation(m);
     const channel = m.conversation_type === 'direct'
       ? `Direct ${fmt(m.recipient || m.contact || m.sender_pubkey || m.pubkey_prefix, '')}`
       : fmt(m.channel_name || m.channel || 'Public');
-    const text = fmt(m.text || m.message);
     const time = m.timestamp_utc || m.timestamp ? new Date(m.timestamp_utc || m.timestamp).toLocaleString() : '-';
     return `<tr><td>${escapeHtml(sender)}</td><td>${escapeHtml(channel)}</td><td>${escapeHtml(text)}</td><td>${escapeHtml(time)}</td></tr>`;
   }).join('');
@@ -797,6 +813,9 @@ function renderMessages() {
   $('messagesTable').innerHTML = chatRows || '<div class="empty">No messages yet.</div>';
   $('messagesTable').querySelectorAll('[data-resend]').forEach((button) => {
     button.addEventListener('click', () => resendMessage(Number(button.dataset.resend)));
+  });
+  $('messagesTable').querySelectorAll('[data-reply]').forEach((button) => {
+    button.addEventListener('click', () => replyToMessage(button.dataset.reply));
   });
   $('messageScope').textContent = state.selectedConversation ? state.selectedConversation.label : 'All';
   const start = state.messageTotal ? state.messageOffset + 1 : 0;
@@ -859,6 +878,26 @@ function updateTargetFields() {
   $('channelTargetField').style.display = direct ? 'none' : 'grid';
   $('directTargetField').style.display = direct ? 'grid' : 'none';
   $('retryDirect').disabled = !direct;
+}
+
+function replyToMessage(id) {
+  const message = state.messages.find((m) => String(m.id) === String(id));
+  if (!message) return;
+  const { sender } = messagePresentation(message);
+  if (message.conversation_type === 'direct') {
+    $('targetType').value = 'direct';
+    updateTargetFields();
+    $('directTarget').value = message.contact || message.sender_pubkey || message.pubkey_prefix || message.sender || '';
+  } else {
+    $('targetType').value = 'channel';
+    updateTargetFields();
+    $('channelTarget').value = String(message.channel_idx ?? 0);
+  }
+  const mention = sender && sender !== '-' && sender !== 'You' ? `@[${sender}] ` : '';
+  $('messageText').value = mention;
+  $('messageText').focus();
+  $('messageText').setSelectionRange($('messageText').value.length, $('messageText').value.length);
+  $('sendStatus').textContent = sender && sender !== '-' ? `Replying to ${sender}` : 'Reply target selected';
 }
 
 function adminSettings() {
