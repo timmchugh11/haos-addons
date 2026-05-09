@@ -20,9 +20,9 @@ firmware build, and the command support exposed by `meshcore_py`.
 - Custom dark web UI with Dashboard, Messages, Nodes, Channels, Room Servers,
   Diagnostics, Map, Identity, and Admin pages.
 - USB serial transport.
-- Channel and direct message history with chat bubbles, reply actions,
-  composer, retry/resend, delivery state, ACK tracking, filters, pagination,
-  browser notifications, and JSON/CSV export.
+- Channel and direct message history with compact chat layout, scrollable
+  conversations, reply actions, composer, retry/resend, delivery state, ACK
+  tracking, filters, pagination, browser notifications, and JSON/CSV export.
 - Contact/node management with manual add, metadata, trust flags, removal,
   `meshcore://` contact import, and contact-card export.
 - Channel management with name updates, private channel key/password support,
@@ -129,4 +129,4 @@ companion GUI.
 
 ## Version
 
-Current add-on version: `0.10.0`
+Current add-on version: `0.10.1`

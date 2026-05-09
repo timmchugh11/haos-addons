@@ -52,12 +52,18 @@ main{flex:1;overflow:auto;padding:30px}
 .unit{font-size:11px;color:var(--muted);margin-top:6px}
 .green .value{color:var(--green)}.yellow .value{color:var(--yellow)}.red .value{color:var(--red)}
 .grid{display:grid;gap:16px;grid-template-columns:1.25fr .75fr}
-.message-grid{display:grid;gap:16px;grid-template-columns:320px 1fr}
-.chat-shell{display:grid;grid-template-rows:auto auto minmax(300px,1fr) auto auto;min-height:calc(100vh - 190px);margin-bottom:0}
-.chat-toolbar{margin-bottom:0;border-bottom:1px solid var(--border);padding-bottom:14px}
-.chat-thread{display:flex;flex-direction:column-reverse;gap:12px;overflow:auto;padding:18px 4px 18px 0;min-height:360px}
-.chat-composer{border-top:1px solid var(--border);padding-top:14px;margin-top:0}
-.chat-composer textarea{min-height:76px;max-height:180px}
+.message-grid{display:grid;gap:16px;grid-template-columns:minmax(240px,300px) minmax(0,1fr);height:calc(100vh - var(--header-h) - 128px);min-height:520px}
+.conversation-panel{display:flex;flex-direction:column;min-height:0;margin-bottom:0}
+.conversation-list{display:grid;gap:8px;overflow:auto;min-height:0;padding-right:2px}
+.chat-shell{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto;height:100%;min-height:0;margin-bottom:0}
+.chat-toolbar{margin-bottom:0;border-bottom:1px solid var(--border);padding-bottom:12px}
+.chat-thread{display:flex;flex-direction:column-reverse;gap:12px;overflow:auto;padding:16px 4px 16px 0;min-height:0}
+.chat-composer{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;border-top:1px solid var(--border);padding-top:12px;margin-top:0}
+.chat-composer textarea{min-height:46px;max-height:120px;resize:vertical}
+.composer-entry label{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.composer-target{color:var(--muted);font-size:11px;font-weight:700;text-transform:none;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer-send-actions{display:grid;gap:6px;justify-items:end}
+.composer-send-actions .send-buttons{display:flex;gap:8px}
 .chat-message{display:grid;gap:4px;max-width:min(76%,720px)}
 .chat-message.incoming{align-self:flex-start}.chat-message.outgoing{align-self:flex-end}
 .chat-sender{font-size:11px;font-weight:800;color:var(--muted);padding:0 4px}
@@ -68,11 +74,10 @@ main{flex:1;overflow:auto;padding:30px}
 .chat-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:11px;padding:0 4px}
 .chat-message.outgoing .chat-meta{justify-content:flex-end}
 .chat-meta .mini-btn{margin-left:2px}
-.conversation-list{display:grid;gap:8px}
-.conversation{width:100%;text-align:left;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);padding:12px}
+.conversation{width:100%;text-align:left;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);padding:10px}
 .conversation:hover,.conversation.active{border-color:#444;background:var(--surface3)}
 .conversation strong{display:block;font-size:13px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.conversation span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conversation span{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .composer{display:grid;gap:12px}
 .composer-row{display:grid;gap:12px;grid-template-columns:160px 1fr}
 .form-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
@@ -130,7 +135,7 @@ main{flex:1;overflow:auto;padding:30px}
   header{padding:0 16px}.brand{padding-left:10px}.brand-title{font-size:16px}.brand-sub{display:none}.layout{display:block;overflow:auto}
   nav{width:100%;display:flex;gap:4px;padding:8px;border-right:none;border-bottom:1px solid var(--border)}
   .nav-group{display:none}nav a{padding:10px 12px;border-radius:6px;white-space:nowrap}
-  main{padding:18px}.grid,.map-grid,.message-grid,.composer-row{grid-template-columns:1fr}.top-actions .btn{display:none}
+  main{padding:18px}.grid,.map-grid,.composer-row{grid-template-columns:1fr}.message-grid{grid-template-columns:1fr;height:auto;min-height:0}.conversation-panel{max-height:280px}.chat-shell{height:calc(100vh - var(--header-h) - 146px);min-height:520px}.chat-composer{grid-template-columns:1fr}.composer-send-actions{justify-items:stretch}.composer-send-actions .send-buttons{justify-content:flex-end}.top-actions .btn{display:none}
 }
 </style>
 </head>
@@ -192,7 +197,7 @@ main{flex:1;overflow:auto;padding:30px}
         <h1 class="page-title">Messages</h1>
         <div class="page-sub">Channel and direct messages with send support through the connected MeshCore companion.</div>
         <div class="message-grid">
-          <div class="box">
+          <div class="box conversation-panel">
             <div class="box-title">Conversations <span id="conversationCount">0</span></div>
             <div id="conversationList" class="conversation-list"></div>
           </div>
@@ -243,33 +248,14 @@ main{flex:1;overflow:auto;padding:30px}
               <button id="nextPage" class="btn" type="button">Next</button>
             </div>
             <form id="composerForm" class="composer chat-composer">
-              <div class="box-title">Composer <span id="selectedConversation">No target selected</span></div>
-              <div class="composer-row">
-                <div class="field">
-                  <label for="targetType">Target</label>
-                  <select id="targetType">
-                    <option value="channel">Channel</option>
-                    <option value="direct">Direct</option>
-                  </select>
-                </div>
-                <div class="field" id="channelTargetField">
-                  <label for="channelTarget">Channel</label>
-                  <select id="channelTarget"></select>
-                </div>
-                <div class="field" id="directTargetField" style="display:none">
-                  <label for="directTarget">Contact or Public Key</label>
-                  <input id="directTarget" list="contactOptions" placeholder="contact name, prefix, or full public key">
-                  <datalist id="contactOptions"></datalist>
-                </div>
+              <div class="field composer-entry">
+                <label for="messageText">Message <span id="selectedConversation" class="composer-target">No chat selected</span></label>
+                <textarea id="messageText" maxlength="512" placeholder="Select a chat, then type a message"></textarea>
               </div>
-              <div class="field">
-                <label for="messageText">Message</label>
-                <textarea id="messageText" maxlength="512" placeholder="Type a MeshCore message"></textarea>
-              </div>
-              <div class="composer-actions">
-                <label class="check"><input id="retryDirect" type="checkbox" checked> Retry direct messages until ACK</label>
-                <div>
-                  <span id="sendStatus" class="send-status"></span>
+              <div class="composer-send-actions">
+                <span id="sendStatus" class="send-status"></span>
+                <label class="check"><input id="retryDirect" type="checkbox" checked> Retry until ACK</label>
+                <div class="send-buttons">
                   <button id="sendBtn" class="btn" type="submit">Send</button>
                   <button id="notifyBtn" class="btn" type="button">Notifications</button>
                 </div>
@@ -852,47 +838,34 @@ function renderConversations() {
 }
 
 function renderComposerOptions() {
-  const channelOptions = state.channels.map((c) => `<option value="${escapeHtml(fmt(c.idx ?? c.index, '0'))}">${escapeHtml(fmt(c.name, `Channel ${c.idx ?? c.index}`))}${c.is_private ? ' (private)' : ''}</option>`).join('');
-  $('channelTarget').innerHTML = channelOptions || '<option value="0">Public</option>';
-  $('contactOptions').innerHTML = state.nodes.map((n) => `<option value="${escapeHtml(fmt(n.public_key || n.pubkey_prefix))}">${escapeHtml(fmt(n.name))}</option>`).join('');
+  const conv = state.selectedConversation;
+  $('selectedConversation').textContent = conv ? conv.label : 'No chat selected';
+  $('messageText').placeholder = conv ? `Message ${conv.label}` : 'Select a chat, then type a message';
+  $('sendBtn').disabled = !conv;
+  $('retryDirect').disabled = !conv || conv.type !== 'direct';
 }
 
 function selectConversation(conv) {
   state.selectedConversation = conv;
   state.messageOffset = 0;
-  if (conv) {
-    $('selectedConversation').textContent = conv.label;
-    $('targetType').value = conv.type;
-    updateTargetFields();
-    if (conv.type === 'channel') $('channelTarget').value = String(conv.channel_idx ?? 0);
-    if (conv.type === 'direct') $('directTarget').value = conv.contact || conv.pubkey_prefix || '';
-  } else {
-    $('selectedConversation').textContent = 'No target selected';
-  }
+  renderComposerOptions();
   renderConversations();
   refresh();
 }
 
 function updateTargetFields() {
-  const direct = $('targetType').value === 'direct';
-  $('channelTargetField').style.display = direct ? 'none' : 'grid';
-  $('directTargetField').style.display = direct ? 'grid' : 'none';
-  $('retryDirect').disabled = !direct;
+  renderComposerOptions();
 }
 
 function replyToMessage(id) {
   const message = state.messages.find((m) => String(m.id) === String(id));
   if (!message) return;
   const { sender } = messagePresentation(message);
-  if (message.conversation_type === 'direct') {
-    $('targetType').value = 'direct';
-    updateTargetFields();
-    $('directTarget').value = message.contact || message.sender_pubkey || message.pubkey_prefix || message.sender || '';
-  } else {
-    $('targetType').value = 'channel';
-    updateTargetFields();
-    $('channelTarget').value = String(message.channel_idx ?? 0);
-  }
+  const convId = conversationIdForMessage(message);
+  const conv = state.conversations.find((item) => item.id === convId);
+  if (conv) state.selectedConversation = conv;
+  renderComposerOptions();
+  renderConversations();
   const mention = sender && sender !== '-' && sender !== 'You' ? `@[${sender}] ` : '';
   $('messageText').value = mention;
   $('messageText').focus();
@@ -918,15 +891,26 @@ async function sendMessage(event) {
   event.preventDefault();
   const text = $('messageText').value.trim();
   if (!text) return;
-  const targetType = $('targetType').value;
+  const conv = state.selectedConversation;
+  if (!conv) {
+    $('sendStatus').textContent = 'Select a chat first';
+    return;
+  }
+  const targetType = conv.type;
   if (!guardWrite(targetType === 'direct' ? 'Send direct message' : 'Send channel message')) return;
   const payload = {
     target_type: targetType,
     text,
     retry: $('retryDirect').checked,
   };
-  if (targetType === 'channel') payload.channel_idx = Number($('channelTarget').value || 0);
-  if (targetType === 'direct') payload.contact = $('directTarget').value.trim();
+  if (targetType === 'channel') payload.channel_idx = Number(conv.channel_idx ?? 0);
+  if (targetType === 'direct') {
+    payload.contact = conv.contact || conv.pubkey_prefix || '';
+    if (!payload.contact) {
+      $('sendStatus').textContent = 'Selected direct chat has no contact key';
+      return;
+    }
+  }
   $('sendBtn').disabled = true;
   $('sendStatus').textContent = 'Sending...';
   try {
@@ -937,7 +921,7 @@ async function sendMessage(event) {
   } catch (err) {
     $('sendStatus').textContent = err.message;
   } finally {
-    $('sendBtn').disabled = false;
+    $('sendBtn').disabled = !state.selectedConversation;
   }
 }
 
@@ -1641,7 +1625,6 @@ $('exportChannels').addEventListener('click', exportChannels);
 $('restoreChannels').addEventListener('click', restoreChannels);
 $('roomForm').addEventListener('submit', postRoom);
 $('syncRoom').addEventListener('click', syncRoom);
-$('targetType').addEventListener('change', updateTargetFields);
 $('messageSearch').addEventListener('input', () => {
   clearTimeout(state.searchTimer);
   state.searchTimer = setTimeout(applyMessageFilters, 250);

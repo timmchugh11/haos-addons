@@ -14,8 +14,8 @@ REST API under `/api/v1/*`.
 ## Main Pages
 
 - **Dashboard**: public traffic stats and recent messages.
-- **Messages**: channel/direct conversations, chat bubbles, reply actions,
-  composer, resend, filters, and export.
+- **Messages**: channel/direct conversations, compact chat layout, reply
+  actions, selected-chat composer, resend, filters, and export.
 - **Nodes**: contacts, trust flags, metadata, contact-card import/export.
 - **Channels**: channel editor, private keys/passwords, backup and restore.
 - **Room Servers**: room discovery, history/status sync, ACL/read-only display,
