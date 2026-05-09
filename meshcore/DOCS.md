@@ -1,4 +1,4 @@
-# MeshCore GUI Add-on Documentation
+ # MeshCore GUI Add-on Documentation
 
 This add-on runs a custom MeshCore web GUI inside Home Assistant. It provides a
 FastAPI backend, a custom browser UI, USB serial MeshCore connectivity, and a

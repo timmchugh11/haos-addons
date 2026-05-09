@@ -129,4 +129,4 @@ companion GUI.
 
 ## Version
 
-Current add-on version: `0.9.6`
+Current add-on version: `0.9.7`
