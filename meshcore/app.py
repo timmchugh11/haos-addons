@@ -984,7 +984,13 @@ async def startup() -> None:
 
 @app.get("/", include_in_schema=False)
 async def root() -> FileResponse:
-    return FileResponse(str(UI_DIR / "index.html"))
+    return FileResponse(
+        str(UI_DIR / "index.html"),
+        headers={
+            "Cache-Control": "no-store, max-age=0",
+            "Pragma": "no-cache",
+        },
+    )
 
 
 @app.get("/api/v1/status")
