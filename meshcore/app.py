@@ -170,6 +170,8 @@ class RadioUpdateRequest(BaseModel):
     airtime_factor: Optional[float] = None
     rx_delay: Optional[int] = None
     af: Optional[int] = None
+    gps_enabled: Optional[bool] = None
+    power_saving: Optional[bool] = None
 
 
 class RoutingUpdateRequest(BaseModel):
@@ -440,6 +442,15 @@ def call_command_compat(command: Any, *args: Any, **kwargs: Any) -> Any:
         except TypeError:
             alt_kwargs.pop("timeout", None)
             return command(*args, **alt_kwargs)
+
+
+async def run_cli_command(command: str) -> Any:
+    if not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    command = command.strip()
+    if not command:
+        raise HTTPException(status_code=400, detail="empty CLI command")
+    return await run_device_command(meshcore_client.commands.send(b"\x13" + command.encode("utf-8")))
 
 
 async def run_named_command(commands: Any, names: tuple[str, ...], *args: Any, **kwargs: Any) -> Any:
@@ -1221,6 +1232,10 @@ async def api_update_radio(request: RadioUpdateRequest) -> Dict[str, Any]:
         rx_delay = int(request.rx_delay or 0)
         af = int(request.af or 0)
         await run_device_command(meshcore_client.commands.set_tuning(rx_delay, af))
+    if request.gps_enabled is not None:
+        await run_cli_command(f"gps {'on' if request.gps_enabled else 'off'}")
+    if request.power_saving is not None:
+        await run_cli_command(f"powersaving {'on' if request.power_saving else 'off'}")
     if meshcore_client:
         result = await run_device_command(meshcore_client.commands.send_appstart())
         if result and result.payload:

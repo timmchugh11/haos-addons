@@ -22,8 +22,8 @@ REST API under `/api/v1/*`.
   and guarded posts.
 - **Diagnostics**: connection health, event logs, sensors, and connection test.
 - **Map**: Leaflet markers, clustering, heatmap, labels, stale/live locations.
-- **Identity**: local identity, radio status, radio/routing controls, reboot,
-  clock sync, and adverts.
+- **Identity**: local identity, radio status, radio controls, GPS/power-saving
+  toggles, routing controls, reboot, clock sync, and adverts.
 - **Admin**: write-safety toggles and maintenance mode.
 
 ## Write Safety
@@ -40,6 +40,9 @@ diagnostics, sensors, radio/routing, and admin settings.
 
 Write-capable endpoints are available for supported actions and are guarded by
 the Admin safety policy.
+
+GPS and power-saving controls use the MeshCore serial CLI commands exposed by
+firmware that supports them (`gps on/off` and `powersaving on/off`).
 
 ## Persistent Data
 

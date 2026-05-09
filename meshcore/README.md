@@ -32,8 +32,8 @@ firmware build, and the command support exposed by `meshcore_py`.
 - Leaflet map with role-based markers, stale/live coordinate handling,
   clustering, heat layer, labels, and own-node location display.
 - Identity page with local name/advertised coordinates, battery/storage/radio
-  status, contact-card export, radio controls, routing controls, reboot, clock
-  sync, and advert commands.
+  status, contact-card export, radio controls, GPS/power-saving toggles,
+  routing controls, reboot, clock sync, and advert commands.
 - Diagnostics page with connection health, serial port discovery, event logs,
   sensor telemetry, and connection test endpoint.
 - Admin page with persisted write-safety toggles, maintenance mode, and browser
@@ -129,4 +129,4 @@ companion GUI.
 
 ## Version
 
-Current add-on version: `0.9.8`
+Current add-on version: `0.9.9`

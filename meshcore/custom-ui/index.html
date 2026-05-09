@@ -53,9 +53,11 @@ main{flex:1;overflow:auto;padding:30px}
 .green .value{color:var(--green)}.yellow .value{color:var(--yellow)}.red .value{color:var(--red)}
 .grid{display:grid;gap:16px;grid-template-columns:1.25fr .75fr}
 .message-grid{display:grid;gap:16px;grid-template-columns:320px 1fr}
-.chat-shell{display:grid;grid-template-rows:auto minmax(360px,1fr) auto;min-height:calc(100vh - 220px);margin-bottom:0}
+.chat-shell{display:grid;grid-template-rows:auto auto minmax(300px,1fr) auto auto;min-height:calc(100vh - 190px);margin-bottom:0}
 .chat-toolbar{margin-bottom:0;border-bottom:1px solid var(--border);padding-bottom:14px}
 .chat-thread{display:flex;flex-direction:column-reverse;gap:12px;overflow:auto;padding:18px 4px 18px 0;min-height:360px}
+.chat-composer{border-top:1px solid var(--border);padding-top:14px;margin-top:0}
+.chat-composer textarea{min-height:76px;max-height:180px}
 .chat-message{display:grid;gap:4px;max-width:min(76%,720px)}
 .chat-message.incoming{align-self:flex-start}.chat-message.outgoing{align-self:flex-end}
 .chat-sender{font-size:11px;font-weight:800;color:var(--muted);padding:0 4px}
@@ -194,89 +196,85 @@ main{flex:1;overflow:auto;padding:30px}
             <div class="box-title">Conversations <span id="conversationCount">0</span></div>
             <div id="conversationList" class="conversation-list"></div>
           </div>
-          <div>
-            <div class="box">
-              <div class="box-title">Composer <span id="selectedConversation">No target selected</span></div>
-              <form id="composerForm" class="composer">
-                <div class="composer-row">
-                  <div class="field">
-                    <label for="targetType">Target</label>
-                    <select id="targetType">
-                      <option value="channel">Channel</option>
-                      <option value="direct">Direct</option>
-                    </select>
-                  </div>
-                  <div class="field" id="channelTargetField">
-                    <label for="channelTarget">Channel</label>
-                    <select id="channelTarget"></select>
-                  </div>
-                  <div class="field" id="directTargetField" style="display:none">
-                    <label for="directTarget">Contact or Public Key</label>
-                    <input id="directTarget" list="contactOptions" placeholder="contact name, prefix, or full public key">
-                    <datalist id="contactOptions"></datalist>
-                  </div>
-                </div>
-                <div class="field">
-                  <label for="messageText">Message</label>
-                  <textarea id="messageText" maxlength="512" placeholder="Type a MeshCore message"></textarea>
-                </div>
-                <div class="composer-actions">
-                  <label class="check"><input id="retryDirect" type="checkbox" checked> Retry direct messages until ACK</label>
-                  <div>
-                    <span id="sendStatus" class="send-status"></span>
-                    <button id="sendBtn" class="btn" type="submit">Send</button>
-                    <button id="notifyBtn" class="btn" type="button">Notifications</button>
-                  </div>
-                </div>
-              </form>
+          <div class="box chat-shell">
+            <div class="box-title">Message History <span id="messageScope">All</span></div>
+            <div class="toolbar chat-toolbar">
+              <div class="field search">
+                <label for="messageSearch">Search</label>
+                <input id="messageSearch" placeholder="Search message, sender, target, status">
+              </div>
+              <div class="field">
+                <label for="scopeFilter">Scope</label>
+                <select id="scopeFilter">
+                  <option value="all">All</option>
+                  <option value="public">Public</option>
+                  <option value="channel">Channels</option>
+                  <option value="direct">Direct</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="statusFilter">Status</label>
+                <select id="statusFilter">
+                  <option value="all">All</option>
+                  <option value="queued">Queued</option>
+                  <option value="sending">Sending</option>
+                  <option value="sent">Sent</option>
+                  <option value="acknowledged">Acknowledged</option>
+                  <option value="ack_timeout">ACK Timeout</option>
+                  <option value="failed">Failed</option>
+                  <option value="received">Received</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="directionFilter">Direction</label>
+                <select id="directionFilter">
+                  <option value="all">All</option>
+                  <option value="incoming">Incoming</option>
+                  <option value="outgoing">Outgoing</option>
+                </select>
+              </div>
+              <button id="exportJson" class="btn" type="button">JSON</button>
+              <button id="exportCsv" class="btn" type="button">CSV</button>
             </div>
-            <div class="box chat-shell">
-              <div class="box-title">Message History <span id="messageScope">All</span></div>
-              <div class="toolbar chat-toolbar">
-                <div class="field search">
-                  <label for="messageSearch">Search</label>
-                  <input id="messageSearch" placeholder="Search message, sender, target, status">
-                </div>
+            <div id="messagesTable" class="chat-thread"></div>
+            <div class="pager">
+              <button id="prevPage" class="btn" type="button">Prev</button>
+              <span id="pageInfo">0 messages</span>
+              <button id="nextPage" class="btn" type="button">Next</button>
+            </div>
+            <form id="composerForm" class="composer chat-composer">
+              <div class="box-title">Composer <span id="selectedConversation">No target selected</span></div>
+              <div class="composer-row">
                 <div class="field">
-                  <label for="scopeFilter">Scope</label>
-                  <select id="scopeFilter">
-                    <option value="all">All</option>
-                    <option value="public">Public</option>
-                    <option value="channel">Channels</option>
+                  <label for="targetType">Target</label>
+                  <select id="targetType">
+                    <option value="channel">Channel</option>
                     <option value="direct">Direct</option>
                   </select>
                 </div>
-                <div class="field">
-                  <label for="statusFilter">Status</label>
-                  <select id="statusFilter">
-                    <option value="all">All</option>
-                    <option value="queued">Queued</option>
-                    <option value="sending">Sending</option>
-                    <option value="sent">Sent</option>
-                    <option value="acknowledged">Acknowledged</option>
-                    <option value="ack_timeout">ACK Timeout</option>
-                    <option value="failed">Failed</option>
-                    <option value="received">Received</option>
-                  </select>
+                <div class="field" id="channelTargetField">
+                  <label for="channelTarget">Channel</label>
+                  <select id="channelTarget"></select>
                 </div>
-                <div class="field">
-                  <label for="directionFilter">Direction</label>
-                  <select id="directionFilter">
-                    <option value="all">All</option>
-                    <option value="incoming">Incoming</option>
-                    <option value="outgoing">Outgoing</option>
-                  </select>
+                <div class="field" id="directTargetField" style="display:none">
+                  <label for="directTarget">Contact or Public Key</label>
+                  <input id="directTarget" list="contactOptions" placeholder="contact name, prefix, or full public key">
+                  <datalist id="contactOptions"></datalist>
                 </div>
-                <button id="exportJson" class="btn" type="button">JSON</button>
-                <button id="exportCsv" class="btn" type="button">CSV</button>
               </div>
-              <div id="messagesTable" class="chat-thread"></div>
-              <div class="pager">
-                <button id="prevPage" class="btn" type="button">Prev</button>
-                <span id="pageInfo">0 messages</span>
-                <button id="nextPage" class="btn" type="button">Next</button>
+              <div class="field">
+                <label for="messageText">Message</label>
+                <textarea id="messageText" maxlength="512" placeholder="Type a MeshCore message"></textarea>
               </div>
-            </div>
+              <div class="composer-actions">
+                <label class="check"><input id="retryDirect" type="checkbox" checked> Retry direct messages until ACK</label>
+                <div>
+                  <span id="sendStatus" class="send-status"></span>
+                  <button id="sendBtn" class="btn" type="submit">Send</button>
+                  <button id="notifyBtn" class="btn" type="button">Notifications</button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       </section>
@@ -492,6 +490,8 @@ main{flex:1;overflow:auto;padding:30px}
               <div class="field"><label for="radioAirtime">Airtime Factor</label><input id="radioAirtime" type="number" step="0.1" min="0.1" max="100"></div>
               <div class="field"><label for="radioRxDelay">RX Delay</label><input id="radioRxDelay" type="number" step="1" min="0"></div>
               <div class="field"><label for="radioAf">Anti-flood</label><input id="radioAf" type="number" step="1" min="0"></div>
+              <div class="field"><label for="radioGps">GPS</label><select id="radioGps"><option value="">No change</option><option value="on">Enable</option><option value="off">Disable</option></select></div>
+              <div class="field"><label for="radioPowerSaving">Power Saving</label><select id="radioPowerSaving"><option value="">No change</option><option value="on">Enable</option><option value="off">Disable</option></select></div>
             </div>
             <div class="composer-actions">
               <span id="radioSaveStatus" class="send-status"></span>
@@ -1004,6 +1004,8 @@ function renderIdentity() {
   $('radioAirtime').value = self.airtime_factor ?? '';
   $('radioRxDelay').value = self.radio_rx_delay ?? '';
   $('radioAf').value = self.radio_af ?? '';
+  $('radioGps').value = '';
+  $('radioPowerSaving').value = '';
 }
 
 function renderAdmin() {
@@ -1232,6 +1234,8 @@ async function saveRadio(event) {
     if (airtime !== '') payload.airtime_factor = Number(airtime);
     if (rxDelay !== '') payload.rx_delay = Number(rxDelay);
     if (af !== '') payload.af = Number(af);
+    if ($('radioGps').value) payload.gps_enabled = $('radioGps').value === 'on';
+    if ($('radioPowerSaving').value) payload.power_saving = $('radioPowerSaving').value === 'on';
     await patchJson('radio', payload);
     $('radioSaveStatus').textContent = 'Saved';
     await refresh();
