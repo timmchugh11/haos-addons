@@ -679,6 +679,38 @@ async def run_device_command(coro) -> Any:
     return result
 
 
+async def set_companion_other_params(
+    *,
+    advert_loc_policy: Optional[int] = None,
+    telemetry_mode_loc: Optional[int] = None,
+) -> None:
+    if not meshcore_client:
+        raise HTTPException(status_code=503, detail="MeshCore device is not connected")
+    result = await run_device_command(meshcore_client.commands.send_appstart())
+    infos = dict(result.payload or {})
+    if advert_loc_policy is not None:
+        infos["adv_loc_policy"] = int(advert_loc_policy)
+    if telemetry_mode_loc is not None:
+        infos["telemetry_mode_loc"] = int(telemetry_mode_loc)
+
+    manual_add_contacts = 1 if infos.get("manual_add_contacts") else 0
+    telemetry_mode_base = int(infos.get("telemetry_mode_base", 0) or 0) & 0b11
+    telemetry_mode_loc_value = int(infos.get("telemetry_mode_loc", 0) or 0) & 0b11
+    telemetry_mode_env = int(infos.get("telemetry_mode_env", 0) or 0) & 0b11
+    adv_loc_policy = int(infos.get("adv_loc_policy", 0) or 0) & 0xFF
+    multi_acks = int(infos.get("multi_acks", 0) or 0) & 0xFF
+    telemetry_byte = telemetry_mode_base | (telemetry_mode_loc_value << 2) | (telemetry_mode_env << 4)
+
+    payload = (
+        b"\x26"
+        + manual_add_contacts.to_bytes(1, "little")
+        + telemetry_byte.to_bytes(1, "little")
+        + adv_loc_policy.to_bytes(1, "little")
+        + multi_acks.to_bytes(1, "little")
+    )
+    await run_device_command(meshcore_client.commands.send(payload, [EventType.OK, EventType.ERROR]))
+
+
 async def pause_meshcore_for_flash(seconds: int = 300) -> None:
     global flashing_until, meshcore_client
     flashing_until = time.monotonic() + seconds
@@ -1274,11 +1306,16 @@ async def api_update_radio(request: RadioUpdateRequest) -> Dict[str, Any]:
         await run_device_command(meshcore_client.commands.set_tuning(rx_delay, af))
     if request.gps_enabled is not None:
         if request.gps_enabled:
-            await run_cli_command("gps on")
-            await run_cli_command("gps advert share")
+            if not hasattr(meshcore_client.commands, "set_custom_var"):
+                raise HTTPException(status_code=501, detail="GPS configuration is not supported by this MeshCore library")
+            await run_device_command(meshcore_client.commands.set_custom_var("gps", "1"))
+            await run_device_command(meshcore_client.commands.set_custom_var("gps_interval", "1"))
+            await set_companion_other_params(advert_loc_policy=1, telemetry_mode_loc=2)
         else:
-            await run_cli_command("gps off")
-            await run_cli_command("gps advert prefs")
+            if not hasattr(meshcore_client.commands, "set_custom_var"):
+                raise HTTPException(status_code=501, detail="GPS configuration is not supported by this MeshCore library")
+            await run_device_command(meshcore_client.commands.set_custom_var("gps", "0"))
+            await set_companion_other_params(advert_loc_policy=0)
     if request.power_saving is not None:
         await run_cli_command(f"powersaving {'on' if request.power_saving else 'off'}")
     if meshcore_client:
