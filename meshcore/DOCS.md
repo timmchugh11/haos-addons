@@ -2,7 +2,8 @@
 
 This add-on runs a custom MeshCore web GUI inside Home Assistant. It provides a
 FastAPI backend, a custom browser UI, USB serial MeshCore connectivity, and a
-REST API under `/api/v1/*`.
+REST API under `/api/v1/*`. The app is available through Home Assistant ingress
+and directly on host port `8081`.
 
 ## Quick Start
 

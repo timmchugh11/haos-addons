@@ -2,7 +2,7 @@
 
 MeshCore GUI is a custom Home Assistant add-on for MeshCore companion radios.
 It runs a standalone FastAPI backend and a custom single-page web UI served at
-`/`, with Home Assistant ingress support and optional direct access on port
+`/`, with Home Assistant ingress support and direct access on port
 `8081`.
 
 The add-on is intended for MeshCore Companion firmware devices connected to the
@@ -57,8 +57,9 @@ firmware build, and the command support exposed by `meshcore_py`.
 Use the Home Assistant sidebar entry named **MeshCore**. The custom dashboard is
 served at `/` through ingress.
 
-Optional direct access can be enabled by mapping port `8081/tcp` in the add-on
-network settings.
+Direct access is mapped by default on `8081/tcp`, so the UI and REST API are
+also available at `http://<home-assistant-host>:8081/` when the add-on is
+running.
 
 ## Persistent Data
 
@@ -161,4 +162,4 @@ companion GUI.
 
 ## Version
 
-Current add-on version: `0.10.7`
+Current add-on version: `0.10.8`
