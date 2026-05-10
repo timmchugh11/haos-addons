@@ -39,6 +39,8 @@ firmware build, and the command support exposed by `meshcore_py`.
   sensor telemetry, and connection test endpoint.
 - Admin page with persisted write-safety toggles, maintenance mode, and browser
   confirmation prompts for write actions.
+- Firmware flasher for serial `.bin` uploads using `esptool`, with optional
+  erase-first mode guarded by a disabled-by-default admin safety toggle.
 - REST API under `/api/v1/*` for the custom UI and external automations.
 
 ## Configuration
@@ -113,6 +115,9 @@ Bluetooth support is disabled for now while the serial GUI is stabilised.
 - Some radio, routing, room server, ACL, and telemetry commands depend on
   firmware support and the command names exposed by the installed
   `meshcore_py` version.
+- Firmware flashing pauses the live serial worker while `esptool` uses the
+  selected port. The device must be in bootloader/flash mode if the board
+  requires it.
 - Map tiles are loaded from external tile providers in the browser; offline tile
   caching is not implemented yet.
 - API auth/rate limiting for direct non-ingress access is still on the roadmap.
@@ -130,4 +135,4 @@ companion GUI.
 
 ## Version
 
-Current add-on version: `0.10.3`
+Current add-on version: `0.10.4`

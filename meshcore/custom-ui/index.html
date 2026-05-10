@@ -137,6 +137,7 @@ main{flex:1;overflow:auto;padding:30px}
 .kv{display:grid;grid-template-columns:130px 1fr;gap:8px 14px;font-size:13px}
 .kv div:nth-child(odd){color:var(--muted)}.kv div:nth-child(even){color:var(--text2);word-break:break-word}
 .status-line{color:var(--muted);font-size:12px;margin-top:8px}
+.log-output{display:block;max-height:240px;overflow:auto;background:#090909;border:1px solid var(--border2);border-radius:6px;color:var(--text2);font-size:12px;white-space:pre-wrap;padding:10px}
 @media(max-width:780px){
   header{padding:0 16px}.brand{padding-left:10px}.brand-title{font-size:16px}.brand-sub{display:none}.layout{display:block;overflow:auto}
   nav{width:100%;display:flex;gap:4px;padding:8px;border-right:none;border-bottom:1px solid var(--border)}
@@ -531,6 +532,7 @@ main{flex:1;overflow:auto;padding:30px}
               <label class="toggle-row"><input id="adminIdentityWrites" type="checkbox"><div><strong>Identity writes</strong><span>Allow local name and advertised coordinate changes.</span></div></label>
               <label class="toggle-row"><input id="adminRadioWrites" type="checkbox"><div><strong>Radio writes</strong><span>Allow changing radio frequency, bandwidth, SF, CR, and power.</span></div></label>
               <label class="toggle-row"><input id="adminDeviceActions" type="checkbox"><div><strong>Device actions</strong><span>Allow reboot, clock sync, and advert commands.</span></div></label>
+              <label class="toggle-row"><input id="adminFirmwareFlash" type="checkbox"><div><strong>Firmware flashing</strong><span>Allow serial .bin flashing with optional full erase.</span></div></label>
             </div>
             <div class="field">
               <label for="adminNote">Admin Note</label>
@@ -540,6 +542,25 @@ main{flex:1;overflow:auto;padding:30px}
               <span id="adminSaveStatus" class="send-status"></span>
               <button class="btn" type="submit">Save Safety Settings</button>
             </div>
+          </form>
+        </div>
+        <div class="box">
+          <div class="box-title">Firmware Flasher <span>serial bin upload</span></div>
+          <form id="flashForm" class="composer">
+            <div class="form-grid">
+              <div class="field"><label for="flashPort">Port</label><select id="flashPort"></select></div>
+              <div class="field"><label for="flashBaud">Baud</label><input id="flashBaud" type="number" min="1200" max="3000000" step="1" value="921600"></div>
+              <div class="field"><label for="flashOffset">Offset</label><input id="flashOffset" value="0x10000"></div>
+              <div class="field"><label for="flashFile">Firmware .bin</label><input id="flashFile" type="file" accept=".bin,application/octet-stream"></div>
+            </div>
+            <div class="composer-actions">
+              <label class="check"><input id="flashErase" type="checkbox"> Erase flash first</label>
+              <div>
+                <span id="flashStatus" class="send-status"></span>
+                <button class="btn" type="submit">Flash Firmware</button>
+              </div>
+            </div>
+            <pre id="flashOutput" class="log-output"></pre>
           </form>
         </div>
       </section>
@@ -1054,6 +1075,7 @@ function renderAdmin() {
   $('adminIdentityWrites').checked = settings.allow_identity_writes !== false;
   $('adminRadioWrites').checked = settings.allow_radio_writes !== false;
   $('adminDeviceActions').checked = settings.allow_device_actions !== false;
+  $('adminFirmwareFlash').checked = !!settings.allow_firmware_flash;
   $('adminNote').value = settings.admin_note || '';
   $('adminStatus').textContent = settings.maintenance_mode ? 'Maintenance mode' : 'Active';
 }
@@ -1070,8 +1092,25 @@ function renderDiagnostics() {
   const transport = diag.transport || {};
   $('diagTransport').textContent = fmt(transport.type, '-');
   $('diagDevice').textContent = fmt(transport.device, '-');
+  renderFlashPorts(transport);
   renderSensors();
   renderEventLogs();
+}
+
+function renderFlashPorts(transport) {
+  const current = $('flashPort').value || transport.device || '';
+  const ports = Array.isArray(transport.serial_ports) ? transport.serial_ports : [];
+  const seen = new Set();
+  const options = [];
+  for (const port of ports) {
+    const device = port.device || port.name || '';
+    if (!device || seen.has(device)) continue;
+    seen.add(device);
+    options.push(`<option value="${escapeHtml(device)}">${escapeHtml(device)}${port.description ? ` / ${escapeHtml(port.description)}` : ''}</option>`);
+  }
+  if (current && !seen.has(current)) options.unshift(`<option value="${escapeHtml(current)}">${escapeHtml(current)}</option>`);
+  $('flashPort').innerHTML = options.join('') || '<option value="/dev/ttyACM0">/dev/ttyACM0</option>';
+  if (current) $('flashPort').value = current;
 }
 
 function renderSensors() {
@@ -1138,6 +1177,7 @@ async function saveAdmin(event) {
     allow_identity_writes:$('adminIdentityWrites').checked,
     allow_radio_writes:$('adminRadioWrites').checked,
     allow_device_actions:$('adminDeviceActions').checked,
+    allow_firmware_flash:$('adminFirmwareFlash').checked,
     admin_note:$('adminNote').value.trim(),
   };
   $('adminSaveStatus').textContent = 'Saving...';
@@ -1147,6 +1187,41 @@ async function saveAdmin(event) {
     renderAdmin();
   } catch (err) {
     $('adminSaveStatus').textContent = err.message;
+  }
+}
+
+async function flashFirmware(event) {
+  event.preventDefault();
+  const settings = adminSettings();
+  if (!settings.allow_firmware_flash) {
+    $('flashStatus').textContent = 'Enable Firmware flashing in Write Safety first.';
+    return;
+  }
+  const file = $('flashFile').files[0];
+  if (!file) {
+    $('flashStatus').textContent = 'Choose a .bin file first.';
+    return;
+  }
+  const eraseText = $('flashErase').checked ? ' This will erase flash first.' : '';
+  if (!confirm(`Flash ${file.name} to ${$('flashPort').value}?${eraseText}`)) return;
+  const form = new FormData();
+  form.append('port', $('flashPort').value);
+  form.append('baud', $('flashBaud').value || '921600');
+  form.append('offset', $('flashOffset').value || '0x10000');
+  form.append('erase', $('flashErase').checked ? 'true' : 'false');
+  form.append('firmware', file);
+  $('flashStatus').textContent = 'Flashing... keep the device connected.';
+  $('flashOutput').textContent = '';
+  try {
+    const res = await fetch(api('admin/flash'), { method:'POST', body:form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : `HTTP ${res.status}`);
+    $('flashStatus').textContent = 'Flash complete';
+    $('flashOutput').textContent = (data.logs || []).map((log) => `[${log.step}] exit ${log.returncode}\n${log.output || ''}`).join('\n\n');
+    await refresh();
+  } catch (err) {
+    $('flashStatus').textContent = 'Flash failed';
+    $('flashOutput').textContent = err.message;
   }
 }
 
@@ -1676,6 +1751,7 @@ $('syncClock').addEventListener('click', syncClock);
 $('sendFloodAdvert').addEventListener('click', sendFloodAdvert);
 $('sendLocalAdvert').addEventListener('click', sendLocalAdvert);
 $('adminForm').addEventListener('submit', saveAdmin);
+$('flashForm').addEventListener('submit', flashFirmware);
 $('channelForm').addEventListener('submit', saveChannel);
 $('exportChannels').addEventListener('click', exportChannels);
 $('restoreChannels').addEventListener('click', restoreChannels);

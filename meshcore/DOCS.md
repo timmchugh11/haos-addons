@@ -25,7 +25,7 @@ REST API under `/api/v1/*`.
   labels, stale/live locations.
 - **Identity**: local identity, radio status, radio controls, GPS/power-saving
   toggles, routing controls, reboot, clock sync, and adverts.
-- **Admin**: write-safety toggles and maintenance mode.
+- **Admin**: write-safety toggles, firmware flashing, and maintenance mode.
 
 ## Write Safety
 
@@ -44,6 +44,10 @@ the Admin safety policy.
 
 GPS and power-saving controls use the MeshCore serial CLI commands exposed by
 firmware that supports them (`gps on/off` and `powersaving on/off`).
+
+Firmware flashing uses `esptool` against the selected serial port. The
+firmware-flash safety toggle is disabled by default, and erase-first mode is
+explicitly optional.
 
 ## Persistent Data
 

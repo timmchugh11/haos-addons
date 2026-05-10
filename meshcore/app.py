@@ -2,6 +2,8 @@ import asyncio
 import concurrent.futures
 import json
 import os
+import subprocess
+import sys
 import threading
 import time
 from collections import Counter
@@ -9,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -29,6 +31,7 @@ MESSAGE_ARCHIVE = DATA_DIR / "messages.json"
 CONTACT_META_FILE = DATA_DIR / "contacts_meta.json"
 CHANNEL_META_FILE = DATA_DIR / "channels_meta.json"
 ADMIN_SETTINGS_FILE = DATA_DIR / "admin_settings.json"
+FIRMWARE_UPLOAD_DIR = DATA_DIR / "firmware"
 LOCATION_STALE_SECONDS = int(os.environ.get("MESHCORE_LOCATION_STALE_SECONDS", str(7 * 24 * 60 * 60)))
 
 DEVICE = os.environ.get("MESHCORE_DEVICE", "/dev/ttyACM0")
@@ -75,6 +78,8 @@ class MeshState:
 state = MeshState()
 worker_loop: Optional[asyncio.AbstractEventLoop] = None
 meshcore_client: Optional[MeshCore] = None
+flash_lock = threading.Lock()
+flashing_until = 0.0
 
 
 def discover_serial_ports() -> List[Dict[str, str]]:
@@ -196,6 +201,7 @@ class AdminSettingsRequest(BaseModel):
     allow_contact_import: bool = False
     allow_radio_writes: bool = True
     allow_device_actions: bool = True
+    allow_firmware_flash: bool = False
     require_confirm_for_writes: bool = True
     maintenance_mode: bool = False
     admin_note: str = Field(default="", max_length=500)
@@ -374,6 +380,7 @@ DEFAULT_ADMIN_SETTINGS: Dict[str, Any] = {
     "allow_contact_import": False,
     "allow_radio_writes": True,
     "allow_device_actions": True,
+    "allow_firmware_flash": False,
     "require_confirm_for_writes": True,
     "maintenance_mode": False,
     "admin_note": "",
@@ -416,6 +423,11 @@ def enforce_write(setting: str, action: str) -> None:
         raise HTTPException(status_code=423, detail=f"{action} blocked: maintenance mode is enabled")
     if not settings.get(setting, False):
         raise HTTPException(status_code=403, detail=f"{action} blocked by admin safety setting: {setting}")
+
+
+def enforce_firmware_flash() -> None:
+    if not admin_settings().get("allow_firmware_flash", False):
+        raise HTTPException(status_code=403, detail="firmware flashing is disabled by admin safety setting: allow_firmware_flash")
 
 
 load_admin_settings()
@@ -667,6 +679,27 @@ async def run_device_command(coro) -> Any:
     return result
 
 
+async def pause_meshcore_for_flash(seconds: int = 300) -> None:
+    global flashing_until, meshcore_client
+    flashing_until = time.monotonic() + seconds
+    client = meshcore_client
+    meshcore_client = None
+    state.set_status("Firmware flashing in progress", False)
+    if client and worker_loop:
+        try:
+            future = asyncio.run_coroutine_threadsafe(client.disconnect(), worker_loop)
+            future.result(timeout=10)
+        except Exception:
+            pass
+
+
+def run_esptool_command(args: List[str], timeout: int = 180) -> Dict[str, Any]:
+    command = [sys.executable, "-m", "esptool", *args]
+    completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+    output = "\n".join(part for part in (completed.stdout, completed.stderr) if part).strip()
+    return {"command": command, "returncode": completed.returncode, "output": output[-12000:]}
+
+
 async def refresh_contacts() -> None:
     if not meshcore_client:
         return
@@ -771,6 +804,10 @@ async def connect_meshcore() -> None:
     while True:
         mc: Optional[MeshCore] = None
         try:
+            if time.monotonic() < flashing_until:
+                state.set_status("Firmware flashing in progress", False)
+                await asyncio.sleep(min(5, max(1, flashing_until - time.monotonic())))
+                continue
             with state.lock:
                 state.reconnect_attempts += 1
                 attempt = state.reconnect_attempts
@@ -796,6 +833,8 @@ async def connect_meshcore() -> None:
 
             while True:
                 await asyncio.sleep(5)
+                if time.monotonic() < flashing_until:
+                    raise ConnectionError("firmware flashing in progress")
                 if not state.connected:
                     raise ConnectionError(state.last_disconnect_reason or "device disconnected")
                 if meshcore_client is not mc:
@@ -1037,6 +1076,7 @@ async def api_admin_settings() -> Dict[str, Any]:
             "allow_contact_import": "Import meshcore:// contact cards",
             "allow_radio_writes": "Configure radio parameters like frequency, bandwidth, spreading factor, coding rate, and TX power",
             "allow_device_actions": "Perform device actions such as reboot, clock sync, and adverts",
+            "allow_firmware_flash": "Upload and flash firmware binaries over serial using esptool; disabled by default",
             "maintenance_mode": "Block all write operations except changing admin settings",
         },
     }
@@ -1305,6 +1345,83 @@ async def api_send_advert(flood: bool = Query(default=False)) -> Dict[str, Any]:
         raise HTTPException(status_code=503, detail="MeshCore device is not connected")
     result = await run_device_command(meshcore_client.commands.send_advert(flood=flood))
     return {"ok": True, "flood": bool(flood), "result": event_payload(result)}
+
+
+@app.post("/api/v1/admin/flash")
+async def api_flash_firmware(
+    port: str = Form(default=DEVICE),
+    baud: int = Form(default=921600),
+    offset: str = Form(default="0x10000"),
+    erase: bool = Form(default=False),
+    firmware: UploadFile = File(...),
+) -> Dict[str, Any]:
+    global flashing_until
+    enforce_firmware_flash()
+    if not port.startswith("/dev/"):
+        raise HTTPException(status_code=400, detail="port must be a /dev serial device")
+    if baud < 1200 or baud > 3000000:
+        raise HTTPException(status_code=400, detail="baud must be between 1200 and 3000000")
+    try:
+        offset_value = int(str(offset).strip(), 0)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="offset must be a decimal or hex value, for example 0x10000") from exc
+    if offset_value < 0 or offset_value > 0x1000000:
+        raise HTTPException(status_code=400, detail="offset is outside the accepted flash range")
+    if not firmware.filename or not firmware.filename.lower().endswith(".bin"):
+        raise HTTPException(status_code=400, detail="firmware upload must be a .bin file")
+    if not flash_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="another firmware flash is already running")
+
+    try:
+        max_bytes = 32 * 1024 * 1024
+        data = await firmware.read(max_bytes + 1)
+        if not data:
+            raise HTTPException(status_code=400, detail="firmware file is empty")
+        if len(data) > max_bytes:
+            raise HTTPException(status_code=413, detail="firmware file is larger than 32 MB")
+        FIRMWARE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        firmware_path = FIRMWARE_UPLOAD_DIR / f"upload-{int(time.time())}.bin"
+        firmware_path.write_bytes(data)
+        await pause_meshcore_for_flash()
+
+        logs: List[Dict[str, Any]] = []
+        try:
+            if erase:
+                erase_result = await asyncio.to_thread(
+                    run_esptool_command,
+                    ["--chip", "auto", "--port", port, "--baud", str(baud), "erase_flash"],
+                    240,
+                )
+                logs.append({"step": "erase_flash", **erase_result})
+                if erase_result["returncode"] != 0:
+                    raise HTTPException(status_code=502, detail={"step": "erase_flash", "output": erase_result["output"]})
+            write_result = await asyncio.to_thread(
+                run_esptool_command,
+                ["--chip", "auto", "--port", port, "--baud", str(baud), "write_flash", "-z", hex(offset_value), str(firmware_path)],
+                300,
+            )
+            logs.append({"step": "write_flash", **write_result})
+            if write_result["returncode"] != 0:
+                raise HTTPException(status_code=502, detail={"step": "write_flash", "output": write_result["output"]})
+            return {
+                "ok": True,
+                "port": port,
+                "baud": baud,
+                "offset": hex(offset_value),
+                "erase": erase,
+                "size": len(data),
+                "logs": logs,
+            }
+        except subprocess.TimeoutExpired as exc:
+            raise HTTPException(status_code=504, detail=f"esptool timed out: {exc}") from exc
+        finally:
+            try:
+                firmware_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            flashing_until = time.monotonic() + 5
+    finally:
+        flash_lock.release()
 
 
 @app.post("/api/v1/contacts/{key}/login")

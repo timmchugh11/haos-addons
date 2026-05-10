@@ -1,3 +1,5 @@
 fastapi
 uvicorn[standard]
+python-multipart
+esptool
 meshcore @ git+https://github.com/PE1HVH/meshcore_py.git@fix/event-race-condition
