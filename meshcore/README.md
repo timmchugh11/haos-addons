@@ -91,6 +91,8 @@ The add-on exposes a REST API under `/api/v1/*`. Key endpoints include:
 - `POST /api/v1/rooms/{key}/sync`
 - `POST /api/v1/rooms/{key}/posts`
 - `GET /api/v1/map`
+- `GET /api/v1/ha/location`
+- `GET /api/v1/ha/locations`
 - `GET /api/v1/diagnostics`
 - `GET /api/v1/diagnostics/logs`
 - `GET /api/v1/sensors`
@@ -102,6 +104,28 @@ The add-on exposes a REST API under `/api/v1/*`. Key endpoints include:
 Write-capable endpoints are guarded by the Admin safety settings. Room posts,
 contact imports, and channel restore are disabled by default until enabled from
 the Admin page.
+
+## Home Assistant REST Location
+
+The add-on exposes a small stable endpoint for Home Assistant REST sensors:
+
+```yaml
+rest:
+  - resource: http://a0d7b954-meshcore:8081/api/v1/ha/location
+    scan_interval: 30
+    sensor:
+      - name: MeshCore Location
+        value_template: "{{ value_json.ha_state }}"
+        json_attributes:
+          - latitude
+          - longitude
+          - altitude
+          - gps_accuracy
+          - battery_voltage
+          - updated_at
+          - freshness
+          - source
+```
 
 ## Transport Notes
 
@@ -137,4 +161,4 @@ companion GUI.
 
 ## Version
 
-Current add-on version: `0.10.6`
+Current add-on version: `0.10.7`

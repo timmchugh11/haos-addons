@@ -57,6 +57,7 @@ class MeshState:
         self.contacts: Dict[str, Dict[str, Any]] = {}
         self.contact_meta: Dict[str, Dict[str, Any]] = {}
         self.admin_settings: Dict[str, Any] = {}
+        self.self_telemetry: Dict[str, Any] = {}
         self.messages: List[Dict[str, Any]] = []
         self.event_logs: List[Dict[str, Any]] = []
         self.next_message_id = 1
@@ -616,6 +617,88 @@ def extract_location(entity: Dict[str, Any], default_source: str) -> Dict[str, A
     return normalize_location(None, None, fallback_time, default_source)
 
 
+def parse_lpp_telemetry(payload: Dict[str, Any]) -> Dict[str, Any]:
+    parsed: Dict[str, Any] = {
+        "pubkey_prefix": payload.get("pubkey_pre") or payload.get("pubkey_prefix") or "",
+        "voltage": None,
+        "battery_mv": None,
+        "latitude": None,
+        "longitude": None,
+        "altitude": None,
+    }
+    for item in payload.get("lpp", []) or []:
+        if not isinstance(item, dict):
+            continue
+        item_type = str(item.get("type", "")).lower()
+        value = item.get("value")
+        if item_type == "voltage":
+            try:
+                parsed["voltage"] = float(value)
+                parsed["battery_mv"] = int(float(value) * 1000)
+            except (TypeError, ValueError):
+                pass
+        elif item_type == "gps" and isinstance(value, dict):
+            parsed["latitude"] = value.get("latitude")
+            parsed["longitude"] = value.get("longitude")
+            parsed["altitude"] = value.get("altitude")
+    return parsed
+
+
+def update_self_telemetry(payload: Dict[str, Any]) -> None:
+    parsed = parse_lpp_telemetry(payload)
+    timestamp = utcnow()
+    telemetry = {**json_safe(payload), **parsed, "updated_at": timestamp}
+    with state.lock:
+        state.self_telemetry = telemetry
+        if valid_coord(parsed.get("latitude"), parsed.get("longitude")):
+            state.device.update({
+                "telemetry_lat": parsed["latitude"],
+                "telemetry_lon": parsed["longitude"],
+                "telemetry_time": timestamp,
+                "gps_altitude": parsed.get("altitude"),
+            })
+        if parsed.get("battery_mv") is not None:
+            state.device["battery_mv"] = parsed["battery_mv"]
+            state.device["battery_voltage"] = parsed["voltage"]
+        state.updated_at = datetime.now(timezone.utc)
+
+
+def ha_location_payload(marker: Dict[str, Any], telemetry: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    location = marker.get("location", {})
+    battery_mv = marker.get("battery_mv")
+    if battery_mv is None and telemetry:
+        battery_mv = telemetry.get("battery_mv")
+    battery_voltage = None
+    try:
+        battery_voltage = round(float(battery_mv) / 1000, 3) if battery_mv is not None else None
+    except (TypeError, ValueError):
+        pass
+    altitude = None
+    if telemetry:
+        altitude = telemetry.get("altitude")
+    return {
+        "name": marker.get("name"),
+        "kind": marker.get("kind"),
+        "node_type": marker.get("node_type"),
+        "public_key": marker.get("public_key"),
+        "pubkey_prefix": marker.get("pubkey_prefix") or (telemetry or {}).get("pubkey_prefix", ""),
+        "valid": bool(location.get("valid")),
+        "latitude": location.get("lat"),
+        "longitude": location.get("lon"),
+        "altitude": altitude,
+        "gps_accuracy": 50 if location.get("valid") else None,
+        "source_type": "gps" if location.get("valid") else None,
+        "source": location.get("source"),
+        "freshness": location.get("freshness"),
+        "updated_at": location.get("updated_at"),
+        "age_seconds": location.get("age_seconds"),
+        "battery_mv": battery_mv,
+        "battery_voltage": battery_voltage,
+        "last_seen": marker.get("last_seen"),
+        "ha_state": "not_home" if location.get("valid") else "unknown",
+    }
+
+
 def map_marker_for_contact(pubkey: str, contact: Dict[str, Any]) -> Dict[str, Any]:
     display = contact_display(pubkey, contact)
     location = display["location"]
@@ -974,6 +1057,10 @@ async def wire_events(mc: MeshCore) -> None:
         append_event_log(event)
 
     async def on_diagnostic_event(event) -> None:
+        if str(event_type_value(event)).lower() == "telemetry_response":
+            payload = event_payload(event)
+            if isinstance(payload, dict):
+                update_self_telemetry(payload)
         append_event_log(event)
 
     def subscribe_if_present(name: str, callback: Any) -> None:
@@ -1554,6 +1641,45 @@ async def api_map() -> Dict[str, Any]:
             "stale": len(stale_markers),
             "invalid": len(invalid_markers),
         },
+    }
+
+
+@app.get("/api/v1/ha/location")
+async def api_ha_location() -> Dict[str, Any]:
+    marker = map_marker_for_self()
+    with state.lock:
+        telemetry = dict(state.self_telemetry)
+        connected = state.connected
+        status = state.status
+    return {
+        "generated_at": utcnow(),
+        "connected": connected,
+        "status": status,
+        **ha_location_payload(marker, telemetry),
+        "telemetry": telemetry,
+    }
+
+
+@app.get("/api/v1/ha/locations")
+async def api_ha_locations() -> Dict[str, Any]:
+    with state.lock:
+        contact_markers = [map_marker_for_contact(pubkey, contact) for pubkey, contact in state.contacts.items()]
+        telemetry = dict(state.self_telemetry)
+        connected = state.connected
+        status = state.status
+    self_marker = map_marker_for_self()
+    markers = [self_marker, *contact_markers]
+    locations = [
+        ha_location_payload(marker, telemetry if marker.get("kind") == "self" else None)
+        for marker in markers
+        if marker.get("location", {}).get("valid")
+    ]
+    return {
+        "generated_at": utcnow(),
+        "connected": connected,
+        "status": status,
+        "total": len(locations),
+        "locations": locations,
     }
 
 

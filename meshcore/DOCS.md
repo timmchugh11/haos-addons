@@ -37,10 +37,15 @@ API actions while still allowing admin settings to be changed.
 
 The bundled GUI uses endpoints under `/api/v1/`, including status, stats,
 identity, messages, conversations, nodes, contacts, channels, rooms, map,
-diagnostics, sensors, radio/routing, and admin settings.
+diagnostics, sensors, Home Assistant location, radio/routing, and admin
+settings.
 
 Write-capable endpoints are available for supported actions and are guarded by
 the Admin safety policy.
+
+Home Assistant can poll `GET /api/v1/ha/location` for the local node's latest
+GPS/telemetry details, or `GET /api/v1/ha/locations` for all valid MeshCore map
+locations in a compact REST-friendly format.
 
 GPS controls use the MeshCore companion custom-variable commands where firmware
 supports them. GPS enable sets `gps=1`, `gps_interval=1`, location telemetry,
