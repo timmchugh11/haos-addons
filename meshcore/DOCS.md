@@ -43,9 +43,11 @@ Write-capable endpoints are available for supported actions and are guarded by
 the Admin safety policy.
 
 GPS and power-saving controls use the MeshCore serial CLI commands exposed by
-firmware that supports them (`gps on/off` and `powersaving on/off`).
+firmware that supports them. GPS enable sends `gps on` plus `gps advert share`;
+GPS disable sends `gps off` plus `gps advert prefs`.
 
-Firmware flashing uses `esptool` against the selected serial port. The
+Firmware flashing uses `esptool` against the selected serial port. The default
+write offset is `0x0`. The
 firmware-flash safety toggle is disabled by default, and erase-first mode is
 explicitly optional.
 

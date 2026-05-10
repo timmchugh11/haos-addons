@@ -1273,7 +1273,12 @@ async def api_update_radio(request: RadioUpdateRequest) -> Dict[str, Any]:
         af = int(request.af or 0)
         await run_device_command(meshcore_client.commands.set_tuning(rx_delay, af))
     if request.gps_enabled is not None:
-        await run_cli_command(f"gps {'on' if request.gps_enabled else 'off'}")
+        if request.gps_enabled:
+            await run_cli_command("gps on")
+            await run_cli_command("gps advert share")
+        else:
+            await run_cli_command("gps off")
+            await run_cli_command("gps advert prefs")
     if request.power_saving is not None:
         await run_cli_command(f"powersaving {'on' if request.power_saving else 'off'}")
     if meshcore_client:
@@ -1351,7 +1356,7 @@ async def api_send_advert(flood: bool = Query(default=False)) -> Dict[str, Any]:
 async def api_flash_firmware(
     port: str = Form(default=DEVICE),
     baud: int = Form(default=921600),
-    offset: str = Form(default="0x10000"),
+    offset: str = Form(default="0x0"),
     erase: bool = Form(default=False),
     firmware: UploadFile = File(...),
 ) -> Dict[str, Any]:
@@ -1364,7 +1369,7 @@ async def api_flash_firmware(
     try:
         offset_value = int(str(offset).strip(), 0)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="offset must be a decimal or hex value, for example 0x10000") from exc
+        raise HTTPException(status_code=400, detail="offset must be a decimal or hex value, for example 0x0") from exc
     if offset_value < 0 or offset_value > 0x1000000:
         raise HTTPException(status_code=400, detail="offset is outside the accepted flash range")
     if not firmware.filename or not firmware.filename.lower().endswith(".bin"):

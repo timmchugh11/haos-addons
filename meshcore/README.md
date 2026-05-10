@@ -118,6 +118,8 @@ Bluetooth support is disabled for now while the serial GUI is stabilised.
 - Firmware flashing pauses the live serial worker while `esptool` uses the
   selected port. The device must be in bootloader/flash mode if the board
   requires it.
+- Enabling GPS sends both `gps on` and `gps advert share`, so GPS-derived
+  coordinates are used in adverts where the firmware supports them.
 - Map tiles are loaded from external tile providers in the browser; offline tile
   caching is not implemented yet.
 - API auth/rate limiting for direct non-ingress access is still on the roadmap.
@@ -135,4 +137,4 @@ companion GUI.
 
 ## Version
 
-Current add-on version: `0.10.4`
+Current add-on version: `0.10.5`

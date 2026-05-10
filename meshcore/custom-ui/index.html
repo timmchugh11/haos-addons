@@ -550,7 +550,7 @@ main{flex:1;overflow:auto;padding:30px}
             <div class="form-grid">
               <div class="field"><label for="flashPort">Port</label><select id="flashPort"></select></div>
               <div class="field"><label for="flashBaud">Baud</label><input id="flashBaud" type="number" min="1200" max="3000000" step="1" value="921600"></div>
-              <div class="field"><label for="flashOffset">Offset</label><input id="flashOffset" value="0x10000"></div>
+              <div class="field"><label for="flashOffset">Offset</label><input id="flashOffset" value="0x00000"></div>
               <div class="field"><label for="flashFile">Firmware .bin</label><input id="flashFile" type="file" accept=".bin,application/octet-stream"></div>
             </div>
             <div class="composer-actions">
@@ -1207,7 +1207,7 @@ async function flashFirmware(event) {
   const form = new FormData();
   form.append('port', $('flashPort').value);
   form.append('baud', $('flashBaud').value || '921600');
-  form.append('offset', $('flashOffset').value || '0x10000');
+  form.append('offset', $('flashOffset').value || '0x0');
   form.append('erase', $('flashErase').checked ? 'true' : 'false');
   form.append('firmware', file);
   $('flashStatus').textContent = 'Flashing... keep the device connected.';
