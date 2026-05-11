@@ -576,6 +576,7 @@ const state = {
   conversations:[], nodes:[], channels:[], rooms:[], mapData:null, admin:null, error:null,
   selectedConversation:null,
   seenMessageIds:new Set(), loadedOnce:false,
+  messageRenderKey:null, conversationRenderKey:null,
   mapReady:false, map:null, tileLayer:null, heatLayer:null, markerLayer:null,
   labelsVisible:false, browserLocation:null,
 };
@@ -785,6 +786,16 @@ function messagePresentation(message) {
 }
 
 function renderMessages() {
+  const messagesEl = $('messagesTable');
+  const previousScrollTop = messagesEl.scrollTop;
+  const wasPinnedToBottom = Math.abs(previousScrollTop) < 4;
+  const renderKey = state.messages.map((m) => [
+    m.id,
+    m.updated_at || m.timestamp_utc || m.timestamp || '',
+    m.status || '',
+    m.ack_count || 0,
+    m.text || m.message || '',
+  ].join(':')).join('|');
   const chatRows = state.messages.map((m) => {
     const outgoing = m.direction === 'outgoing';
     const { sender, text } = messagePresentation(m);
@@ -824,13 +835,17 @@ function renderMessages() {
     return `<tr><td>${escapeHtml(sender)}</td><td>${escapeHtml(channel)}</td><td>${escapeHtml(text)}</td><td>${escapeHtml(time)}</td></tr>`;
   }).join('');
   $('recentMessages').innerHTML = recentRows || emptyRow(4, 'No messages yet.');
-  $('messagesTable').innerHTML = chatRows || '<div class="empty">No messages yet.</div>';
-  $('messagesTable').querySelectorAll('[data-resend]').forEach((button) => {
-    button.addEventListener('click', () => resendMessage(Number(button.dataset.resend)));
-  });
-  $('messagesTable').querySelectorAll('[data-reply]').forEach((button) => {
-    button.addEventListener('click', () => replyToMessage(button.dataset.reply));
-  });
+  if (renderKey !== state.messageRenderKey) {
+    messagesEl.innerHTML = chatRows || '<div class="empty">No messages yet.</div>';
+    messagesEl.querySelectorAll('[data-resend]').forEach((button) => {
+      button.addEventListener('click', () => resendMessage(Number(button.dataset.resend)));
+    });
+    messagesEl.querySelectorAll('[data-reply]').forEach((button) => {
+      button.addEventListener('click', () => replyToMessage(button.dataset.reply));
+    });
+    messagesEl.scrollTop = wasPinnedToBottom ? 0 : previousScrollTop;
+    state.messageRenderKey = renderKey;
+  }
   $('messageScope').textContent = state.selectedConversation ? state.selectedConversation.label : 'All';
   const start = state.messageTotal ? state.messageOffset + 1 : 0;
   const end = Math.min(state.messageOffset + state.messageLimit, state.messageTotal);
@@ -847,6 +862,18 @@ function conversationIdForMessage(m) {
 }
 
 function renderConversations() {
+  const renderKey = state.conversations.map((conv) => [
+    conv.id,
+    conv.label || '',
+    conv.last_message || '',
+    conv.last_timestamp || '',
+    conv.unread || 0,
+    state.selectedConversation && state.selectedConversation.id === conv.id ? 'active' : '',
+  ].join(':')).join('|');
+  if (renderKey === state.conversationRenderKey) {
+    $('conversationCount').textContent = String(state.conversations.length);
+    return;
+  }
   const rows = state.conversations.map((conv) => {
     const active = state.selectedConversation && state.selectedConversation.id === conv.id ? ' active' : '';
     return `<button type="button" class="conversation${active}" data-conversation="${escapeHtml(conv.id)}">
@@ -863,6 +890,7 @@ function renderConversations() {
       selectConversation(conv || null);
     });
   });
+  state.conversationRenderKey = renderKey;
 }
 
 function renderComposerOptions() {
