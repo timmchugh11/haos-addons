@@ -58,6 +58,7 @@ main{flex:1;overflow:auto;padding:30px}
 .unit{font-size:11px;color:var(--muted);margin-top:6px}
 .green .value{color:var(--green)}.yellow .value{color:var(--yellow)}.red .value{color:var(--red)}
 .grid{display:grid;gap:16px;grid-template-columns:1.25fr .75fr}
+.grid-wide{grid-column:1 / -1}
 .message-grid{display:grid;gap:16px;grid-template-columns:minmax(240px,300px) minmax(0,1fr);height:calc(100vh - var(--header-h) - 128px);min-height:520px}
 .conversation-panel{display:flex;flex-direction:column;min-height:0;margin-bottom:0}
 .conversation-list{display:grid;gap:8px;overflow:auto;min-height:0;padding-right:2px}
@@ -117,6 +118,12 @@ main{flex:1;overflow:auto;padding:30px}
 .tbl td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text2);vertical-align:top}
 .tbl td:first-child{color:var(--text);font-weight:600}
 .tbl tr:last-child td{border-bottom:none}
+.event-log-box{overflow:hidden}
+.event-log-table{table-layout:fixed}
+.event-log-table th:nth-child(1){width:170px}
+.event-log-table th:nth-child(2){width:150px}
+.event-log-table td{overflow-wrap:anywhere;word-break:break-word}
+.event-log-payload{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
 .empty{color:var(--muted);padding:24px;text-align:center;border:1px dashed var(--border2);border-radius:8px;background:rgba(255,255,255,.02)}
 #mapCanvas{position:relative;width:100%;height:min(62vh,680px);min-height:420px;border:1px solid var(--border);border-radius:8px;background:#090909;overflow:hidden}
 .leaflet-container{width:100%;height:100%;background:#090909;color:#111}
@@ -142,7 +149,7 @@ main{flex:1;overflow:auto;padding:30px}
   header{padding:0 16px}.brand{padding-left:10px}.brand-title{font-size:16px}.brand-sub{display:none}.layout{display:block;overflow:auto}
   nav{width:100%;display:flex;gap:4px;padding:8px;border-right:none;border-bottom:1px solid var(--border)}
   .nav-group{display:none}nav a{padding:10px 12px;border-radius:6px;white-space:nowrap}
-  main{padding:18px}.grid,.map-grid,.composer-row{grid-template-columns:1fr}.message-grid{grid-template-columns:1fr;height:auto;min-height:0}.conversation-panel{max-height:280px}.chat-shell{height:calc(100vh - var(--header-h) - 146px);min-height:520px}.chat-composer{grid-template-columns:1fr}.composer-send-actions{justify-items:stretch}.composer-send-actions .send-buttons{justify-content:flex-end}.top-actions .btn{display:none}
+  main{padding:18px}.grid,.map-grid,.composer-row{grid-template-columns:1fr}.event-log-table th:nth-child(1),.event-log-table th:nth-child(2){width:auto}.message-grid{grid-template-columns:1fr;height:auto;min-height:0}.conversation-panel{max-height:280px}.chat-shell{height:calc(100vh - var(--header-h) - 146px);min-height:520px}.chat-composer{grid-template-columns:1fr}.composer-send-actions{justify-items:stretch}.composer-send-actions .send-buttons{justify-content:flex-end}.top-actions .btn{display:none}
 }
 </style>
 </head>
@@ -393,12 +400,12 @@ main{flex:1;overflow:auto;padding:30px}
             <table class="tbl"><thead><tr><th>Name</th><th>Type</th><th>Last Seen</th><th>Location</th><th>Telemetry</th></tr></thead><tbody id="sensorTable"></tbody></table>
             <div id="sensorStatus" class="status-line"></div>
           </div>
-          <div class="box">
+          <div class="box event-log-box grid-wide">
             <div class="box-title">Protocol / Event Log</div>
             <div class="form-grid">
               <div class="field"><label for="logFilter">Filter</label><input id="logFilter" placeholder="event type or payload"></div>
             </div>
-            <table class="tbl"><thead><tr><th>Time</th><th>Event</th><th>Payload</th></tr></thead><tbody id="eventLogs"></tbody></table>
+            <table class="tbl event-log-table"><thead><tr><th>Time</th><th>Event</th><th>Payload</th></tr></thead><tbody id="eventLogs"></tbody></table>
           </div>
         </div>
       </section>
@@ -1173,7 +1180,7 @@ function renderEventLogs() {
     if (!filter) return true;
     return fmt(entry.type, '').toLowerCase().includes(filter) || JSON.stringify(entry.payload || {}).toLowerCase().includes(filter);
   });
-  $('eventLogs').innerHTML = filtered.map((entry) => `<tr><td>${escapeHtml(entry.timestamp)}</td><td>${escapeHtml(entry.type)}</td><td>${escapeHtml(JSON.stringify(entry.payload))}</td></tr>`).join('') || emptyRow(3, 'No diagnostic events available.');
+  $('eventLogs').innerHTML = filtered.map((entry) => `<tr><td>${escapeHtml(entry.timestamp)}</td><td>${escapeHtml(entry.type)}</td><td class="event-log-payload">${escapeHtml(JSON.stringify(entry.payload))}</td></tr>`).join('') || emptyRow(3, 'No diagnostic events available.');
 }
 
 async function runDiagnosticsTest() {
