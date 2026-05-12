@@ -1,0 +1,33 @@
+name: Garmin GLO2 GPS
+version: "0.2.0"
+slug: garmin_glo2_gps
+description: Reads Garmin GLO 2 GPS data over Bluetooth RFCOMM/SPP and publishes it to Home Assistant through the Core API.
+url: https://github.com/timmchugh11/haos-addons
+arch:
+  - amd64
+  - aarch64
+  - armv7
+startup: services
+boot: auto
+init: false
+host_network: true
+host_dbus: true
+homeassistant_api: true
+hassio_api: true
+privileged:
+  - NET_ADMIN
+  - NET_RAW
+  - SYS_ADMIN
+devices:
+  - /dev:/dev:rwm
+map:
+  - share:rw
+  - config:rw
+options:
+  bluetooth_mac: AA:BB:CC:DD:EE:FF
+  rfcomm_channel: 1
+  debug: true
+schema:
+  bluetooth_mac: str
+  rfcomm_channel: int
+  debug: bool

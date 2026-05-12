@@ -34,6 +34,18 @@ thumbnails and more — accessible from any web browser.
 
 ---
 
+### Garmin GLO2 GPS
+
+[![version](https://img.shields.io/badge/version-0.2.0-blue.svg)](garmin_glo2_gps/config.yaml)
+
+Bluetooth GPS bridge for the Garmin GLO 2 receiver. Connects over Bluetooth
+RFCOMM/SPP, reads NMEA sentences, and publishes a Home Assistant
+`device_tracker.garmin_glo2` entity through the Core API.
+
+**[Documentation](garmin_glo2_gps/README.md)**
+
+---
+
 ### Starlink GUI
 
 [![version](https://img.shields.io/badge/version-1.1.22-blue.svg)](starlink_gui/config.yaml)
