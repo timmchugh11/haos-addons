@@ -1,0 +1,21 @@
+name: Entity Remover
+version: "1.0.0"
+slug: entity_remover
+description: Deletes specified entities from Home Assistant on startup.
+url: https://github.com/timmchugh11/haos-addons
+arch:
+  - amd64
+  - aarch64
+  - armv7
+startup: once
+boot: auto
+init: false
+homeassistant_api: true
+options:
+  entity_ids:
+    - device_tracker.example_entity
+  delay_seconds: 10
+schema:
+  entity_ids:
+    - str
+  delay_seconds: int
