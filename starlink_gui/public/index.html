@@ -594,10 +594,6 @@ main:has(#page-dishy-alignment.active){
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="2"/></svg>
     Alignment
   </a>
-  <a href="#dishy-location" class="nav-link" data-page="dishy-location">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-    Location
-  </a>
   <a href="#dishy-controls" class="nav-link" data-page="dishy-controls">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
     Controls
@@ -828,25 +824,6 @@ main:has(#page-dishy-alignment.active){
         </div>
       </div>
     </div>
-  </section>
-
-  <!-- ════ DISHY LOCATION ════ -->
-  <section id="page-dishy-location" class="page">
-    <div class="page-title">Location</div>
-    <div class="page-sub">GPS coordinates from the dish (must be enabled in dish settings)</div>
-
-    <div class="refresh-row">
-      <button class="btn btn-primary btn-sm" onclick="loadLocation()">Refresh</button>
-      <span class="last-update" id="loc-updated">Never updated</span>
-    </div>
-    <div class="cards">
-      <div class="card blue"><div class="label">Latitude</div><div class="value" id="loc-lat">—</div></div>
-      <div class="card blue"><div class="label">Longitude</div><div class="value" id="loc-lon">—</div></div>
-      <div class="card"><div class="label">Altitude (m)</div><div class="value" id="loc-alt">—</div></div>
-      <div class="card"><div class="label">Fix Available</div><div class="value" style="font-size:14px" id="loc-src">—</div></div>
-    </div>
-    <div id="loc-map-link"></div>
-    <div id="location-content"></div>
   </section>
 
   <!-- ════ DISHY CONTROLS ════ -->
@@ -1295,7 +1272,6 @@ function autoLoad(page) {
     'dishy-history': loadDishyHistory,
     'dishy-obstruction': loadObstruction,
     'dishy-alignment':   loadAlignment,
-    'dishy-location': loadLocation,
     'router-status': loadRouterStatus,
     'router-clients': loadRouterClients,
     'router-interfaces': loadRouterInterfaces,
@@ -1516,11 +1492,6 @@ function renderDiagnostics(d) {
     html += '<hr class="sep">';
     html += clear.map(([k]) => `<span class="alert-chip clear">${fmtKey(k)}</span>`).join('');
     html += '</div>';
-  }
-
-  // Location
-  if (d.location) {
-    html += renderKVBox('Location', d.location);
   }
 
   if (d.alignmentStats) {
@@ -2385,37 +2356,6 @@ function renderAlignmentMap() {
 }
 
 window.addEventListener('starlink-obstruction-3d-ready', () => { ensureAlignmentScene(); });
-
-// ════════════════════════════════════════════════════════════════════
-// LOCATION
-// ════════════════════════════════════════════════════════════════════
-
-async function loadLocation() {
-  set('loc-updated', 'Loading…');
-  try {
-    const data = await apiFetch('/dishy/location');
-    const lat = data.lla?.lat ?? data.latitude  ?? null;
-    const lon = data.lla?.lon ?? data.longitude ?? null;
-    const alt = data.lla?.alt ?? data.altitude  ?? null;
-    set('loc-lat', typeof lat === 'number' ? lat.toFixed(6) : '—');
-    set('loc-lon', typeof lon === 'number' ? lon.toFixed(6) : '—');
-    set('loc-alt', typeof alt === 'number' ? alt.toFixed(1) : '—');
-    set('loc-src', typeof lat === 'number' && typeof lon === 'number' ? 'Yes' : 'No');
-    const mapEl = document.getElementById('loc-map-link');
-    if (typeof lat === 'number' && typeof lon === 'number') {
-      mapEl.innerHTML = `<div style="height:14px"></div><div class="box"><div class="box-title">Map Links</div><div class="btn-group"><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Open in Google Maps ↗</a><a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=12" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Open in OpenStreetMap ↗</a></div></div>`;
-    } else {
-      mapEl.innerHTML = '';
-    }
-    const el = document.getElementById('location-content');
-    preserveScroll(() => { el.innerHTML = renderJsonTable(data); });
-    set('loc-updated', 'Updated ' + now());
-  } catch(e) {
-    document.getElementById('location-content').innerHTML = renderError(e);
-    toast('Location error: ' + e.message, 'err');
-    set('loc-updated', 'Error');
-  }
-}
 
 // ════════════════════════════════════════════════════════════════════
 // CONTROLS

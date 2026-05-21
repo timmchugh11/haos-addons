@@ -106,9 +106,11 @@ app.get('/api/dishy/history', (req, res) => {
     handle(res, () => dishy.fetch_history().finally(() => dishy.close()));
 });
 
-app.get('/api/dishy/location', (req, res) => {
-    const dishy = getDishy(req);
-    handle(res, () => dishy.fetch_location().finally(() => dishy.close()));
+app.get('/api/dishy/location', (_req, res) => {
+    res.status(410).json({
+        ok: false,
+        error: 'Dish location is unavailable: Starlink policy disables local GetLocation requests on current firmware.',
+    });
 });
 
 app.get('/api/dishy/obstruction-map', (req, res) => {
@@ -154,13 +156,13 @@ app.get('/api/dishy/dump', async (req, res) => {
             const dishy = getDishy(req);
             return dishy.fetch_history().finally(() => dishy.close());
         },
-        getLocation: async () => {
-            const dishy = getDishy(req);
-            return dishy['handle']({ getLocation: {} }).finally(() => dishy.close());
+        getLocation: {
+            request: { getLocation: {} },
+            reason: 'Skipped: Starlink policy disables local GetLocation requests on current firmware.',
         },
-        location: async () => {
-            const dishy = getDishy(req);
-            return dishy.fetch_location().finally(() => dishy.close());
+        location: {
+            request: { fetch_location: {} },
+            reason: 'Skipped: Starlink policy disables local GetLocation requests on current firmware.',
         },
         dishGetObstructionMap: async () => {
             const dishy = getDishy(req);
@@ -423,9 +425,9 @@ app.get('/api/router/dump', async (req, res) => {
             const router = getRouter(req);
             return router['handle']({ wifiGetHistory: {} }).finally(() => router.close());
         },
-        getLocation: async () => {
-            const router = getRouter(req);
-            return router['handle']({ getLocation: {} }).finally(() => router.close());
+        getLocation: {
+            request: { getLocation: {} },
+            reason: 'Skipped: Starlink policy disables local GetLocation requests on current firmware.',
         },
         getLog: async () => {
             const router = getRouter(req);
