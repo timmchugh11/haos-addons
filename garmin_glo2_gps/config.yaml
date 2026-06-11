@@ -1,5 +1,5 @@
 name: Garmin GLO2 GPS
-version: "0.4.0"
+version: "0.4.2"
 slug: garmin_glo2_gps
 description: Reads Garmin GLO 2 GPS data over Bluetooth RFCOMM/SPP and publishes it to Home Assistant through the Core API.
 url: https://github.com/timmchugh11/haos-addons

@@ -86,6 +86,10 @@ else
   log_warn "lsmod is not available"
 fi
 
+log_info "Powering on Bluetooth adapter"
+bluetoothctl power on || log_warn "bluetoothctl power on failed"
+sleep 2
+
 run_or_warn "bluetoothctl show" bluetoothctl show
 run_or_warn "bluetoothctl devices Paired" bluetoothctl devices Paired
 run_or_warn "bluetoothctl info ${BLUETOOTH_MAC}" bluetoothctl info "${BLUETOOTH_MAC}"
@@ -107,9 +111,6 @@ except Exception as err:
 PY
 
 run_or_warn "bluetoothctl trust ${BLUETOOTH_MAC}" bluetoothctl trust "${BLUETOOTH_MAC}"
-
-log_info "Attempting bluetoothctl connect ${BLUETOOTH_MAC}"
-bluetoothctl connect "${BLUETOOTH_MAC}" || log_warn "bluetoothctl connect failed; this can be normal until the serial channel is opened"
 
 log_info "Checking supervisor token environment:"
 printenv | grep -i 'token\|supervisor\|hassio' | sed 's/=.*/=<redacted>/' || log_warn "No token/supervisor vars found in environment"

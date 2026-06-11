@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime, time
 import json
 import logging
 import os
+import select
 import socket
 import time as time_module
 from typing import Any
@@ -166,14 +167,14 @@ def reader_loop() -> None:
                 sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
                 sock.settimeout(10.0)
                 sock.connect((mac, channel))
-                sock.settimeout(1.0)
+                sock.setblocking(True)
                 LOGGER.info("RFCOMM connected")
                 buf = b""
                 while True:
-                    try:
-                        chunk = sock.recv(4096)
-                    except socket.timeout:
+                    readable, _, _ = select.select([sock], [], [], 1.0)
+                    if not readable:
                         continue
+                    chunk = sock.recv(4096)
                     if not chunk:
                         LOGGER.warning("Connection closed by device")
                         break
