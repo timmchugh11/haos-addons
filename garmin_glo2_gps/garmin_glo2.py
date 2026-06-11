@@ -114,6 +114,11 @@ class EntityState:
 
 def parse_message(line: str, state: GpsState) -> bool:
     """Parse one NMEA line into state. Return true when publish-worthy."""
+    # Pre-filter: only parse sentence types we actually use, avoiding the
+    # overhead of pynmea2.parse() on GSV, GSA, VTG, GLL, etc.
+    sentence_type = line[3:6] if len(line) > 6 else ""
+    if sentence_type not in ("RMC", "GGA"):
+        return False
     try:
         message = pynmea2.parse(line)
     except pynmea2.ParseError:
@@ -148,7 +153,7 @@ def reader_loop() -> None:
     mac = os.getenv("BLUETOOTH_MAC", "AA:BB:CC:DD:EE:FF")
     channel = int(os.getenv("RFCOMM_CHANNEL", "1"))
     debug = os.getenv("DEBUG", "false").lower() == "true"
-    publish_interval = 1.0
+    publish_interval = 5.0
     last_publish = 0.0
     state = GpsState()
     publisher = Publisher()
