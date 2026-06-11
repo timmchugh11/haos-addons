@@ -59,7 +59,7 @@ read_option() {
 
 BLUETOOTH_MAC="$(read_option bluetooth_mac "AA:BB:CC:DD:EE:FF")"
 RFCOMM_CHANNEL="$(read_option rfcomm_channel "1")"
-DEBUG="$(read_option debug "true")"
+DEBUG="$(read_option debug "false")"
 
 export BLUETOOTH_MAC
 export RFCOMM_CHANNEL

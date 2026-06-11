@@ -153,7 +153,7 @@ def reader_loop() -> None:
     mac = os.getenv("BLUETOOTH_MAC", "AA:BB:CC:DD:EE:FF")
     channel = int(os.getenv("RFCOMM_CHANNEL", "1"))
     debug = os.getenv("DEBUG", "false").lower() == "true"
-    publish_interval = 5.0
+    publish_interval = 1.0
     last_publish = 0.0
     state = GpsState()
     publisher = Publisher()
@@ -171,7 +171,7 @@ def reader_loop() -> None:
                 buf = b""
                 while True:
                     try:
-                        chunk = sock.recv(1024)
+                        chunk = sock.recv(4096)
                     except socket.timeout:
                         continue
                     if not chunk:
@@ -190,15 +190,16 @@ def reader_loop() -> None:
                             if now - last_publish >= publish_interval:
                                 publisher.publish(state)
                                 last_publish = now
+                    time_module.sleep(1.0)
             except OSError as err:
                 LOGGER.warning("RFCOMM error: %s", err)
-                time_module.sleep(5)
             finally:
                 if sock is not None:
                     try:
                         sock.close()
                     except OSError:
                         pass
+            time_module.sleep(5)
     finally:
         publisher.close()
 
