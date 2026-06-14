@@ -130,18 +130,18 @@ function pickLan(ifaces) {
 
 async function discoverWifiClients(url, session) {
     // Try zyxel.ap ubus bridge first — one call, band-accurate counts
+    // Response shape: { clients: { "mac\n": { band: "2.4GHz\n", ... } } }
     try {
         const d = await ubusCall(url, session, 'zyxel.ap', 'get_clients');
-        if (d && typeof d === 'object') {
-            const entries = Object.values(d);
-            if (entries.length > 0) {
-                let clients2ghz = 0, clients5ghz = 0;
-                for (const c of entries) {
-                    if (c.band === '5GHz') clients5ghz++;
-                    else clients2ghz++;
-                }
-                return { clients2ghz, clients5ghz };
+        const raw = (d && d.clients) ? d.clients : {};
+        const entries = Object.values(raw);
+        if (entries.length > 0) {
+            let clients2ghz = 0, clients5ghz = 0;
+            for (const c of entries) {
+                if ((c.band || '').trim() === '5GHz') clients5ghz++;
+                else clients2ghz++;
             }
+            return { clients2ghz, clients5ghz };
         }
     } catch (_) {}
     // Fall back to hostapd ubus objects
@@ -284,41 +284,76 @@ async function getRouterClients({ protocol, host, username, password }) {
         return { clients: [], _source: 'openwrt', error: `Login failed: ${e.message}` };
     }
 
-    // Try zyxel.ap ubus bridge — gives band info (iface 2=2.4GHz, 3=5GHz)
+    // Build wireless map from zyxel.ap: normalised lowercase MAC → client info
+    // Response: { clients: { "mac\n": { band: "2.4GHz\n", signal: -46, ... } } }
+    // All string values have trailing \n — strip with .trim()
+    const wirelessByMac = {};
     try {
         const d = await ubusCall(url, session, 'zyxel.ap', 'get_clients');
-        if (d && typeof d === 'object' && Object.keys(d).length > 0) {
-            const clients = Object.values(d).map(c => ({
-                mac:           c.macaddr || '—',
-                ipAddress:     c.ipaddr  || '—',
-                hostname:      c.ssid    || '',
-                iface:         c.band === '5GHz' ? 3 : 2,
-                signalStrength: typeof c.signal === 'number' ? c.signal : null,
-                _txRate:       c.tx_rate,
-                _rxRate:       c.rx_rate,
-                _band:         c.band,
-            }));
-            return { clients, _source: 'zyxel-ap-ubus' };
+        const raw = (d && d.clients) ? d.clients : {};
+        for (const [key, c] of Object.entries(raw)) {
+            const mac = (c.macaddr || key).trim().toLowerCase();
+            wirelessByMac[mac] = {
+                band:     (c.band       || '').trim(),
+                signal:   typeof c.signal === 'number' ? c.signal : null,
+                txRate:   (c.tx_rate    || '').trim(),
+                rxRate:   (c.rx_rate    || '').trim(),
+                ssid:     (c.ssid       || '').trim(),
+                hostname: (c.hostname   || '').trim(),
+                ipaddr:   (c.ipaddr     || '').trim(),
+            };
         }
     } catch (e) {
         console.warn('[openwrt] zyxel.ap get_clients failed:', e.message);
     }
 
-    // Fall back to DHCP leases (no band info)
-    let clients = [];
+    // DHCP leases = full client list (includes ethernet). MACs are uppercase.
+    let leases = [];
     try {
         const d = await ubusCall(url, session, 'luci-rpc', 'getDHCPLeases');
-        if (Array.isArray(d.dhcp_leases)) {
-            clients = d.dhcp_leases.map(l => ({
-                mac:      l.macaddr || '—',
-                ipAddress: l.ipaddr || '—',
-                hostname: l.hostname || '',
-                iface:    1,
-            }));
-        }
+        if (Array.isArray(d.dhcp_leases)) leases = d.dhcp_leases;
     } catch (e) {
         console.warn('[openwrt] getDHCPLeases failed:', e.message);
     }
+
+    // Merge: DHCP provides the full list; zyxel adds band/signal where available.
+    // Anything in DHCP but not in zyxel → ethernet (iface 1).
+    const seen = new Set();
+    const clients = [];
+
+    for (const l of leases) {
+        const mac = (l.macaddr || '').toLowerCase();
+        if (!mac || seen.has(mac)) continue;
+        seen.add(mac);
+        const w = wirelessByMac[mac];
+        clients.push({
+            mac,
+            ipAddress:     l.ipaddr   || '—',
+            hostname:      l.hostname || (w && w.hostname) || '',
+            iface:         w ? (w.band === '5GHz' ? 3 : 2) : 1,
+            signalStrength: w ? w.signal : null,
+            _txRate:       w ? w.txRate : null,
+            _rxRate:       w ? w.rxRate : null,
+            _band:         w ? w.band   : 'Ethernet',
+        });
+    }
+
+    // Also add any zyxel wireless clients not yet in DHCP
+    for (const [mac, w] of Object.entries(wirelessByMac)) {
+        if (seen.has(mac)) continue;
+        seen.add(mac);
+        clients.push({
+            mac,
+            ipAddress:     w.ipaddr || '—',
+            hostname:      w.hostname || '',
+            iface:         w.band === '5GHz' ? 3 : 2,
+            signalStrength: w.signal,
+            _txRate:       w.txRate,
+            _rxRate:       w.rxRate,
+            _band:         w.band,
+        });
+    }
+
     return { clients, _source: 'openwrt' };
 }
 
