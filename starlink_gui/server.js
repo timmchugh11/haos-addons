@@ -6,7 +6,7 @@ const fs    = require('fs');
 const path = require('path');
 const { Dishy } = require('@gibme/starlink');
 const { WiFiRouter } = require('@gibme/starlink');
-const { getRouterSummary: getOpenwrtRouterSummary, fmtUptime } = require('./openwrt');
+const { getRouterSummary: getOpenwrtRouterSummary, getRouterClients: getOpenwrtClients, getRouterInterfaces: getOpenwrtInterfaces, fmtUptime } = require('./openwrt');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,12 +17,17 @@ const DEFAULT_DISH_PORT   = parseInt(process.env.DISH_PORT   || '9200', 10);
 const DEFAULT_ROUTER_HOST = process.env.ROUTER_HOST || '192.168.1.1';
 const DEFAULT_ROUTER_PORT = parseInt(process.env.ROUTER_PORT || '9000', 10);
 
-// OpenWrt optional fill for bypass mode
+// Bypass mode and OpenWrt config (from HA add-on options)
+const BYPASS_MODE            = process.env.BYPASS_MODE === 'true';
 const OPENWRT_FILL_ROUTER_BLANKS = process.env.OPENWRT_FILL_ROUTER_BLANKS === 'true';
 const OPENWRT_HOST     = process.env.OPENWRT_HOST     || '192.168.1.1';
 const OPENWRT_PROTOCOL = process.env.OPENWRT_PROTOCOL || 'http';
 const OPENWRT_USERNAME = process.env.OPENWRT_USERNAME || 'root';
 const OPENWRT_PASSWORD = process.env.OPENWRT_PASSWORD || '';
+
+function owrtConfig() {
+    return { protocol: OPENWRT_PROTOCOL, host: OPENWRT_HOST, username: OPENWRT_USERNAME, password: OPENWRT_PASSWORD };
+}
 
 // Read HTML files once at startup for ingress-path injection
 const INDEX_HTML        = fs.readFileSync(path.join(__dirname, 'public', 'index.html'),        'utf8');
@@ -289,12 +294,28 @@ app.post('/api/dishy/unstow', (req, res) => {
 
 // ── WiFi Router routes ────────────────────────────────────────────────────────
 
-app.get('/api/router/diagnostics', (req, res) => {
+app.get('/api/router/diagnostics', async (req, res) => {
+    if (BYPASS_MODE) {
+        return res.json({ ok: true, data: { _source: 'bypass', _note: 'Router diagnostics not available in bypass mode' } });
+    }
     const router = getRouter(req);
     handle(res, () => router.fetch_diagnostics().finally(() => router.close()));
 });
 
-app.get('/api/router/status', (req, res) => {
+app.get('/api/router/status', async (req, res) => {
+    if (BYPASS_MODE && OPENWRT_FILL_ROUTER_BLANKS) {
+        return handle(res, async () => {
+            const s = await getOpenwrtRouterSummary(owrtConfig());
+            return {
+                deviceState:   { uptimeS: s.uptimeSeconds },
+                ipv4WanAddress: s.wanIp,
+                deviceInfo:    { id: s.id, hardwareVersion: s.hardwareVersion, softwareVersion: s.softwareVersion },
+                serialNumber:  s.id,
+                _source:       'openwrt',
+            };
+        });
+    }
+    if (BYPASS_MODE) return res.json({ ok: true, data: { _source: 'bypass' } });
     const router = getRouter(req);
     handle(res, () => router['handle']({ getStatus: {} })
         .then(r => {
@@ -305,7 +326,11 @@ app.get('/api/router/status', (req, res) => {
     );
 });
 
-app.get('/api/router/clients', (req, res) => {
+app.get('/api/router/clients', async (req, res) => {
+    if (BYPASS_MODE && OPENWRT_FILL_ROUTER_BLANKS) {
+        return handle(res, () => getOpenwrtClients(owrtConfig()));
+    }
+    if (BYPASS_MODE) return res.json({ ok: true, data: { clients: [], _source: 'bypass' } });
     const router = getRouter(req);
     handle(res, () => router['handle']({ wifiGetClients: {} })
         .then(r => {
@@ -316,7 +341,26 @@ app.get('/api/router/clients', (req, res) => {
     );
 });
 
-app.get('/api/router/networks', (req, res) => {
+app.get('/api/router/networks', async (req, res) => {
+    if (BYPASS_MODE && OPENWRT_FILL_ROUTER_BLANKS) {
+        return handle(res, async () => {
+            const s = await getOpenwrtRouterSummary(owrtConfig());
+            return {
+                id: s.id,
+                hardwareVersion: s.hardwareVersion,
+                softwareVersion: s.softwareVersion,
+                networks: [{
+                    ipv4: s.lanIpv4,
+                    ipv6: [],
+                    clientsEthernet: s.clientsEthernet,
+                    clients2ghz:     s.clients2ghz,
+                    clients5ghz:     s.clients5ghz,
+                }],
+                _source: 'openwrt',
+            };
+        });
+    }
+    if (BYPASS_MODE) return res.json({ ok: true, data: { networks: [], _source: 'bypass' } });
     // wifiGetDiagnostics v1 is not implemented on current firmware;
     // use the v2 diagnostics which includes LAN network info.
     const router = getRouter(req);
@@ -339,7 +383,8 @@ app.get('/api/router/history', (req, res) => {
     );
 });
 
-app.get('/api/router/ping-metrics', (req, res) => {
+app.get('/api/router/ping-metrics', async (req, res) => {
+    if (BYPASS_MODE) return res.json({ ok: true, data: { results: [], _source: 'bypass' } });
     const router = getRouter(req);
     handle(res, () => router['handle']({ getPing: {} })
         .then(r => unwrapResponse(r, 'getPing'))
@@ -355,7 +400,11 @@ app.get('/api/router/device-info', (req, res) => {
     );
 });
 
-app.get('/api/router/interfaces', (req, res) => {
+app.get('/api/router/interfaces', async (req, res) => {
+    if (BYPASS_MODE && OPENWRT_FILL_ROUTER_BLANKS) {
+        return handle(res, () => getOpenwrtInterfaces(owrtConfig()));
+    }
+    if (BYPASS_MODE) return res.json({ ok: true, data: { networkInterfaces: [], _source: 'bypass' } });
     const router = getRouter(req);
     handle(res, () => router['handle']({ getNetworkInterfaces: {} })
         .then(r => unwrapResponse(r, 'networkInterfaces'))
@@ -534,7 +583,7 @@ function bypassPlaceholder() {
 }
 
 app.get('/api/router/summary', async (req, res) => {
-    const bypass = req.query.bypass === '1' || req.query.bypass === 'true';
+    const bypass = BYPASS_MODE || req.query.bypass === '1' || req.query.bypass === 'true';
 
     if (bypass && OPENWRT_FILL_ROUTER_BLANKS) {
         const summary = await getOpenwrtRouterSummary({
@@ -665,6 +714,7 @@ app.get('/api/config', (_req, res) => {
         dishPort:   DEFAULT_DISH_PORT,
         routerHost: DEFAULT_ROUTER_HOST,
         routerPort: DEFAULT_ROUTER_PORT,
+        bypassMode:              BYPASS_MODE,
         openwrtFillRouterBlanks: OPENWRT_FILL_ROUTER_BLANKS,
         cardModulePath: `/${CARD_MODULE_NAME}`,
         cardType: 'custom:starlink-combined-card',

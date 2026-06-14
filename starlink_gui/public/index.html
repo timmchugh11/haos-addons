@@ -476,10 +476,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
 /* ── bypass mode ── */
-.bypass-active .router-item{display:none!important}
-/* When OpenWrt fill is active, re-show dashboard cards and Router Snapshot box */
-.bypass-openwrt .router-item.card{display:block!important}
-.bypass-openwrt .router-item.box{display:block!important}
+.bypass-active .bypass-indicator{display:inline-flex!important}
 
 /* ── alignment map ── */
 main:has(#page-dishy-alignment.active){
@@ -1015,12 +1012,9 @@ main:has(#page-dishy-alignment.active){
 
     <div class="box">
       <div class="box-title">Bypass Mode</div>
-      <div style="display:flex;align-items:center;gap:12px">
-        <label class="toggle-wrap" style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
-          <input type="checkbox" id="cfg-bypass-mode" onchange="setBypassMode(this.checked)" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer"/>
-          <span style="font-size:13px;color:var(--text2)">Hide all router info — useful when the Starlink router is bypassed / not present</span>
-        </label>
-      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Controlled by the <strong>bypass_mode</strong> option in Home Assistant add-on settings — cannot be changed here.</div>
+      <div id="cfg-bypass-status" style="font-size:13px;color:var(--text)">—</div>
+      <div id="cfg-openwrt-status" style="display:none;font-size:13px;color:var(--text2);margin-top:6px"></div>
     </div>
 
     <div class="box">
@@ -1086,13 +1080,13 @@ const cfg = {
   dishPort: 9200,
   routerHost: '192.168.1.1',
   routerPort: 9000,
+  bypassMode: false,
   openwrtFillRouterBlanks: false,
 };
 const BASE = window.__BASE__ || '';
 
 const STORAGE_KEYS = {
   refreshInterval:   'starlink_gui.refresh_interval_secs',
-  bypassMode:        'starlink_gui.bypass_mode',
   obstructionColors: 'starlink_gui.obstruction_colors',
   ingressPath:       'starlink_gui.ingress_path',
 };
@@ -1226,7 +1220,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 });
 
 function getBypassMode() {
-  try { return window.localStorage.getItem(STORAGE_KEYS.bypassMode) === '1'; } catch (_) { return false; }
+  return cfg.bypassMode === true;
 }
 
 function applyBypassClasses(enabled) {
@@ -1234,13 +1228,6 @@ function applyBypassClasses(enabled) {
   document.body.classList.toggle('bypass-openwrt', enabled && cfg.openwrtFillRouterBlanks === true);
 }
 
-function setBypassMode(enabled) {
-  try { window.localStorage.setItem(STORAGE_KEYS.bypassMode, enabled ? '1' : '0'); } catch (_) {}
-  applyBypassClasses(enabled);
-  const chk = document.getElementById('cfg-bypass-mode');
-  if (chk) chk.checked = enabled;
-  if (enabled && currentPage.startsWith('router-')) navigate('dashboard');
-}
 
 function getObstructionColors() {
   const defaults = { clear: '#00ffff', obstructed: '#ff4444' };
@@ -1265,7 +1252,6 @@ function saveObstructionColors() {
 }
 
 function navigate(page) {
-  if (getBypassMode() && page.startsWith('router-')) page = 'dashboard';
   document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
   currentPage = page;
@@ -2927,6 +2913,7 @@ async function init() {
     cfg.routerHost              = defaults.routerHost || cfg.routerHost;
     cfg.routerPort              = defaults.routerPort || cfg.routerPort;
     cfg.openwrtFillRouterBlanks = defaults.openwrtFillRouterBlanks === true;
+    cfg.bypassMode              = defaults.bypassMode === true;
   } catch (_) { /* fall back to hard-coded defaults */ }
 
   // Pre-populate settings form
@@ -2941,9 +2928,24 @@ async function init() {
   document.getElementById('cfg-color-clear').value      = cols.clear;
   document.getElementById('cfg-color-obstructed').value = cols.obstructed;
 
-  const bypass = getBypassMode();
-  document.getElementById('cfg-bypass-mode').checked = bypass;
-  applyBypassClasses(bypass);
+  applyBypassClasses(cfg.bypassMode);
+
+  // Populate bypass status display in Settings
+  const bypassEl  = document.getElementById('cfg-bypass-status');
+  const openwrtEl = document.getElementById('cfg-openwrt-status');
+  if (bypassEl) {
+    if (cfg.bypassMode) {
+      bypassEl.innerHTML = '<span class="pill ok">Bypass Active</span> Starlink router absent — router pages will show OpenWrt data';
+      if (openwrtEl) {
+        openwrtEl.style.display = '';
+        openwrtEl.innerHTML = cfg.openwrtFillRouterBlanks
+          ? '<span class="pill ok">OpenWrt Enabled</span> Router pages will display data from OpenWrt'
+          : '<span class="pill idle">OpenWrt Disabled</span> Enable <code>openwrt_fill_router_blanks</code> in HA add-on settings to show router data';
+      }
+    } else {
+      bypassEl.innerHTML = '<span class="pill idle">Normal Mode</span> Starlink router connected';
+    }
+  }
 
   applyInterval(false);
   checkConnStatus();

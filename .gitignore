@@ -1,3 +1,4 @@
 node_modules/
 */node_modules/
 homeassistant-starlink-custom-card/
+*/test_endpoint.py

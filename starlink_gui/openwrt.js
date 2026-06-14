@@ -82,6 +82,23 @@ function parseDhcpLeases(raw) {
     return raw.split('\n').filter(l => l.trim().length > 0).length;
 }
 
+async function getDhcpLeaseCount(url, session) {
+    // Try luci-rpc first — works without any ACL setup on routers with LuCI installed
+    try {
+        const d = await ubusCall(url, session, 'luci-rpc', 'getDHCPLeases');
+        return Array.isArray(d.dhcp_leases) ? d.dhcp_leases.length : 0;
+    } catch (_) {}
+    // Fallback: read the leases file directly (requires file read ACL in rpcd)
+    try {
+        const d = await ubusCall(url, session, 'file', 'read', { path: '/tmp/dhcp.leases' });
+        return parseDhcpLeases(d.data);
+    } catch (e) {
+        console.warn('[openwrt] DHCP leases unavailable:', e.message,
+            '— install luci-rpc or add file read ACL in /usr/share/rpcd/acl.d/');
+        return 0;
+    }
+}
+
 function isPrivateIp(addr) {
     if (!addr) return false;
     return addr.startsWith('10.')
@@ -109,6 +126,26 @@ function pickLan(ifaces) {
             return a && isPrivateIp(a);
         })
         || {};
+}
+
+async function discoverWifiClients(url, session) {
+    // Try zyxel.ap ubus bridge first — one call, band-accurate counts
+    try {
+        const d = await ubusCall(url, session, 'zyxel.ap', 'get_clients');
+        if (d && typeof d === 'object') {
+            const entries = Object.values(d);
+            if (entries.length > 0) {
+                let clients2ghz = 0, clients5ghz = 0;
+                for (const c of entries) {
+                    if (c.band === '5GHz') clients5ghz++;
+                    else clients2ghz++;
+                }
+                return { clients2ghz, clients5ghz };
+            }
+        }
+    } catch (_) {}
+    // Fall back to hostapd ubus objects
+    return discoverHostapdClients(url, session);
 }
 
 async function discoverHostapdClients(url, session) {
@@ -192,21 +229,16 @@ async function getRouterSummary({ protocol, host, username, password }) {
                 raw.wan = wan;
                 raw.lan = lan;
             }),
-        ubusCall(url, session, 'file', 'read', { path: '/tmp/dhcp.leases' })
-            .then(d => { dhcpLeases = parseDhcpLeases(d.data); raw.leases = d; })
-            .catch(e => {
-                // ubus code 6 = PERMISSION_DENIED — rpcd ACL not configured for file reads
-                console.warn('[openwrt] DHCP leases unavailable:', e.message,
-                    '— add file read ACL in /usr/share/rpcd/acl.d/');
-            }),
-        discoverHostapdClients(url, session)
+        getDhcpLeaseCount(url, session)
+            .then(n => { dhcpLeases = n; }),
+        discoverWifiClients(url, session)
             .then(c => { clients2ghz = c.clients2ghz; clients5ghz = c.clients5ghz; }),
     ]);
 
     const callNames = [
         'system.board', 'system.info',
         'network.interface dump',
-        'file.read(/tmp/dhcp.leases)', 'hostapd',
+        'dhcp leases', 'hostapd',
     ];
     settled.forEach((r, i) => {
         if (r.status === 'rejected') {
@@ -243,4 +275,80 @@ async function getRouterSummary({ protocol, host, username, password }) {
     };
 }
 
-module.exports = { getRouterSummary, fmtUptime };
+async function getRouterClients({ protocol, host, username, password }) {
+    const url = `${protocol}://${host}/ubus`;
+    let session;
+    try {
+        session = await ubusLogin(url, username, password);
+    } catch (e) {
+        return { clients: [], _source: 'openwrt', error: `Login failed: ${e.message}` };
+    }
+
+    // Try zyxel.ap ubus bridge — gives band info (iface 2=2.4GHz, 3=5GHz)
+    try {
+        const d = await ubusCall(url, session, 'zyxel.ap', 'get_clients');
+        if (d && typeof d === 'object' && Object.keys(d).length > 0) {
+            const clients = Object.values(d).map(c => ({
+                mac:           c.macaddr || '—',
+                ipAddress:     c.ipaddr  || '—',
+                hostname:      c.ssid    || '',
+                iface:         c.band === '5GHz' ? 3 : 2,
+                signalStrength: typeof c.signal === 'number' ? c.signal : null,
+                _txRate:       c.tx_rate,
+                _rxRate:       c.rx_rate,
+                _band:         c.band,
+            }));
+            return { clients, _source: 'zyxel-ap-ubus' };
+        }
+    } catch (e) {
+        console.warn('[openwrt] zyxel.ap get_clients failed:', e.message);
+    }
+
+    // Fall back to DHCP leases (no band info)
+    let clients = [];
+    try {
+        const d = await ubusCall(url, session, 'luci-rpc', 'getDHCPLeases');
+        if (Array.isArray(d.dhcp_leases)) {
+            clients = d.dhcp_leases.map(l => ({
+                mac:      l.macaddr || '—',
+                ipAddress: l.ipaddr || '—',
+                hostname: l.hostname || '',
+                iface:    1,
+            }));
+        }
+    } catch (e) {
+        console.warn('[openwrt] getDHCPLeases failed:', e.message);
+    }
+    return { clients, _source: 'openwrt' };
+}
+
+async function getRouterInterfaces({ protocol, host, username, password }) {
+    const url = `${protocol}://${host}/ubus`;
+    let session;
+    try {
+        session = await ubusLogin(url, username, password);
+    } catch (e) {
+        return { networkInterfaces: [], _source: 'openwrt', error: `Login failed: ${e.message}` };
+    }
+    let networkInterfaces = [];
+    try {
+        const devStatus = await ubusCall(url, session, 'network.device', 'status', {});
+        networkInterfaces = Object.entries(devStatus).map(([name, dev]) => ({
+            name,
+            ethernet: { linkDetected: dev.up === true },
+            rxStats: {
+                bytes: dev.statistics?.rx_bytes ?? 0,
+                packets: dev.statistics?.rx_packets ?? 0,
+            },
+            txStats: {
+                bytes: dev.statistics?.tx_bytes ?? 0,
+                packets: dev.statistics?.tx_packets ?? 0,
+            },
+        }));
+    } catch (e) {
+        console.warn('[openwrt] network.device status failed:', e.message);
+    }
+    return { networkInterfaces, _source: 'openwrt' };
+}
+
+module.exports = { getRouterSummary, getRouterClients, getRouterInterfaces, fmtUptime };
