@@ -1334,12 +1334,13 @@ async function checkConnStatus() {
 async function refreshDashboard() {
   updateConnStatus('idle', 'Fetching…');
   try {
+    const bypass = getBypassMode();
     const [status, diagnostics, routerStatus, routerClients, routerNetworks] = await Promise.all([
       apiFetch('/dishy/status'),
       apiFetch('/dishy/diagnostics'),
-      apiFetch('/router/status'),
-      apiFetch('/router/clients'),
-      apiFetch('/router/networks'),
+      bypass ? Promise.resolve({}) : apiFetch('/router/status'),
+      bypass ? Promise.resolve({}) : apiFetch('/router/clients'),
+      bypass ? Promise.resolve({}) : apiFetch('/router/networks'),
     ]);
     const dev = status.deviceState || {};
     const alerts = status.alerts || diagnostics.alerts || {};
