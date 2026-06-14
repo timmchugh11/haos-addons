@@ -909,6 +909,7 @@ main:has(#page-dishy-alignment.active){
       <div class="card"><div class="label">Ethernet</div><div class="value" id="rcl-eth">—</div></div>
       <div class="card"><div class="label">2.4 GHz</div><div class="value" id="rcl-2g">—</div></div>
       <div class="card"><div class="label">5 GHz</div><div class="value" id="rcl-5g">—</div></div>
+      <div class="card"><div class="label">6 GHz</div><div class="value" id="rcl-6g">—</div></div>
     </div>
 
     <div class="box" style="margin-top:16px">
@@ -2468,10 +2469,11 @@ async function loadRouterStatus() {
         <td>${n.clientsEthernet ?? '—'}</td>
         <td>${n.clients2ghz ?? '—'}</td>
         <td>${n.clients5ghz ?? '—'}</td>
-        <td>${(n.clientsEthernet ?? 0) + (n.clients2ghz ?? 0) + (n.clients5ghz ?? 0)}</td>
+        <td>${n.clients6ghz ?? '—'}</td>
+        <td>${(n.clientsEthernet ?? 0) + (n.clients2ghz ?? 0) + (n.clients5ghz ?? 0) + (n.clients6ghz ?? 0)}</td>
       </tr>`).join('');
       hostedEl.innerHTML = `<table class="tbl" data-sort-id="router-status-networks">
-        <thead><tr><th>IPv4 Range</th><th>IPv6</th><th>Ethernet</th><th>2.4 GHz</th><th>5 GHz</th><th>Total</th></tr></thead>
+        <thead><tr><th>IPv4 Range</th><th>IPv6</th><th>Ethernet</th><th>2.4 GHz</th><th>5 GHz</th><th>6 GHz</th><th>Total</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
     }
@@ -2491,24 +2493,26 @@ async function loadRouterStatus() {
 // ROUTER CLIENTS
 // ════════════════════════════════════════════════════════════════════
 
-const IFACE_LABEL = { 0: 'Unknown', 1: 'Ethernet', 2: '2.4 GHz', 3: '5 GHz' };
+const IFACE_LABEL = { 0: 'Unknown', 1: 'Ethernet', 2: '2.4 GHz', 3: '5 GHz', 4: '6 GHz' };
 
 async function loadRouterClients() {
   try {
     const data = await apiFetch('/router/clients');
     const clients = data.clients || [];
 
-    let eth = 0, g2 = 0, g5 = 0;
+    let eth = 0, g2 = 0, g5 = 0, g6 = 0;
     clients.forEach(c => {
       if      (c.iface === 1) eth++;
       else if (c.iface === 2) g2++;
       else if (c.iface === 3) g5++;
+      else if (c.iface === 4) g6++;
     });
 
     set('rcl-total', String(clients.length));
     set('rcl-eth',   String(eth));
     set('rcl-2g',    String(g2));
     set('rcl-5g',    String(g5));
+    set('rcl-6g',    String(g6));
 
     const tableEl = document.getElementById('router-clients-table');
     if (!clients.length) {

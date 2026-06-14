@@ -136,12 +136,14 @@ async function discoverWifiClients(url, session) {
         const raw = (d && d.clients) ? d.clients : {};
         const entries = Object.values(raw);
         if (entries.length > 0) {
-            let clients2ghz = 0, clients5ghz = 0;
+            let clients2ghz = 0, clients5ghz = 0, clients6ghz = 0;
             for (const c of entries) {
-                if ((c.band || '').trim() === '5GHz') clients5ghz++;
-                else clients2ghz++;
+                const band = (c.band || '').trim();
+                if      (band === '5GHz') clients5ghz++;
+                else if (band === '6GHz') clients6ghz++;
+                else                      clients2ghz++;
             }
-            return { clients2ghz, clients5ghz };
+            return { clients2ghz, clients5ghz, clients6ghz };
         }
     } catch (_) {}
     // Fall back to hostapd ubus objects
@@ -197,7 +199,7 @@ async function getRouterSummary({ protocol, host, username, password }) {
         id: PH, hardwareVersion: PH, softwareVersion: PH, countryCode: PH,
         wanIp: PH, lanIpv4: PH, lanIpv6Count: 0,
         uptime: PH, uptimeSeconds: 0,
-        totalClients: 0, clientsEthernet: 0, clients2ghz: 0, clients5ghz: 0,
+        totalClients: 0, clientsEthernet: 0, clients2ghz: 0, clients5ghz: 0, clients6ghz: 0,
         statCards: { wan: PH, uptime: PH, clients: '0', bands: '0 / 0 / 0' },
         error: null, raw: {},
     };
@@ -212,7 +214,7 @@ async function getRouterSummary({ protocol, host, username, password }) {
 
     const raw = {};
     let board = {}, info = {}, wan = {}, lan = {};
-    let dhcpLeases = 0, clients2ghz = 0, clients5ghz = 0;
+    let dhcpLeases = 0, clients2ghz = 0, clients5ghz = 0, clients6ghz = 0;
 
     const settled = await Promise.allSettled([
         ubusCall(url, session, 'system', 'board')
@@ -232,7 +234,7 @@ async function getRouterSummary({ protocol, host, username, password }) {
         getDhcpLeaseCount(url, session)
             .then(n => { dhcpLeases = n; }),
         discoverWifiClients(url, session)
-            .then(c => { clients2ghz = c.clients2ghz; clients5ghz = c.clients5ghz; }),
+            .then(c => { clients2ghz = c.clients2ghz; clients5ghz = c.clients5ghz; clients6ghz = c.clients6ghz || 0; }),
     ]);
 
     const callNames = [
@@ -254,7 +256,7 @@ async function getRouterSummary({ protocol, host, username, password }) {
     const id              = board.hostname              ?? PH;
     const hardwareVersion = board.model                 ?? PH;
     const softwareVersion = board.release?.description ?? board.release?.version ?? PH;
-    const wifiClients     = clients2ghz + clients5ghz;
+    const wifiClients     = clients2ghz + clients5ghz + clients6ghz;
     const clientsEthernet = Math.max(0, dhcpLeases - wifiClients);
     const totalClients    = dhcpLeases;
 
@@ -263,12 +265,12 @@ async function getRouterSummary({ protocol, host, username, password }) {
         id, hardwareVersion, softwareVersion, countryCode: PH,
         wanIp, lanIpv4, lanIpv6Count,
         uptime, uptimeSeconds,
-        totalClients, clientsEthernet, clients2ghz, clients5ghz,
+        totalClients, clientsEthernet, clients2ghz, clients5ghz, clients6ghz,
         statCards: {
             wan:     wanIp,
             uptime,
             clients: String(totalClients),
-            bands:   `${clients2ghz} / ${clients5ghz} / ${clientsEthernet}`,
+            bands:   `${clients2ghz} / ${clients5ghz} / ${clients6ghz} / ${clientsEthernet}`,
         },
         error: null,
         raw,
@@ -330,7 +332,7 @@ async function getRouterClients({ protocol, host, username, password }) {
             mac,
             ipAddress:     l.ipaddr   || '—',
             hostname:      l.hostname || (w && w.hostname) || '',
-            iface:         w ? (w.band === '5GHz' ? 3 : 2) : 1,
+            iface:         w ? (w.band === '5GHz' ? 3 : w.band === '6GHz' ? 4 : 2) : 1,
             signalStrength: w ? w.signal : null,
             _txRate:       w ? w.txRate : null,
             _rxRate:       w ? w.rxRate : null,
@@ -346,7 +348,7 @@ async function getRouterClients({ protocol, host, username, password }) {
             mac,
             ipAddress:     w.ipaddr || '—',
             hostname:      w.hostname || '',
-            iface:         w.band === '5GHz' ? 3 : 2,
+            iface:         w.band === '5GHz' ? 3 : w.band === '6GHz' ? 4 : 2,
             signalStrength: w.signal,
             _txRate:       w.txRate,
             _rxRate:       w.rxRate,
