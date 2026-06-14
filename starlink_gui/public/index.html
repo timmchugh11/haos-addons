@@ -477,6 +477,9 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:18px 0}
 ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
 /* ── bypass mode ── */
 .bypass-active .router-item{display:none!important}
+/* When OpenWrt fill is active, re-show dashboard cards and Router Snapshot box */
+.bypass-openwrt .router-item.card{display:block!important}
+.bypass-openwrt .router-item.box{display:block!important}
 
 /* ── alignment map ── */
 main:has(#page-dishy-alignment.active){
@@ -1083,6 +1086,7 @@ const cfg = {
   dishPort: 9200,
   routerHost: '192.168.1.1',
   routerPort: 9000,
+  openwrtFillRouterBlanks: false,
 };
 const BASE = window.__BASE__ || '';
 
@@ -1225,9 +1229,14 @@ function getBypassMode() {
   try { return window.localStorage.getItem(STORAGE_KEYS.bypassMode) === '1'; } catch (_) { return false; }
 }
 
+function applyBypassClasses(enabled) {
+  document.body.classList.toggle('bypass-active', enabled);
+  document.body.classList.toggle('bypass-openwrt', enabled && cfg.openwrtFillRouterBlanks === true);
+}
+
 function setBypassMode(enabled) {
   try { window.localStorage.setItem(STORAGE_KEYS.bypassMode, enabled ? '1' : '0'); } catch (_) {}
-  document.body.classList.toggle('bypass-active', enabled);
+  applyBypassClasses(enabled);
   const chk = document.getElementById('cfg-bypass-mode');
   if (chk) chk.checked = enabled;
   if (enabled && currentPage.startsWith('router-')) navigate('dashboard');
@@ -1289,9 +1298,9 @@ function qs() {
   return `?dishHost=${encodeURIComponent(cfg.dishHost)}&dishPort=${cfg.dishPort}&routerHost=${encodeURIComponent(cfg.routerHost)}&routerPort=${cfg.routerPort}`;
 }
 
-async function apiFetch(path) {
+async function apiFetch(path, extra = '') {
   const base = window.__BASE__ || '';
-  const r = await fetch(base + '/api' + path + qs());
+  const r = await fetch(base + '/api' + path + qs() + extra);
   const j = await r.json();
   if (!j.ok) throw new Error(j.error || 'Unknown error');
   return j.data;
@@ -1335,55 +1344,43 @@ async function refreshDashboard() {
   updateConnStatus('idle', 'Fetching…');
   try {
     const bypass = getBypassMode();
-    const [status, diagnostics, routerStatus, routerClients, routerNetworks] = await Promise.all([
+    const [status, diagnostics, routerSumm] = await Promise.all([
       apiFetch('/dishy/status'),
       apiFetch('/dishy/diagnostics'),
-      bypass ? Promise.resolve({}) : apiFetch('/router/status'),
-      bypass ? Promise.resolve({}) : apiFetch('/router/clients'),
-      bypass ? Promise.resolve({}) : apiFetch('/router/networks'),
+      apiFetch('/router/summary', bypass ? '&bypass=1' : ''),
     ]);
-    const dev = status.deviceState || {};
+    const dev    = status.deviceState || {};
     const alerts = status.alerts || diagnostics.alerts || {};
-    const routerDev = routerStatus.deviceState || {};
-    const networks = routerNetworks.networks || [];
-    const clients = routerClients.clients || [];
-    const firstLan = networks[0] || {};
 
     const uptime = dev.uptimeS != null ? fmtUptime(dev.uptimeS) : '—';
-    const dl = status.downlinkThroughputBps != null ? (status.downlinkThroughputBps / 1e6).toFixed(1) : '—';
-    const ul = status.uplinkThroughputBps != null ? (status.uplinkThroughputBps / 1e6).toFixed(1) : '—';
-    const lat = status.popPingLatencyMs != null ? status.popPingLatencyMs.toFixed(1) : '—';
-    const obst = status.obstructionStats?.validS != null ? String(status.obstructionStats.validS) : '—';
-    const snr = diagnostics.hardwareSelfTest ?? '—';
+    const dl     = status.downlinkThroughputBps != null ? (status.downlinkThroughputBps / 1e6).toFixed(1) : '—';
+    const ul     = status.uplinkThroughputBps   != null ? (status.uplinkThroughputBps   / 1e6).toFixed(1) : '—';
+    const lat    = status.popPingLatencyMs       != null ? status.popPingLatencyMs.toFixed(1)             : '—';
+    const obst   = status.obstructionStats?.validS != null ? String(status.obstructionStats.validS)       : '—';
+    const snr    = diagnostics.hardwareSelfTest ?? '—';
     const dishHw = status.deviceInfo?.hardwareVersion ?? '—';
-    const routerUptime = routerDev.uptimeS != null ? fmtUptime(routerDev.uptimeS) : '—';
-    const wan = routerStatus.ipv4WanAddress ?? '—';
-    const totalClients = clients.length;
-    const eth = firstLan.clientsEthernet ?? clients.filter(c => c.iface === 1).length;
-    const g2 = firstLan.clients2ghz ?? clients.filter(c => c.iface === 2).length;
-    const g5 = firstLan.clients5ghz ?? clients.filter(c => c.iface === 3).length;
 
     const activeAlerts = Object.entries(alerts).filter(([,v]) => v === true);
 
-    set('d-state', dishHw);
-    set('d-dl', dl);
-    set('d-ul', ul);
-    set('d-lat', lat);
+    set('d-state',  dishHw);
+    set('d-dl',     dl);
+    set('d-ul',     ul);
+    set('d-lat',    lat);
     set('d-uptime', uptime);
-    set('d-obst', obst);
-    set('d-snr', snr);
+    set('d-obst',   obst);
+    set('d-snr',    snr);
     set('d-alerts', activeAlerts.length);
-    set('rd-wan', wan);
-    set('rd-uptime', routerUptime);
-    set('rd-clients', String(totalClients));
-    set('rd-bands', `${g2} / ${g5} / ${eth}`);
+    set('rd-wan',     routerSumm.statCards.wan);
+    set('rd-uptime',  routerSumm.statCards.uptime);
+    set('rd-clients', routerSumm.statCards.clients);
+    set('rd-bands',   routerSumm.statCards.bands);
 
     // colour
-    colorCard('d-dl', parseFloat(dl) > 50 ? 'blue' : parseFloat(dl) > 10 ? 'yellow' : 'red');
-    colorCard('d-ul', parseFloat(ul) > 10 ? 'blue' : parseFloat(ul) > 2 ? 'yellow' : 'red');
-    colorCard('d-lat', parseFloat(lat) < 80 ? 'green' : parseFloat(lat) < 200 ? 'yellow' : 'red');
+    colorCard('d-dl',  parseFloat(dl)  > 50  ? 'blue'  : parseFloat(dl)  > 10  ? 'yellow' : 'red');
+    colorCard('d-ul',  parseFloat(ul)  > 10  ? 'blue'  : parseFloat(ul)  > 2   ? 'yellow' : 'red');
+    colorCard('d-lat', parseFloat(lat) < 80  ? 'green' : parseFloat(lat) < 200 ? 'yellow' : 'red');
     colorCard('d-alerts', activeAlerts.length === 0 ? 'green' : 'red');
-    colorCard('rd-clients', totalClients > 0 ? 'blue' : 'yellow');
+    colorCard('rd-clients', routerSumm.totalClients > 0 ? 'blue' : 'yellow');
 
     const alertsEl = document.getElementById('dash-alerts-list');
     if (activeAlerts.length === 0) {
@@ -1396,29 +1393,33 @@ async function refreshDashboard() {
       ).join('');
     }
 
+    if (routerSumm.error && routerSumm.provider === 'openwrt') {
+      toast('OpenWrt: ' + routerSumm.error, 'err');
+    }
+
     const dishSummary = {
-      id: status.deviceInfo?.id ?? '—',
-      hardwareVersion: status.deviceInfo?.hardwareVersion ?? '—',
-      softwareVersion: status.deviceInfo?.softwareVersion ?? '—',
-      countryCode: status.deviceInfo?.countryCode ?? '—',
-      stowed: diagnostics.stowed ?? '—',
-      disablementCode: diagnostics.disablementCode ?? '—',
-      boresightAzimuthDeg: diagnostics.alignmentStats?.boresightAzimuthDeg ?? '—',
+      id:                    status.deviceInfo?.id ?? '—',
+      hardwareVersion:       status.deviceInfo?.hardwareVersion ?? '—',
+      softwareVersion:       status.deviceInfo?.softwareVersion ?? '—',
+      countryCode:           status.deviceInfo?.countryCode ?? '—',
+      stowed:                diagnostics.stowed ?? '—',
+      disablementCode:       diagnostics.disablementCode ?? '—',
+      boresightAzimuthDeg:   diagnostics.alignmentStats?.boresightAzimuthDeg ?? '—',
       boresightElevationDeg: diagnostics.alignmentStats?.boresightElevationDeg ?? '—',
-      desiredAzimuthDeg: diagnostics.alignmentStats?.desiredBoresightAzimuthDeg ?? '—',
-      desiredElevationDeg: diagnostics.alignmentStats?.desiredBoresightElevationDeg ?? '—',
+      desiredAzimuthDeg:     diagnostics.alignmentStats?.desiredBoresightAzimuthDeg ?? '—',
+      desiredElevationDeg:   diagnostics.alignmentStats?.desiredBoresightElevationDeg ?? '—',
     };
     const routerSummary = {
-      id: routerStatus.deviceInfo?.id ?? routerNetworks.id ?? '—',
-      hardwareVersion: routerStatus.deviceInfo?.hardwareVersion ?? routerNetworks.hardwareVersion ?? '—',
-      softwareVersion: routerStatus.deviceInfo?.softwareVersion ?? routerNetworks.softwareVersion ?? '—',
-      countryCode: routerStatus.deviceInfo?.countryCode ?? '—',
-      wanIp: wan,
-      lanIpv4: firstLan.ipv4 ?? '—',
-      lanIpv6Count: Array.isArray(firstLan.ipv6) ? firstLan.ipv6.length : 0,
-      clientsEthernet: eth,
-      clients2ghz: g2,
-      clients5ghz: g5,
+      id:              routerSumm.id,
+      hardwareVersion: routerSumm.hardwareVersion,
+      softwareVersion: routerSumm.softwareVersion,
+      countryCode:     routerSumm.countryCode,
+      wanIp:           routerSumm.wanIp,
+      lanIpv4:         routerSumm.lanIpv4,
+      lanIpv6Count:    routerSumm.lanIpv6Count,
+      clientsEthernet: routerSumm.clientsEthernet,
+      clients2ghz:     routerSumm.clients2ghz,
+      clients5ghz:     routerSumm.clients5ghz,
     };
     document.getElementById('dash-dish-summary').innerHTML = renderKVTable(dishSummary);
     document.getElementById('dash-router-summary').innerHTML = renderKVTable(routerSummary);
@@ -2921,10 +2922,11 @@ async function init() {
     persistIngressPath(base);
     const r = await fetch(base + '/api/config');
     const defaults = await r.json();
-    cfg.dishHost   = defaults.dishHost   || cfg.dishHost;
-    cfg.dishPort   = defaults.dishPort   || cfg.dishPort;
-    cfg.routerHost = defaults.routerHost || cfg.routerHost;
-    cfg.routerPort = defaults.routerPort || cfg.routerPort;
+    cfg.dishHost                = defaults.dishHost   || cfg.dishHost;
+    cfg.dishPort                = defaults.dishPort   || cfg.dishPort;
+    cfg.routerHost              = defaults.routerHost || cfg.routerHost;
+    cfg.routerPort              = defaults.routerPort || cfg.routerPort;
+    cfg.openwrtFillRouterBlanks = defaults.openwrtFillRouterBlanks === true;
   } catch (_) { /* fall back to hard-coded defaults */ }
 
   // Pre-populate settings form
@@ -2941,7 +2943,7 @@ async function init() {
 
   const bypass = getBypassMode();
   document.getElementById('cfg-bypass-mode').checked = bypass;
-  document.body.classList.toggle('bypass-active', bypass);
+  applyBypassClasses(bypass);
 
   applyInterval(false);
   checkConnStatus();

@@ -6,6 +6,7 @@ const fs    = require('fs');
 const path = require('path');
 const { Dishy } = require('@gibme/starlink');
 const { WiFiRouter } = require('@gibme/starlink');
+const { getRouterSummary: getOpenwrtRouterSummary, fmtUptime } = require('./openwrt');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,6 +16,13 @@ const DEFAULT_DISH_HOST   = process.env.DISH_HOST   || '192.168.100.1';
 const DEFAULT_DISH_PORT   = parseInt(process.env.DISH_PORT   || '9200', 10);
 const DEFAULT_ROUTER_HOST = process.env.ROUTER_HOST || '192.168.1.1';
 const DEFAULT_ROUTER_PORT = parseInt(process.env.ROUTER_PORT || '9000', 10);
+
+// OpenWrt optional fill for bypass mode
+const OPENWRT_FILL_ROUTER_BLANKS = process.env.OPENWRT_FILL_ROUTER_BLANKS === 'true';
+const OPENWRT_HOST     = process.env.OPENWRT_HOST     || '192.168.1.1';
+const OPENWRT_PROTOCOL = process.env.OPENWRT_PROTOCOL || 'http';
+const OPENWRT_USERNAME = process.env.OPENWRT_USERNAME || 'root';
+const OPENWRT_PASSWORD = process.env.OPENWRT_PASSWORD || '';
 
 // Read HTML files once at startup for ingress-path injection
 const INDEX_HTML        = fs.readFileSync(path.join(__dirname, 'public', 'index.html'),        'utf8');
@@ -509,6 +517,146 @@ app.get('/api/router/dump', async (req, res) => {
     res.json({ ok: true, data: await collectResults(specs) });
 });
 
+// ── Normalized router summary (Starlink | bypass placeholder | OpenWrt) ───────
+
+const PH = '—';
+
+function bypassPlaceholder() {
+    return {
+        provider: 'bypass',
+        id: PH, hardwareVersion: PH, softwareVersion: PH, countryCode: PH,
+        wanIp: PH, lanIpv4: PH, lanIpv6Count: 0,
+        uptime: PH, uptimeSeconds: 0,
+        totalClients: 0, clientsEthernet: 0, clients2ghz: 0, clients5ghz: 0,
+        statCards: { wan: PH, uptime: PH, clients: '0', bands: '0 / 0 / 0' },
+        error: null,
+    };
+}
+
+app.get('/api/router/summary', async (req, res) => {
+    const bypass = req.query.bypass === '1' || req.query.bypass === 'true';
+
+    if (bypass && OPENWRT_FILL_ROUTER_BLANKS) {
+        const summary = await getOpenwrtRouterSummary({
+            protocol: OPENWRT_PROTOCOL,
+            host: OPENWRT_HOST,
+            username: OPENWRT_USERNAME,
+            password: OPENWRT_PASSWORD,
+        }).catch(e => ({ ...bypassPlaceholder(), provider: 'openwrt', error: e.message }));
+        return res.json({ ok: true, data: summary });
+    }
+
+    if (bypass) {
+        return res.json({ ok: true, data: bypassPlaceholder() });
+    }
+
+    // Normal mode: normalize Starlink router data into the shared shape
+    const r1 = getRouter(req);
+    const r2 = getRouter(req);
+    const r3 = getRouter(req);
+    try {
+        const [sr, nr, cr] = await Promise.allSettled([
+            r1['handle']({ getStatus: {} })
+                .then(r => r.wifiGetStatus || {})
+                .finally(() => r1.close()),
+            r2.fetch_diagnostics()
+                .finally(() => r2.close()),
+            r3['handle']({ wifiGetClients: {} })
+                .then(r => r.wifiGetClients || {})
+                .finally(() => r3.close()),
+        ]);
+
+        const routerStatus   = sr.status === 'fulfilled' ? sr.value : {};
+        const routerNetworks = nr.status === 'fulfilled' ? nr.value : {};
+        const routerClients  = cr.status === 'fulfilled' ? cr.value : {};
+
+        const routerDev = routerStatus.deviceState || {};
+        const networks  = routerNetworks.networks  || [];
+        const clients   = Array.isArray(routerClients.clients) ? routerClients.clients : [];
+        const firstLan  = networks[0] || {};
+
+        const uptimeSeconds   = routerDev.uptimeS ?? 0;
+        const uptime          = uptimeSeconds > 0 ? fmtUptime(uptimeSeconds) : PH;
+        const wanIp           = routerStatus.ipv4WanAddress ?? PH;
+        const totalClients    = clients.length;
+        const eth             = firstLan.clientsEthernet ?? clients.filter(c => c.iface === 1).length;
+        const g2              = firstLan.clients2ghz     ?? clients.filter(c => c.iface === 2).length;
+        const g5              = firstLan.clients5ghz     ?? clients.filter(c => c.iface === 3).length;
+        const id              = routerStatus.deviceInfo?.id              ?? routerNetworks.id             ?? PH;
+        const hardwareVersion = routerStatus.deviceInfo?.hardwareVersion ?? routerNetworks.hardwareVersion ?? PH;
+        const softwareVersion = routerStatus.deviceInfo?.softwareVersion ?? routerNetworks.softwareVersion ?? PH;
+        const countryCode     = routerStatus.deviceInfo?.countryCode     ?? PH;
+        const lanIpv4         = firstLan.ipv4 ?? PH;
+        const lanIpv6Count    = Array.isArray(firstLan.ipv6) ? firstLan.ipv6.length : 0;
+
+        res.json({
+            ok: true,
+            data: {
+                provider: 'starlink',
+                id, hardwareVersion, softwareVersion, countryCode,
+                wanIp, lanIpv4, lanIpv6Count,
+                uptime, uptimeSeconds,
+                totalClients, clientsEthernet: eth, clients2ghz: g2, clients5ghz: g5,
+                statCards: {
+                    wan:     wanIp,
+                    uptime,
+                    clients: String(totalClients),
+                    bands:   `${g2} / ${g5} / ${eth}`,
+                },
+                error: null,
+            },
+        });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: e.message || String(e) });
+    }
+});
+
+// ── OpenWrt debug routes ──────────────────────────────────────────────────────
+
+function owrtHandle(res, fn) {
+    fn().then(data => res.json({ ok: true, data }))
+        .catch(e => res.status(500).json({ ok: false, error: e.message || String(e) }));
+}
+
+app.get('/api/openwrt/status', (req, res) => {
+    owrtHandle(res, () => getOpenwrtRouterSummary({
+        protocol: OPENWRT_PROTOCOL,
+        host: req.query.host || OPENWRT_HOST,
+        username: OPENWRT_USERNAME,
+        password: OPENWRT_PASSWORD,
+    }));
+});
+
+app.get('/api/openwrt/interfaces', (req, res) => {
+    owrtHandle(res, async () => {
+        const summary = await getOpenwrtRouterSummary({
+            protocol: OPENWRT_PROTOCOL,
+            host: req.query.host || OPENWRT_HOST,
+            username: OPENWRT_USERNAME,
+            password: OPENWRT_PASSWORD,
+        });
+        return { wan: summary.raw?.wan ?? null, lan: summary.raw?.lan ?? null };
+    });
+});
+
+app.get('/api/openwrt/clients', (req, res) => {
+    owrtHandle(res, async () => {
+        const summary = await getOpenwrtRouterSummary({
+            protocol: OPENWRT_PROTOCOL,
+            host: req.query.host || OPENWRT_HOST,
+            username: OPENWRT_USERNAME,
+            password: OPENWRT_PASSWORD,
+        });
+        return {
+            totalClients:    summary.totalClients,
+            clientsEthernet: summary.clientsEthernet,
+            clients2ghz:     summary.clients2ghz,
+            clients5ghz:     summary.clients5ghz,
+            leases:          summary.raw?.leases ?? null,
+        };
+    });
+});
+
 // ── Config endpoint (returns active defaults for the frontend) ────────────────
 
 app.get('/api/config', (_req, res) => {
@@ -517,6 +665,7 @@ app.get('/api/config', (_req, res) => {
         dishPort:   DEFAULT_DISH_PORT,
         routerHost: DEFAULT_ROUTER_HOST,
         routerPort: DEFAULT_ROUTER_PORT,
+        openwrtFillRouterBlanks: OPENWRT_FILL_ROUTER_BLANKS,
         cardModulePath: `/${CARD_MODULE_NAME}`,
         cardType: 'custom:starlink-combined-card',
     });

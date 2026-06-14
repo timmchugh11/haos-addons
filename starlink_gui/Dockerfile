@@ -14,7 +14,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 # Copy application files
-COPY server.js ./
+COPY server.js openwrt.js ./
 COPY public/ ./public/
 
 # Add and permission the entrypoint
@@ -23,7 +23,7 @@ RUN chmod a+x /run.sh
 
 # Required labels for HA Supervisor
 LABEL \
-    io.hass.version="1.1.30" \
+    io.hass.version="1.1.31" \
     io.hass.type="addon" \
     io.hass.arch="aarch64|amd64|armhf|armv7|i386"
 

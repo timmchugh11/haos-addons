@@ -35,9 +35,19 @@ options:
   dish_port: 9200
   router_host: "192.168.1.1"
   router_port: 9000
+  openwrt_fill_router_blanks: false
+  openwrt_host: "192.168.1.1"
+  openwrt_protocol: "http"
+  openwrt_username: "root"
+  openwrt_password: ""
 
 schema:
   dish_host: str
   dish_port: int
   router_host: str
   router_port: int
+  openwrt_fill_router_blanks: bool
+  openwrt_host: str
+  openwrt_protocol: list(http|https)
+  openwrt_username: str
+  openwrt_password: password
