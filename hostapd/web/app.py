@@ -731,6 +731,7 @@ def _setup_bridge_mode(bridge, uplink):
     gateway = _get_default_gateway()
     cmds = [
         ["ip", "link", "add", "name", bridge, "type", "bridge"],
+        ["ip", "link", "set", "dev", bridge, "type", "bridge", "stp_state", "0"],
         ["ip", "link", "set", uplink, "master", bridge],
         ["ip", "link", "set", bridge, "up"],
     ]
@@ -759,9 +760,7 @@ def _teardown_ap_bridge(bridge):
 
 
 def _teardown_bridge_mode(bridge, uplink, gateway=None, ip_prefix=None):
-    if gateway:
-        subprocess.run(["ip", "route", "del", "default"], capture_output=True)
-        subprocess.run(["ip", "route", "add", "default", "via", gateway, "dev", uplink], capture_output=True)
+    # Remove uplink from bridge and restore its IP before adding back the default route
     cmds = [
         ["ip", "link", "set", uplink, "nomaster"],
         ["ip", "link", "set", bridge, "down"],
@@ -771,6 +770,9 @@ def _teardown_bridge_mode(bridge, uplink, gateway=None, ip_prefix=None):
         cmds.append(["ip", "addr", "add", ip_prefix, "dev", uplink])
     for cmd in cmds:
         subprocess.run(cmd, capture_output=True)
+    if gateway:
+        subprocess.run(["ip", "route", "del", "default"], capture_output=True)
+        subprocess.run(["ip", "route", "add", "default", "via", gateway, "dev", uplink], capture_output=True)
 
 
 def _write_dnsmasq_config(dhcp_cfg):
@@ -1026,12 +1028,11 @@ def apply_config(cfg):
         wpa3 = bool(radio.get("wpa3"))
         hw_mode = HW_MODE.get(band, "g")
 
-        # Bring wifi iface up without IP — hostapd manages it via the bridge
+        # Bring wifi iface up without IP — hostapd adds it to the bridge via bridge= config
         for cmd in [
             ["ip", "link", "set", iface, "down"],
             ["iw", "dev", iface, "set", "type", "__ap"],
             ["ip", "addr", "flush", "dev", iface],
-            ["ip", "link", "set", iface, "master", bridge],
             ["ip", "link", "set", iface, "up"],
         ]:
             subprocess.run(cmd, capture_output=True)

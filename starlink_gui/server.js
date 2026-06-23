@@ -33,8 +33,6 @@ function owrtConfig() {
 const INDEX_HTML        = fs.readFileSync(path.join(__dirname, 'public', 'index.html'),        'utf8');
 const OBSTRUCTION_HTML  = fs.readFileSync(path.join(__dirname, 'public', 'obstruction.html'),  'utf8');
 const ALIGNMENT_HTML    = fs.readFileSync(path.join(__dirname, 'public', 'alignment.html'),    'utf8');
-const COMBINED_HTML     = fs.readFileSync(path.join(__dirname, 'public', 'combined.html'),     'utf8');
-const CARD_MODULE_NAME  = 'starlink-combined-card.js';
 
 app.use(cors());
 app.use(express.json());
@@ -716,17 +714,7 @@ app.get('/api/config', (_req, res) => {
         routerPort: DEFAULT_ROUTER_PORT,
         bypassMode:              BYPASS_MODE,
         openwrtFillRouterBlanks: OPENWRT_FILL_ROUTER_BLANKS,
-        cardModulePath: `/${CARD_MODULE_NAME}`,
-        cardType: 'custom:starlink-combined-card',
     });
-});
-
-app.get('/api/card-example', (_req, res) => {
-    res.type('text/plain; charset=utf-8').send([
-        'type: custom:starlink-combined-card',
-        'title: Starlink',
-        'aspect_ratio: 16:9',
-    ].join('\n'));
 });
 
 // ── Serve SPA — inject HA ingress base path so frontend fetch() calls work ────
@@ -757,12 +745,21 @@ function serveSimplePage(html) {
 
 app.get('/obstruction', serveSimplePage(OBSTRUCTION_HTML));
 app.get('/alignment',   serveSimplePage(ALIGNMENT_HTML));
-app.get('/combined',    serveSimplePage(COMBINED_HTML));
+app.get('/combined', (_req, res) => {
+    res.status(410).type('text/plain; charset=utf-8').send(
+        'The combined Lovelace iframe page has moved to the native Starlink custom integration.'
+    );
+});
 
-const CARD_PAGES = { obstruction: OBSTRUCTION_HTML, alignment: ALIGNMENT_HTML, combined: COMBINED_HTML };
+const SIMPLE_PAGES = { obstruction: OBSTRUCTION_HTML, alignment: ALIGNMENT_HTML };
 
 app.get('/', (req, res, next) => {
-    const page = CARD_PAGES[req.query.p];
+    if (req.query.p === 'combined') {
+        return res.status(410).type('text/plain; charset=utf-8').send(
+            'The combined Lovelace iframe page has moved to the native Starlink custom integration.'
+        );
+    }
+    const page = SIMPLE_PAGES[req.query.p];
     if (page) return serveSimplePage(page)(req, res);
     next();
 });

@@ -24,8 +24,5 @@ bashio::log.info "Router: ${ROUTER_HOST}:${ROUTER_PORT}"
 bashio::log.info "Bypass mode: ${BYPASS_MODE}"
 bashio::log.info "OpenWrt fill: ${OPENWRT_FILL_ROUTER_BLANKS} (host: ${OPENWRT_HOST})"
 bashio::log.info "Listening on port 3000"
-bashio::log.info "Publishing Lovelace card to /homeassistant/www/starlink-gui/starlink-combined-card.js"
-
-install -D -m 0644 /app/public/starlink-combined-card.js /homeassistant/www/starlink-gui/starlink-combined-card.js
 
 exec node /app/server.js

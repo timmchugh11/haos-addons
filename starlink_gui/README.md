@@ -11,7 +11,6 @@ open directly from the HA sidebar without publishing a separate public endpoint.
 ![Starlink gui screenshot](img/starlink-gui.png)
 
 - Live dashboard with dish and router summary cards
-- Bundled Lovelace custom card module for the combined Starlink page
 - Dish pages for:
   - status
   - diagnostics
@@ -128,37 +127,34 @@ you can leave it internal and use ingress only.
 - In bypass mode, the Settings page shows a read-only status indicator for
   bypass/OpenWrt state — these are controlled from HA add-on options, not the UI
 
-## Lovelace Resource
+## Lovelace Card
 
-Add the bundled module as a Lovelace resource:
+Lovelace card support has moved out of this add-on and into the native Home
+Assistant custom integration:
 
-`/local/starlink-gui/starlink-combined-card.js`
+<https://github.com/timmchugh11/starlink_custom>
 
-The add-on publishes this file into Home Assistant's `www` folder at startup, so
-Lovelace can always load the card module from Home Assistant's `/local` path.
+Install that integration through HACS as a custom repository using:
+
+`https://github.com/timmchugh11/starlink_custom`
+
+After the integration loads, add this JavaScript module as a Lovelace resource:
+
+`/starlink-static/starlink-obstruction-card.js`
 
 Then use:
 
 ```yaml
-type: custom:starlink-combined-card
+type: custom:starlink-obstruction-card
 title: Starlink
 aspect_ratio: 16:9
 ```
 
-Optional card fields:
-
-- `height`: fixed iframe height such as `420px`
-- `ingress_path`: manual ingress path override if automatic discovery is unavailable
-- `dish_host`: override the dish host for this card only
-- `dish_port`: override the dish gRPC port for this card only
-- `router_host`: override the router host for this card only
-- `router_port`: override the router gRPC port for this card only
-
 Important:
 
-- The card JavaScript is served from `/local`, but the embedded Starlink page still uses Home Assistant ingress.
-- If the ingress session is not active on a device, the card shows a custom fallback with a retry button instead of exposing the raw `401 Unauthorized` page.
-- When the add-on UI is opened through ingress, it stores the current ingress path in browser `localStorage` so the `/local` card can reuse it on later loads before falling back to Supervisor API discovery.
+- The add-on no longer publishes or serves a Lovelace card module.
+- The native custom integration serves the card at `/starlink-static/starlink-obstruction-card.js`.
+- This avoids Home Assistant ingress session issues for dashboard cards while keeping this add-on focused on the ingress GUI.
 
 ## Sky Obstruction Map
 

@@ -1047,8 +1047,17 @@ main:has(#page-dishy-alignment.active){
   </section>
 
   <section id="page-lovelace" class="page">
-    <div class="page-title">Lovelace Setup</div>
-    <div class="page-sub">The add-on also hosts a real `custom:starlink-combined-card` module. Load it as a Lovelace resource, then use the YAML below.</div>
+    <div class="page-title">Lovelace Card</div>
+    <div class="page-sub">Lovelace support now lives in the native Starlink custom integration. Install it through HACS as a custom repository, then add the resource and card below.</div>
+    <div class="box">
+      <div class="box-title">Custom Integration</div>
+      <div class="info-list">
+        <div class="info-line">
+          <strong>HACS Repository</strong>
+          <span>https://github.com/timmchugh11/starlink_custom</span>
+        </div>
+      </div>
+    </div>
     <div class="box">
       <div class="box-title">Resource URL</div>
       <div class="info-list">
@@ -2831,9 +2840,9 @@ function escHtml(value) {
 }
 
 function updateLovelaceSetup() {
-  document.getElementById('resource-url').textContent = '/local/starlink-gui/starlink-combined-card.js';
+  document.getElementById('resource-url').textContent = '/starlink-static/starlink-obstruction-card.js';
   document.getElementById('yaml-snippet').textContent = [
-    'type: custom:starlink-combined-card',
+    'type: custom:starlink-obstruction-card',
     'title: Starlink',
     'aspect_ratio: 16:9',
   ].join('\n');
