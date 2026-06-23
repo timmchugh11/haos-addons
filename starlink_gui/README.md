@@ -247,4 +247,4 @@ python test_endpoint.py                          # full test
 
 ## Current Version
 
-The add-on version is `1.1.36`.
+The add-on version is `1.1.37`.

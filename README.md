@@ -48,7 +48,7 @@ RFCOMM/SPP, reads NMEA sentences, and publishes a Home Assistant
 
 ### Starlink GUI
 
-[![version](https://img.shields.io/badge/version-1.1.22-blue.svg)](starlink_gui/config.yaml)
+[![version](https://img.shields.io/badge/version-1.1.37-blue.svg)](starlink_gui/config.yaml)
 
 ![Starlink gui screenshot](starlink_gui/img/starlink-gui.png)
 
