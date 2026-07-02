@@ -1,6 +1,6 @@
 name: "Nginx Proxy"
 description: "Expose a local network HTTP web page through Home Assistant ingress"
-version: "0.1.1"
+version: "0.1.2"
 slug: "nginx_proxy"
 init: false
 stage: "experimental"
@@ -19,6 +19,7 @@ ingress: true
 ingress_port: 8099
 panel_icon: mdi:web
 panel_title: Proxy
+host_network: true
 
 options:
   target_url: "http://192.168.1.100/"

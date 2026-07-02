@@ -43,6 +43,9 @@ server {
     listen 8099 default_server;
     server_name _;
 
+    access_log /dev/stdout;
+    error_log /dev/stderr info;
+
     proxy_http_version 1.1;
     proxy_buffering off;
     proxy_read_timeout 3600s;
