@@ -1,6 +1,6 @@
 name: "Proxmox Proxy"
 description: "Expose a local Proxmox web interface through Home Assistant ingress"
-version: "0.1.12"
+version: "0.1.13"
 slug: "proxmox_proxy"
 init: false
 stage: "experimental"
