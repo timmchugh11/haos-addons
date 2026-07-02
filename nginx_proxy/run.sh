@@ -27,6 +27,9 @@ if [ "${REWRITE_ABSOLUTE_PATHS}" = "true" ]; then
         proxy_set_header Accept-Encoding "";
         sub_filter_once off;
         sub_filter_types text/css application/javascript text/javascript;
+        sub_filter "http://$http_host" "https://$host";
+        sub_filter "http://$host:8099" "https://$host";
+        sub_filter "http://$host" "https://$host";
         sub_filter "href=\"/" "href=\"$http_x_ingress_path/";
         sub_filter "src=\"/" "src=\"$http_x_ingress_path/";
         sub_filter "action=\"/" "action=\"$http_x_ingress_path/";
@@ -37,6 +40,11 @@ cat > /etc/nginx/http.d/default.conf <<EOF
 map \$http_upgrade \$connection_upgrade {
     default upgrade;
     '' close;
+}
+
+map \$http_x_forwarded_proto \$external_proto {
+    default \$http_x_forwarded_proto;
+    '' https;
 }
 
 server {
@@ -59,8 +67,12 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Host \$host;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Proto \$external_proto;
+        proxy_set_header X-Forwarded-Ssl on;
+        proxy_set_header X-Forwarded-Port 443;
         proxy_set_header X-Forwarded-Prefix \$http_x_ingress_path;
+        proxy_redirect http://\$host:8099/ https://\$host/;
+        proxy_redirect http://\$host/ https://\$host/;
         proxy_redirect ~^(/.*)\$ \$http_x_ingress_path\$1;${SUB_FILTERS}
     }
 }
