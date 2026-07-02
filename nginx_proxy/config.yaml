@@ -1,6 +1,6 @@
 name: "Nginx Proxy"
 description: "Expose a local network HTTP web page through Home Assistant ingress"
-version: "0.1.0"
+version: "0.1.1"
 slug: "nginx_proxy"
 init: false
 stage: "experimental"

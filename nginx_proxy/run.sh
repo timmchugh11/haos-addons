@@ -26,7 +26,7 @@ if [ "${REWRITE_ABSOLUTE_PATHS}" = "true" ]; then
   SUB_FILTERS='
         proxy_set_header Accept-Encoding "";
         sub_filter_once off;
-        sub_filter_types text/html text/css application/javascript text/javascript;
+        sub_filter_types text/css application/javascript text/javascript;
         sub_filter "href=\"/" "href=\"$http_x_ingress_path/";
         sub_filter "src=\"/" "src=\"$http_x_ingress_path/";
         sub_filter "action=\"/" "action=\"$http_x_ingress_path/";
