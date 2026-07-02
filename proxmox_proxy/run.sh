@@ -45,14 +45,14 @@ if [ "${REWRITE_ABSOLUTE_PATHS}" = "true" ]; then
         sub_filter \"href=\\\"/\" \"href=\\\"\$http_x_ingress_path/\";
         sub_filter \"src=\\\"/\" \"src=\\\"\$http_x_ingress_path/\";
         sub_filter \"action=\\\"/\" \"action=\\\"\$http_x_ingress_path/\";
-        sub_filter \"\\\"/api2/\" \"\\\"api2/\";
-        sub_filter \"'/api2/\" \"'api2/\";
-        sub_filter \"\\\"/pve2/\" \"\\\"pve2/\";
-        sub_filter \"'/pve2/\" \"'pve2/\";
-        sub_filter \"\\\"/novnc/\" \"\\\"novnc/\";
-        sub_filter \"'/novnc/\" \"'novnc/\";
-        sub_filter \"\\\"/xtermjs/\" \"\\\"xtermjs/\";
-        sub_filter \"'/xtermjs/\" \"'xtermjs/\";
+        sub_filter \"\\\"/api2/\" \"window.location.pathname.replace(/\\/\$/, '') + \\\"/api2/\";
+        sub_filter \"'/api2/\" \"window.location.pathname.replace(/\\/\$/, '') + '/api2/\";
+        sub_filter \"\\\"/pve2/\" \"window.location.pathname.replace(/\\/\$/, '') + \\\"/pve2/\";
+        sub_filter \"'/pve2/\" \"window.location.pathname.replace(/\\/\$/, '') + '/pve2/\";
+        sub_filter \"\\\"/novnc/\" \"window.location.pathname.replace(/\\/\$/, '') + \\\"/novnc/\";
+        sub_filter \"'/novnc/\" \"window.location.pathname.replace(/\\/\$/, '') + '/novnc/\";
+        sub_filter \"\\\"/xtermjs/\" \"window.location.pathname.replace(/\\/\$/, '') + \\\"/xtermjs/\";
+        sub_filter \"'/xtermjs/\" \"window.location.pathname.replace(/\\/\$/, '') + '/xtermjs/\";
         sub_filter \"url(/\" \"url(\$http_x_ingress_path/\";"
 fi
 
