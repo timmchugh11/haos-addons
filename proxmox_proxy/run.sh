@@ -102,6 +102,8 @@ server {
         proxy_hide_header Service-Worker-Allowed;
         add_header Cache-Control "no-store";
         add_header X-Proxmox-Proxy "1" always;
+        add_header X-Proxmox-Upstream-Status \$upstream_status always;
+        add_header X-Proxmox-Upstream-Content-Type \$upstream_http_content_type always;
         proxy_ssl_server_name on;
         proxy_ssl_verify ${PROXY_SSL_VERIFY};
         proxy_redirect ${TARGET_ORIGIN}/ \$external_proto://\$host\$http_x_ingress_path/;
