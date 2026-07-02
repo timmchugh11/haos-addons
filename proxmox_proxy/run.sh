@@ -44,6 +44,17 @@ if [ "${REWRITE_ABSOLUTE_PATHS}" = "true" ]; then
         sub_filter \"href=\\\"/\" \"href=\\\"./\";
         sub_filter \"src=\\\"/\" \"src=\\\"./\";
         sub_filter \"action=\\\"/\" \"action=\\\"./\";
+        sub_filter \"href='/\" \"href='./\";
+        sub_filter \"src='/\" \"src='./\";
+        sub_filter \"action='/\" \"action='./\";
+        sub_filter \"\\\"/novnc/\" \"\\\"./novnc/\";
+        sub_filter \"'/novnc/\" \"'./novnc/\";
+        sub_filter \"\\\"/xtermjs/\" \"\\\"./xtermjs/\";
+        sub_filter \"'/xtermjs/\" \"'./xtermjs/\";
+        sub_filter \"\\\"/api2/\" \"\\\"./api2/\";
+        sub_filter \"'/api2/\" \"'./api2/\";
+        sub_filter \"\\\"/pve2/\" \"\\\"./pve2/\";
+        sub_filter \"'/pve2/\" \"'./pve2/\";
         sub_filter \"</head>\" \"<script>(function(){function b(){var p=window.location.pathname;if(p.endsWith('/'))p=p.slice(0,-1);return p;}function r(u){if(typeof u!=='string')return u;var o=window.location.origin;if(u.indexOf(o+'/?')===0)return o+b()+u.slice(o.length);if(u.charAt(0)==='?')return b()+'/'+u;if(u.indexOf('/?')===0)return b()+u;if(u.charAt(0)==='/'&&(u.indexOf('/api2/')===0||u.indexOf('/pve2/')===0||u.indexOf('/novnc/')===0||u.indexOf('/xtermjs/')===0))return b()+u;return u;}var xo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){arguments[1]=r(u);return xo.apply(this,arguments);};var wo=window.open;window.open=function(u,n,f){return wo.call(this,r(u),n,f);};var sa=Element.prototype.setAttribute;Element.prototype.setAttribute=function(n,v){var k=String(n).toLowerCase();if(k==='src'||k==='href'||k==='action')v=r(v);return sa.call(this,n,v);};function ps(c,p){var d=Object.getOwnPropertyDescriptor(c.prototype,p);if(!d||!d.set)return;Object.defineProperty(c.prototype,p,{get:d.get,set:function(v){return d.set.call(this,r(v));}});}ps(HTMLIFrameElement,'src');ps(HTMLAnchorElement,'href');ps(HTMLFormElement,'action');document.addEventListener('click',function(e){var c=e.target&&e.target.closest;if(!c)return;var a=e.target.closest('a[href]');if(!a)return;var h=a.getAttribute('href');var nh=r(h);if(nh!==h)a.setAttribute('href',nh);},true);if(window.fetch){var fo=window.fetch;window.fetch=function(i,n){if(typeof i==='string')i=r(i);else if(i&&i.url)i=new Request(r(i.url),i);return fo.call(this,i,n);};}})();</script></head>\";
         sub_filter \"url(/\" \"url(\$http_x_ingress_path/\";"
 fi
