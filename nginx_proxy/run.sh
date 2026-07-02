@@ -45,6 +45,14 @@ if [ "${REWRITE_ABSOLUTE_PATHS}" = "true" ]; then
         sub_filter \"href=\\\"/\" \"href=\\\"\$http_x_ingress_path/\";
         sub_filter \"src=\\\"/\" \"src=\\\"\$http_x_ingress_path/\";
         sub_filter \"action=\\\"/\" \"action=\\\"\$http_x_ingress_path/\";
+        sub_filter \"\\\"/api2/\" \"\\\"\$http_x_ingress_path/api2/\";
+        sub_filter \"'/api2/\" \"'\$http_x_ingress_path/api2/\";
+        sub_filter \"\\\"/pve2/\" \"\\\"\$http_x_ingress_path/pve2/\";
+        sub_filter \"'/pve2/\" \"'\$http_x_ingress_path/pve2/\";
+        sub_filter \"\\\"/novnc/\" \"\\\"\$http_x_ingress_path/novnc/\";
+        sub_filter \"'/novnc/\" \"'\$http_x_ingress_path/novnc/\";
+        sub_filter \"\\\"/xtermjs/\" \"\\\"\$http_x_ingress_path/xtermjs/\";
+        sub_filter \"'/xtermjs/\" \"'\$http_x_ingress_path/xtermjs/\";
         sub_filter \"url(/\" \"url(\$http_x_ingress_path/\";"
 fi
 
