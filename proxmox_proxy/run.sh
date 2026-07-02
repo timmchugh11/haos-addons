@@ -53,6 +53,7 @@ if [ "${REWRITE_ABSOLUTE_PATHS}" = "true" ]; then
         sub_filter \"'/novnc/\" \"(window.location.pathname.endsWith('/') ? window.location.pathname.slice(0,-1) : window.location.pathname) + '/novnc/\";
         sub_filter \"\\\"/xtermjs/\" \"(window.location.pathname.endsWith('/') ? window.location.pathname.slice(0,-1) : window.location.pathname) + \\\"/xtermjs/\";
         sub_filter \"'/xtermjs/\" \"(window.location.pathname.endsWith('/') ? window.location.pathname.slice(0,-1) : window.location.pathname) + '/xtermjs/\";
+        sub_filter \"</head>\" \"<script>(function(){function r(u){if(typeof u==='string'&&u.charAt(0)==='/'&&(u.indexOf('/api2/')===0||u.indexOf('/pve2/')===0||u.indexOf('/novnc/')===0||u.indexOf('/xtermjs/')===0)){var b=window.location.pathname;if(b.endsWith('/'))b=b.slice(0,-1);return b+u;}return u;}var xo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){arguments[1]=r(u);return xo.apply(this,arguments);};if(window.fetch){var fo=window.fetch;window.fetch=function(i,n){if(typeof i==='string')i=r(i);else if(i&&i.url)i=new Request(r(i.url),i);return fo.call(this,i,n);};}})();</script></head>\";
         sub_filter \"url(/\" \"url(\$http_x_ingress_path/\";"
 fi
 
