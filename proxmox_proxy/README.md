@@ -1,6 +1,6 @@
-# Nginx Proxy
+# Proxmox Proxy
 
-Expose one HTTP or HTTPS web page from your local network through Home Assistant ingress.
+Expose a local Proxmox web interface through Home Assistant ingress.
 
 This is intended for devices or services that are available from the Home Assistant host on plain HTTP, for example:
 
@@ -21,4 +21,4 @@ When the add-on is opened through Home Assistant, including over Nabu Casa cloud
 
 ## Notes
 
-Some web applications assume they are hosted at `/` and may use JavaScript-generated absolute URLs. The path rewrite option covers common static HTML/CSS cases, but some applications may still need app-specific base URL settings.
+Proxmox assumes it is hosted at `/` and uses absolute API/static paths. This add-on rewrites common Proxmox paths so they are requested through the Home Assistant ingress URL.

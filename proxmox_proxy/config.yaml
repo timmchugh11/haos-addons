@@ -1,7 +1,7 @@
-name: "Nginx Proxy"
-description: "Expose a local network HTTP web page through Home Assistant ingress"
-version: "0.1.5"
-slug: "nginx_proxy"
+name: "Proxmox Proxy"
+description: "Expose a local Proxmox web interface through Home Assistant ingress"
+version: "0.1.7"
+slug: "proxmox_proxy"
 init: false
 stage: "experimental"
 
@@ -18,7 +18,7 @@ boot: auto
 ingress: true
 ingress_port: 8099
 panel_icon: mdi:web
-panel_title: Proxy
+panel_title: Proxmox
 host_network: true
 
 options:

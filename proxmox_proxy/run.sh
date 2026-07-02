@@ -40,19 +40,19 @@ if [ "${REWRITE_ABSOLUTE_PATHS}" = "true" ]; then
   SUB_FILTERS="
         proxy_set_header Accept-Encoding \"\";
         sub_filter_once off;
-        sub_filter_types text/css application/javascript text/javascript;
+        sub_filter_types *;
         sub_filter \"${TARGET_ORIGIN}\" \"\$external_proto://\$host\$http_x_ingress_path\";
         sub_filter \"href=\\\"/\" \"href=\\\"\$http_x_ingress_path/\";
         sub_filter \"src=\\\"/\" \"src=\\\"\$http_x_ingress_path/\";
         sub_filter \"action=\\\"/\" \"action=\\\"\$http_x_ingress_path/\";
-        sub_filter \"\\\"/api2/\" \"\\\"\$http_x_ingress_path/api2/\";
-        sub_filter \"'/api2/\" \"'\$http_x_ingress_path/api2/\";
-        sub_filter \"\\\"/pve2/\" \"\\\"\$http_x_ingress_path/pve2/\";
-        sub_filter \"'/pve2/\" \"'\$http_x_ingress_path/pve2/\";
-        sub_filter \"\\\"/novnc/\" \"\\\"\$http_x_ingress_path/novnc/\";
-        sub_filter \"'/novnc/\" \"'\$http_x_ingress_path/novnc/\";
-        sub_filter \"\\\"/xtermjs/\" \"\\\"\$http_x_ingress_path/xtermjs/\";
-        sub_filter \"'/xtermjs/\" \"'\$http_x_ingress_path/xtermjs/\";
+        sub_filter \"\\\"/api2/\" \"\\\"api2/\";
+        sub_filter \"'/api2/\" \"'api2/\";
+        sub_filter \"\\\"/pve2/\" \"\\\"pve2/\";
+        sub_filter \"'/pve2/\" \"'pve2/\";
+        sub_filter \"\\\"/novnc/\" \"\\\"novnc/\";
+        sub_filter \"'/novnc/\" \"'novnc/\";
+        sub_filter \"\\\"/xtermjs/\" \"\\\"xtermjs/\";
+        sub_filter \"'/xtermjs/\" \"'xtermjs/\";
         sub_filter \"url(/\" \"url(\$http_x_ingress_path/\";"
 fi
 
