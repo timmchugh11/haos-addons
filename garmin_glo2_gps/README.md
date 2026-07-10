@@ -15,6 +15,8 @@ Home Assistant OS add-on for the Garmin GLO 2 Bluetooth GPS receiver. Connects o
 | --- | --- | --- |
 | `bluetooth_mac` | `AA:BB:CC:DD:EE:FF` | Bluetooth MAC address of the Garmin GLO 2 |
 | `rfcomm_channel` | `1` | RFCOMM/SPP channel number |
+| `poll_interval` | `30` | Seconds between GPS update cycles. The add-on disconnects from the Garmin between cycles. |
+| `read_timeout` | `8` | Maximum seconds to hold the Bluetooth connection open while waiting for fresh NMEA data. |
 | `debug` | `true` | Log every raw NMEA sentence |
 
 ## Pair the Garmin first
@@ -43,6 +45,8 @@ device_tracker.garmin_glo2
 When a GPS fix is active, it carries `latitude`, `longitude`, and `gps_accuracy` attributes so it appears on the Home Assistant map and participates in zone automation. Additional attributes include `altitude`, `speed_knots`, `course`, `satellites`, `hdop`, and `timestamp`.
 
 State is `not_home` with a fix, `unknown` without one.
+
+By default the add-on connects to the Garmin every 30 seconds, reads fresh NMEA data for up to 8 seconds, publishes one Home Assistant update, and then disconnects. This keeps the Bluetooth adapter free between GPS updates for other Bluetooth devices.
 
 ## Requirements
 

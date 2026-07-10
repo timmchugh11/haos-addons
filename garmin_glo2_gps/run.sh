@@ -59,10 +59,14 @@ read_option() {
 
 BLUETOOTH_MAC="$(read_option bluetooth_mac "AA:BB:CC:DD:EE:FF")"
 RFCOMM_CHANNEL="$(read_option rfcomm_channel "1")"
+POLL_INTERVAL="$(read_option poll_interval "30")"
+READ_TIMEOUT="$(read_option read_timeout "8")"
 DEBUG="$(read_option debug "false")"
 
 export BLUETOOTH_MAC
 export RFCOMM_CHANNEL
+export POLL_INTERVAL
+export READ_TIMEOUT
 export DEBUG
 
 run_or_warn() {
@@ -75,6 +79,8 @@ run_or_warn() {
 log_info "Garmin GLO2 GPS add-on starting"
 log_info "Configured MAC: ${BLUETOOTH_MAC}"
 log_info "Configured RFCOMM channel: ${RFCOMM_CHANNEL}"
+log_info "Configured poll interval: ${POLL_INTERVAL}s"
+log_info "Configured read timeout: ${READ_TIMEOUT}s"
 log_info "Publish method: Home Assistant Core API"
 
 run_or_warn "uname -a" uname -a

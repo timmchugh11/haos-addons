@@ -150,17 +150,20 @@ def parse_message(line: str, state: GpsState) -> bool:
 
 
 def reader_loop() -> None:
-    """Read NMEA data over a direct Bluetooth RFCOMM socket, reconnecting after failures."""
+    """Poll NMEA data over Bluetooth RFCOMM, disconnecting between updates."""
     mac = os.getenv("BLUETOOTH_MAC", "AA:BB:CC:DD:EE:FF")
     channel = int(os.getenv("RFCOMM_CHANNEL", "1"))
     debug = os.getenv("DEBUG", "false").lower() == "true"
-    publish_interval = 1.0
-    last_publish = 0.0
-    state = GpsState()
+    poll_interval = max(5, int(os.getenv("POLL_INTERVAL", "30")))
+    read_timeout = max(1, int(os.getenv("READ_TIMEOUT", "8")))
     publisher = Publisher()
 
     try:
         while True:
+            cycle_started = time_module.monotonic()
+            state = GpsState()
+            updated = False
+            published = False
             sock = None
             try:
                 LOGGER.info("Connecting to %s channel %s", mac, channel)
@@ -170,8 +173,10 @@ def reader_loop() -> None:
                 sock.setblocking(True)
                 LOGGER.info("RFCOMM connected")
                 buf = b""
-                while True:
-                    readable, _, _ = select.select([sock], [], [], 1.0)
+                read_deadline = time_module.monotonic() + read_timeout
+                while time_module.monotonic() < read_deadline:
+                    timeout = max(0.1, min(1.0, read_deadline - time_module.monotonic()))
+                    readable, _, _ = select.select([sock], [], [], timeout)
                     if not readable:
                         continue
                     chunk = sock.recv(4096)
@@ -187,11 +192,18 @@ def reader_loop() -> None:
                         if debug:
                             LOGGER.info("NMEA: %s", line)
                         if parse_message(line, state):
-                            now = time_module.monotonic()
-                            if now - last_publish >= publish_interval:
+                            updated = True
+                            if state.fix and state.latitude is not None and state.longitude is not None:
                                 publisher.publish(state)
-                                last_publish = now
-                    time_module.sleep(1.0)
+                                published = True
+                                break
+                    if published:
+                        break
+                if updated and not published:
+                    publisher.publish(state)
+                    published = True
+                if not published:
+                    LOGGER.warning("No publish-worthy NMEA data received during %ss read window", read_timeout)
             except OSError as err:
                 LOGGER.warning("RFCOMM error: %s", err)
             finally:
@@ -200,7 +212,11 @@ def reader_loop() -> None:
                         sock.close()
                     except OSError:
                         pass
-            time_module.sleep(5)
+                    LOGGER.info("RFCOMM disconnected")
+            elapsed = time_module.monotonic() - cycle_started
+            sleep_for = max(0.0, poll_interval - elapsed)
+            if sleep_for > 0:
+                time_module.sleep(sleep_for)
     finally:
         publisher.close()
 
