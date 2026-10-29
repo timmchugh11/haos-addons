@@ -149,74 +149,73 @@ def parse_message(line: str, state: GpsState) -> bool:
     return updated
 
 
+def stream_session(sock, publisher, interval: float, read_timeout: float, debug: bool) -> None:
+    """Keep one RFCOMM connection, consuming all input and publishing at a bounded rate."""
+    state = GpsState()
+    buf = b""
+    last_data = time_module.monotonic()
+    last_publish = float("-inf")
+    while True:
+        now = time_module.monotonic()
+        if now - last_data >= read_timeout:
+            raise OSError("NMEA stream timed out")
+        readable, _, _ = select.select([sock], [], [], min(1.0, read_timeout))
+        if not readable:
+            continue
+        chunk = sock.recv(4096)
+        if not chunk:
+            raise OSError("RFCOMM connection closed")
+        last_data = time_module.monotonic()
+        buf += chunk
+        if len(buf) > 65536:
+            raise OSError("NMEA input exceeded buffer limit")
+        while b"\n" in buf:
+            raw_line, buf = buf.split(b"\n", 1)
+            line = raw_line.decode("ascii", errors="ignore").strip()
+            if not line.startswith("$") or not parse_message(line, state):
+                continue
+            now = time_module.monotonic()
+            # RMC supplies the UTC timestamp, position, course and speed. GGA enriches it.
+            # Publish only a newly received RMC timestamp, never a stale GGA-only fix.
+            if line[3:6] != "RMC" or now - last_publish < interval:
+                continue
+            publisher.publish(state)
+            last_publish = now
+            if debug:
+                LOGGER.info("GPS published: fix=%s satellites=%s", state.fix, state.satellites)
+
+
 def reader_loop() -> None:
-    """Poll NMEA data over Bluetooth RFCOMM, disconnecting between updates."""
+    """Keep Bluetooth connected; reconnect with bounded backoff after loss."""
     mac = os.getenv("BLUETOOTH_MAC", "AA:BB:CC:DD:EE:FF")
     channel = int(os.getenv("RFCOMM_CHANNEL", "1"))
     debug = os.getenv("DEBUG", "false").lower() == "true"
-    poll_interval = max(5, int(os.getenv("POLL_INTERVAL", "30")))
-    read_timeout = max(1, int(os.getenv("READ_TIMEOUT", "8")))
+    interval = max(1.0, float(os.getenv("PUBLISH_INTERVAL", "1")))
+    read_timeout = max(3, int(os.getenv("READ_TIMEOUT", "8")))
     publisher = Publisher()
-
+    backoff = 1
     try:
         while True:
-            cycle_started = time_module.monotonic()
-            state = GpsState()
-            updated = False
-            published = False
             sock = None
+            started = time_module.monotonic()
             try:
-                LOGGER.info("Connecting to %s channel %s", mac, channel)
+                LOGGER.info("Connecting to Garmin RFCOMM channel %s", channel)
                 sock = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
                 sock.settimeout(10.0)
                 sock.connect((mac, channel))
                 sock.setblocking(True)
-                LOGGER.info("RFCOMM connected")
-                buf = b""
-                read_deadline = time_module.monotonic() + read_timeout
-                while time_module.monotonic() < read_deadline:
-                    timeout = max(0.1, min(1.0, read_deadline - time_module.monotonic()))
-                    readable, _, _ = select.select([sock], [], [], timeout)
-                    if not readable:
-                        continue
-                    chunk = sock.recv(4096)
-                    if not chunk:
-                        LOGGER.warning("Connection closed by device")
-                        break
-                    buf += chunk
-                    while b"\n" in buf:
-                        raw_line, buf = buf.split(b"\n", 1)
-                        line = raw_line.decode("ascii", errors="ignore").strip()
-                        if not line.startswith("$"):
-                            continue
-                        if debug:
-                            LOGGER.info("NMEA: %s", line)
-                        if parse_message(line, state):
-                            updated = True
-                            if state.fix and state.latitude is not None and state.longitude is not None:
-                                publisher.publish(state)
-                                published = True
-                                break
-                    if published:
-                        break
-                if updated and not published:
-                    publisher.publish(state)
-                    published = True
-                if not published:
-                    LOGGER.warning("No publish-worthy NMEA data received during %ss read window", read_timeout)
+                LOGGER.info("RFCOMM connected; publish interval %.1fs", interval)
+                stream_session(sock, publisher, interval, read_timeout, debug)
             except OSError as err:
                 LOGGER.warning("RFCOMM error: %s", err)
             finally:
                 if sock is not None:
-                    try:
-                        sock.close()
-                    except OSError:
-                        pass
-                    LOGGER.info("RFCOMM disconnected")
-            elapsed = time_module.monotonic() - cycle_started
-            sleep_for = max(0.0, poll_interval - elapsed)
-            if sleep_for > 0:
-                time_module.sleep(sleep_for)
+                    sock.close()
+            if time_module.monotonic() - started > 10:
+                backoff = 1
+            LOGGER.info("Reconnecting in %ss", backoff)
+            time_module.sleep(backoff)
+            backoff = min(30, backoff * 2)
     finally:
         publisher.close()
 

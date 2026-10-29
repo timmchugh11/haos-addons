@@ -15,9 +15,10 @@ Home Assistant OS add-on for the Garmin GLO 2 Bluetooth GPS receiver. Connects o
 | --- | --- | --- |
 | `bluetooth_mac` | `AA:BB:CC:DD:EE:FF` | Bluetooth MAC address of the Garmin GLO 2 |
 | `rfcomm_channel` | `1` | RFCOMM/SPP channel number |
-| `poll_interval` | `30` | Seconds between GPS update cycles. The add-on disconnects from the Garmin between cycles. |
-| `read_timeout` | `8` | Maximum seconds to hold the Bluetooth connection open while waiting for fresh NMEA data. |
-| `debug` | `true` | Log every raw NMEA sentence |
+| `publish_interval` | `1` | Minimum seconds between published RMC fixes; Bluetooth stays connected. |
+| `poll_interval` | `30` | Legacy option retained for upgrades; ignored since 0.5.0. |
+| `read_timeout` | `8` | Reconnect after this many seconds without NMEA data. |
+| `debug` | `true` | Log a concise summary for each published fix |
 
 ## Pair the Garmin first
 
@@ -53,3 +54,9 @@ By default the add-on connects to the Garmin every 30 seconds, reads fresh NMEA 
 - Home Assistant OS (HAOS)
 - Garmin GLO 2 paired to the HAOS host via Bluetooth Classic
 - Add-on config: `host_network: true`, `host_dbus: true`, `NET_ADMIN` / `NET_RAW` / `SYS_ADMIN` privileges
+
+## Continuous tracking (0.5.0)
+
+The RFCOMM connection stays open. RMC fixes are published at most once per `publish_interval` seconds; GGA enriches altitude, satellites and HDOP. Disconnects reconnect with 1–30 second backoff. Input buffering is limited to 64 KiB. The receiver must supply fresh RMC timestamps; stale fixes are never retimestamped.
+
+Offline stream tests: `python garmin_glo2_gps/test_stream.py`. Revert to 0.4.3 to restore the previous intermittent connection behaviour.
